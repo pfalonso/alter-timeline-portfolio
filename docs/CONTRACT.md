@@ -105,7 +105,7 @@ src/
 - **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados se atenúan/desvanecen con transición, no desaparecen en seco. Estado reflejado en la URL.
 - Marcas de año sobre el eje. HUD con nombre, tagline y contador de eventos visibles.
 - VFX: bloom, partículas fluyendo por las ramas, campo de polvo/estrellas con parallax, halo pulsante en nodos, niebla de profundidad, pulso al seleccionar.
-- Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog", aria-modal).
+- Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog" no modal: es un panel lateral y el resto sigue operable, así que no lleva `aria-modal` ni atrapa el foco; ver DOC_DISCREPANCIES A6).
 - Responsive (móvil: pop-up a pantalla completa, gestos táctiles). Fallback legible si no hay WebGL.
 - Rendimiento: partículas con `Points`/instancing, pixelRatio limitado a 2, pausar render con la pestaña oculta.
 

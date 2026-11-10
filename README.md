@@ -1383,7 +1383,7 @@ window.__timelineDebug.open('id')   // abre el pop-up de un evento
 | Alternativa a la escena 3D | Índice de eventos en DOM (lista ordenada de botones) con el mismo contenido y el mismo pop-up |
 | Enlace de salto | «Saltar al índice de eventos», primer elemento enfocable |
 | Teclado | Toda la navegación tiene atajo (ver [4.1](#41-navegación)). Los atajos no interfieren con `Enter` y `Espacio` sobre botones y enlaces |
-| Pop-up | `role="dialog"`, `aria-modal`, `aria-labelledby`. Atrapa el foco con `Tab` y `Shift`+`Tab`, y lo devuelve al elemento anterior al cerrar |
+| Pop-up | Diálogo **no modal**: `role="dialog"` y `aria-labelledby`, sin `aria-modal`, porque es un panel lateral y la escena, los filtros y el índice siguen operables. Al abrirse recibe el foco; `Tab` sale de él por el orden natural; al cerrarse devuelve el foco al elemento anterior (salvo que el usuario ya lo haya llevado a otro control) |
 | Lector de pantalla | Región `aria-live` que anuncia título, fechas y resumen del evento enfocado; el contador de eventos también es `aria-live` |
 | Filtros | Botones con `aria-pressed`, agrupados con `role="group"` y etiqueta |
 | Escena | `role="application"`, enfocable, con una etiqueta que explica los atajos y remite al índice |
@@ -1429,7 +1429,6 @@ Tomadas de `docs/DEV_NOTES.md` y del propio código. Para el estado de las compr
 | Docker | `docker build` sin ejecutar en el entorno de desarrollo (registros de imágenes bloqueados). La configuración de nginx sí se probó con un nginx local |
 | CI | El workflow de GitHub Actions no estaba en el repositorio al escribir esta documentación |
 | JSON Schema | No se valida contra el schema con ninguna librería; es documentación y ayuda para el editor |
-| Pop-up | Declara `aria-modal="true"` pero es un panel lateral: la escena, los filtros y el índice siguen siendo operables con el ratón |
 | Presupuesto de partículas | Se calcula al cargar; cambiar la preferencia de movimiento o el tamaño de ventana no lo recalcula hasta recargar |
 
 ### Hoja de ruta

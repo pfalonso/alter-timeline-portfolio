@@ -40,9 +40,3 @@ export function safeLink(label: string, url: string, className?: string): HTMLAn
   link.rel = 'noopener noreferrer';
   return link;
 }
-
-const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-export function focusableWithin(root: HTMLElement): HTMLElement[] {
-  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((node) => !node.hasAttribute('hidden'));
-}

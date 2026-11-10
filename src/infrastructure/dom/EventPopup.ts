@@ -5,12 +5,15 @@ import type {
 } from '../../application/ports';
 import type { LifeEvent, Timeline } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
-import { append, clear, el, focusableWithin, safeLink } from './dom';
+import { append, clear, el, safeLink } from './dom';
 import { STRINGS } from './strings';
 
 /**
- * Pop-up de detalle (role="dialog", aria-modal). Gestiona el foco: lo atrapa mientras está
- * abierto y lo devuelve al cerrar. Todo el contenido del JSON se pinta con textContent.
+ * Pop-up de detalle: diálogo NO modal (role="dialog" sin aria-modal). Es un panel lateral sin
+ * velo: la escena, los filtros y el índice siguen operables mientras está abierto, así que el
+ * foco tampoco se atrapa (Tab sale del panel con normalidad). Al abrir lleva el foco al panel y
+ * al cerrar lo devuelve, salvo que el usuario ya lo haya movido. Todo el contenido del JSON se
+ * pinta con textContent.
  */
 export class EventPopup implements TimelineViewPart {
   private handlers: TimelineViewHandlers | null = null;
@@ -33,7 +36,6 @@ export class EventPopup implements TimelineViewPart {
     private readonly keepOpenSelector = '[data-keep-popup]',
   ) {
     root.setAttribute('role', 'dialog');
-    root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'popup-title');
     root.tabIndex = -1;
     root.hidden = true;
@@ -45,7 +47,6 @@ export class EventPopup implements TimelineViewPart {
     this.closeButton.addEventListener('click', () => this.handlers?.onDetailClosed());
     this.prevButton.addEventListener('click', () => this.handlers?.onNavigate('previous'));
     this.nextButton.addEventListener('click', () => this.handlers?.onNavigate('next'));
-    root.addEventListener('keydown', (event) => this.trapFocus(event));
     document.addEventListener('pointerdown', (event) => this.onOutsidePointer(event));
   }
 
@@ -170,25 +171,6 @@ export class EventPopup implements TimelineViewPart {
       return el('figure', { class: 'popup__figure' }, [image, item.alt ? el('figcaption', { text: item.alt }) : null]);
     });
     return el('div', { class: 'popup__media' }, figures);
-  }
-
-  private trapFocus(event: KeyboardEvent): void {
-    if (event.key !== 'Tab' || this.openEventId === null) return;
-    const focusable = focusableWithin(this.root);
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || active === this.root)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
   }
 
   private onOutsidePointer(event: Event): void {
