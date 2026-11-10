@@ -163,6 +163,12 @@ describe('NodeLabels', () => {
     expect(shown(long)).toBe(false);
   });
 
+  it('un evento sin categoría conocida usa un acento neutro', () => {
+    const root = mount('div');
+    new NodeLabels(root).render(unsafeModel(buildModel(), { categories: [] }));
+    expect(root.querySelector<HTMLElement>('.node-label')?.style.getPropertyValue('--accent')).toBe('#ffffff');
+  });
+
   it('seguridad: los títulos se escriben como texto', () => {
     const root = mount('div');
     new NodeLabels(root).render(unsafeModel(buildModel(), { events: { 'a-school': { title: '<img src=x onerror=alert(1)>' } } }));

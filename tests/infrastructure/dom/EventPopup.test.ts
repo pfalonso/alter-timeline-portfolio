@@ -279,6 +279,29 @@ describe('EventPopup: gestión del foco', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('regresión (BUG-3): si el usuario ya ha llevado el foco a otro control, cerrar no se lo quita', () => {
+    const opener = mount('button');
+    const chip = mount('button', { 'data-keep-popup': '' });
+    opener.focus();
+    const { popup } = setup();
+    popup.applySelection(selection('c-side', true));
+    // P. ej. pulsa un chip de filtro que oculta el evento abierto: el foco está en el chip.
+    chip.focus();
+    popup.applySelection(selection(null, false));
+    expect(document.activeElement).toBe(chip);
+  });
+
+  it('si el foco se había perdido (está en <body>), al cerrar vuelve al elemento original', () => {
+    const opener = mount('button');
+    opener.focus();
+    const { root, popup } = setup();
+    popup.applySelection(selection('b-job', true));
+    root.blur();
+    expect(document.activeElement).toBe(document.body);
+    popup.applySelection(selection('b-job', false));
+    expect(document.activeElement).toBe(opener);
+  });
+
   it('si el elemento original ya no está en el documento, no falla', () => {
     const opener = mount('button');
     opener.focus();

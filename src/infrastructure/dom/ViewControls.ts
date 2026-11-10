@@ -16,7 +16,9 @@ export class ViewControls {
       button(STRINGS.overview, '◇', () => controls.showOverview()),
     );
     keyTarget.addEventListener('keydown', (event) => {
-      const key = (event as KeyboardEvent).key;
+      const { key, ctrlKey, metaKey, altKey } = event as KeyboardEvent;
+      // Ctrl/⌘ con +, − y 0 son el zoom del navegador: no se tocan.
+      if (ctrlKey || metaKey || altKey) return;
       const target = event.target;
       if (target instanceof Element && target.closest('input, textarea, select')) return;
       if (key === '+' || key === '=') controls.zoomBy(0.8);

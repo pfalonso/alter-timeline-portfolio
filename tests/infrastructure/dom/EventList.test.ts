@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventList } from '../../../src/infrastructure/dom/EventList';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
-import { cleanupDom, click, mount, press, texts } from '../../helpers/dom';
+import { cleanupDom, click, mount, press, texts, unsafeModel } from '../../helpers/dom';
 import { buildModel, fakeHandlers, selection } from '../../helpers/fixtures';
 
 afterEach(cleanupDom);
@@ -68,6 +68,13 @@ describe('EventList (índice accesible)', () => {
     expect(buttons(root).map((button) => button.getAttribute('aria-current'))).toEqual([null, null, 'true', null]);
     list.applySelection(selection(null));
     expect(root.querySelector('[aria-current]')).toBeNull();
+  });
+
+  it('un evento sin categoría conocida se lista igualmente, con acento neutro', () => {
+    const root = mount('nav');
+    new EventList(root).render(unsafeModel(buildModel(), { categories: [] }));
+    expect(texts(root, '.index__category')).toEqual(['', '', '', '']);
+    expect(buttons(root)[0].style.getPropertyValue('--accent')).toBe('#ffffff');
   });
 
   it('volver a pintar no duplica elementos', () => {
@@ -139,6 +146,40 @@ describe('EventList: abrir y cerrar', () => {
     const { root } = setup({ withToggle: false, hidden: false });
     press(buttons(root)[0], 'Escape');
     expect(root.hidden).toBe(false);
+  });
+
+  it('regresión (BUG-1): el enlace «saltar al índice» abre el panel oculto y lleva el foco a la lista', () => {
+    const skip = mount('a', { href: '#index', class: 'skip-link' });
+    const other = mount('a', { href: '#otra-cosa' });
+    const toggle = mount('button');
+    const root = mount('nav', { id: 'index' });
+    root.hidden = true;
+    const list = new EventList(root, toggle);
+    list.render(buildModel());
+
+    const ignored = new MouseEvent('click', { bubbles: true, cancelable: true });
+    other.dispatchEvent(ignored);
+    expect(root.hidden).toBe(true);
+    expect(ignored.defaultPrevented).toBe(false);
+
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    skip.dispatchEvent(event);
+    expect(root.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(buttons(root)[0]);
+    // Se gestiona aquí: un salto de ancla a un elemento que estaba oculto no mueve el foco.
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('el enlace de salto también funciona en modo sin WebGL (lista ya visible)', () => {
+    const skip = mount('a', { href: '#index' });
+    const root = mount('nav', { id: 'index' });
+    const list = new EventList(root);
+    list.render(buildModel());
+    list.showAsMainContent('aviso');
+    click(skip);
+    expect(root.hidden).toBe(false);
+    expect(document.activeElement).toBe(buttons(root)[0]);
   });
 
   it('modo sin WebGL: pasa a contenido principal, con aviso, y no se puede cerrar', () => {

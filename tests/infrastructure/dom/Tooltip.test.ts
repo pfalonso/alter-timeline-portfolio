@@ -79,6 +79,16 @@ describe('Tooltip', () => {
     expect(root.hidden).toBe(true);
   });
 
+  it('si el evento no tiene categoría conocida, no muestra etiqueta y usa un acento neutro', () => {
+    const root = mount('div');
+    const tooltip = new Tooltip(root);
+    tooltip.render(unsafeModel(buildModel(), { categories: [] }));
+    tooltip.onNodeHover('a-school', { x: 1, y: 1 });
+    expect(root.hidden).toBe(false);
+    expect(root.querySelector('.tooltip__category')?.textContent).toBe('');
+    expect(root.style.getPropertyValue('--accent')).toBe('#ffffff');
+  });
+
   it('seguridad: el título se escribe como texto', () => {
     const root = mount('div');
     const tooltip = new Tooltip(root);

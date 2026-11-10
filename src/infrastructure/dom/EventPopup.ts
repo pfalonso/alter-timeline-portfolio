@@ -88,10 +88,14 @@ export class EventPopup implements TimelineViewPart {
   private close(): void {
     if (this.openEventId === null) return;
     this.openEventId = null;
+    // Solo se devuelve el foco si sigue en el pop-up (o se ha perdido): si el usuario ya lo ha
+    // llevado a otro control (p. ej. un chip de filtro), no se le quita.
+    const active = document.activeElement;
+    const focusIsElsewhere = active !== null && active !== document.body && !this.root.contains(active);
     this.root.hidden = true;
     const target = this.returnFocus;
     this.returnFocus = null;
-    if (target && target.isConnected) target.focus({ preventScroll: true });
+    if (target && target.isConnected && !focusIsElsewhere) target.focus({ preventScroll: true });
   }
 
   private fill(event: LifeEvent): void {

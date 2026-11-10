@@ -60,6 +60,18 @@ describe('ViewControls', () => {
     expect(controls.showOverview).not.toHaveBeenCalled();
   });
 
+  it('regresión (BUG-2): no secuestra el zoom del navegador (Ctrl/⌘ con +, − y 0) ni atajos con Alt', () => {
+    const { keys, controls } = setup();
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { altKey: true }]) {
+      for (const key of ['+', '=', '-', '_', '0']) press(keys, key, modifier);
+    }
+    expect(controls.zoomBy).not.toHaveBeenCalled();
+    expect(controls.showOverview).not.toHaveBeenCalled();
+    // Mayúsculas sí: en muchos teclados "+" y "_" se escriben con Shift.
+    press(keys, '+', { shiftKey: true });
+    expect(controls.zoomBy).toHaveBeenCalledTimes(1);
+  });
+
   it('por defecto escucha en window', () => {
     const controls = { zoomBy: vi.fn(), showOverview: vi.fn() };
     new ViewControls(mount('div'), controls);

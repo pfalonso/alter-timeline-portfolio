@@ -143,10 +143,11 @@ Bloques del encargo (para reanudar si se corta la sesión):
 Resultados de la última pasada (10/11/2026):
 
 - `npm run lint`, `npm run typecheck`, `npm run build`: en verde.
-- `npm run test`: 6 tests de humo del dominio, en verde.
-- **`npm run test:coverage` falla el umbral** (≈20 % frente al 75 %): por encargo solo hay tests de
-  humo (`tests/domain/smoke.test.ts`); la batería completa la escribe otro agente. Hasta entonces
-  la cadena de calidad del contrato (`lint && typecheck && test:coverage && build`) no pasa entera.
+- `npm run test` / `npm run test:coverage`: 758 tests en 43 ficheros, en verde; cobertura global
+  99,67 % sentencias · 97,44 % ramas · 100 % funciones · 99,87 % líneas (umbral 75 %). La cadena de
+  calidad del contrato (`lint && typecheck && test:coverage && build`) pasa entera. Detalle por
+  capa, bugs corregidos y huecos en `docs/QA_REPORT.md`; cómo están organizados los tests, en la
+  sección «Tests» de más abajo.
 - **`docker build` no se ha podido ejecutar**: la política de red de este entorno deniega (403) los
   registros de imágenes (`registry-1.docker.io`; tampoco `public.ecr.aws`, `mirror.gcr.io`), así
   que `node:22-alpine` y `nginx:alpine` no se descargan. El `Dockerfile` y `docker-compose.yml`
@@ -170,3 +171,32 @@ Resultados de la última pasada (10/11/2026):
   podido medir en GPU real. El coste principal son el bloom y la nebulosa procedural a pantalla
   completa.
 - Probado solo en Chrome headless; sin pruebas en Firefox/Safari ni en dispositivos táctiles reales.
+
+## Tests (agente 3)
+
+`tests/` refleja `src/` (`domain/`, `application/`, `infrastructure/{http,storage,dom,three}`), más:
+
+- `tests/data/` — valida `public/data/life.example.json` con el validador del dominio.
+- `tests/security/` — inyección de HTML y URLs peligrosas, de punta a punta y capa a capa.
+- `tests/integration/` — la app cableada como en `main.ts` pero sin escena 3D (fetch falso →
+  repositorio → controlador → DOM y URL).
+- `tests/schema/` — coherencia entre `schema/life.schema.json` y el validador (sin `ajv`).
+- `tests/scripts/` — `scripts/validate-data.ts` en un proceso aparte (códigos de salida 0/1/2).
+- `tests/helpers/` — `fixtures.ts` (datos mínimos válidos, `buildModel`, handlers falsos),
+  `fakes.ts` (vista, repositorio y almacén falsos), `dom.ts` (`mount`, `press`, `unsafeModel`),
+  `three.ts` (planificador y visibilidad manuales, `frameContext`), `app.ts` (`mountApp`).
+
+Convenciones:
+
+- Nombres de test en español, describiendo el comportamiento. «Hoy» es siempre una fecha inyectada.
+- Los tests nunca leen `data/life.json`; usan `makeData()` o el JSON de ejemplo.
+- `unsafeModel()` construye un modelo SIN pasar por validador ni fábrica: es la forma de comprobar
+  que cada capa se defiende sola de datos hostiles.
+- jsdom normaliza `style.transform`; para posiciones usa `translation(element)` en vez de comparar
+  la cadena.
+- La capa three se prueba sin WebGL: objetos three reales (geometrías, materiales, cámara) y un
+  `RenderBackend` falso para `ThreeTimelineView`. Solo `webgl.test.ts` usa `vi.mock` (sustituye
+  `WebGLRenderer` y las pasadas de `three/examples/jsm/postprocessing`).
+- jsdom no trae `ResizeObserver`: `ThreeTimelineView.test.ts` lo sustituye con `vi.stubGlobal`.
+- No hay exclusiones de cobertura nuevas: siguen siendo `main.ts` y los ficheros que solo declaran
+  tipos.

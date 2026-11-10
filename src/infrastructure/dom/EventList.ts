@@ -27,6 +27,17 @@ export class EventList implements TimelineViewPart {
       toggleButton.setAttribute('aria-expanded', String(!root.hidden));
       toggleButton.addEventListener('click', () => this.setOpen(this.root.hidden !== false));
     }
+    // Los enlaces de salto (`<a href="#index">`) apuntan a un panel que empieza oculto: un salto
+    // de ancla normal no haría nada, así que se abre el índice y se lleva el foco a la lista.
+    if (root.id) {
+      for (const link of root.ownerDocument.querySelectorAll('a[href^="#"]')) {
+        if (link.getAttribute('href') !== `#${root.id}`) continue;
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          this.setOpen(true);
+        });
+      }
+    }
     root.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && this.toggleButton && !this.root.hidden) {
         event.stopPropagation();

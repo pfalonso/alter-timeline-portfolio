@@ -1,4 +1,4 @@
-import { Scene } from 'three';
+import { Scene, type BufferAttribute } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { BranchCurve, type BranchStyle } from '../../../src/infrastructure/three/BranchCurve';
 import { PathTable } from '../../../src/infrastructure/three/math';
@@ -193,10 +193,11 @@ describe('ParticleFlow', () => {
 
   it('el tamaño de punto sigue al alto del viewport y marca los búferes como sucios', () => {
     const flow = new ParticleFlow([path()]);
-    const versionBefore = flow.points.geometry.attributes.position.version;
+    const position = flow.points.geometry.attributes.position as BufferAttribute;
+    const versionBefore = position.version;
     flow.update(frameContext({ viewport: { width: 500, height: 1000 } }));
     expect(flow.points.material.uniforms.uScale.value).toBe(900);
-    expect(flow.points.geometry.attributes.position.version).toBeGreaterThan(versionBefore);
+    expect(position.version).toBeGreaterThan(versionBefore);
   });
 
   it('attach / dispose', () => {

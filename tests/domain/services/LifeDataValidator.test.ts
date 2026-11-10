@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ValidationError, type ValidationIssue } from '../../../src/domain/errors';
 import { LifeDataValidator } from '../../../src/domain/services';
-import { makeData, makeEvent } from '../../helpers/fixtures';
+import { makeData, makeEvent as makeTypedEvent } from '../../helpers/fixtures';
 
 type Loose = {
   schemaVersion: unknown;
@@ -11,6 +11,10 @@ type Loose = {
 } & Record<string, unknown>;
 
 const validator = new LifeDataValidator();
+
+/** Evento válido, tipado de forma laxa para poder meterlo en el documento mutable. */
+const makeEvent = (overrides: Parameters<typeof makeTypedEvent>[0]): Record<string, unknown> =>
+  makeTypedEvent(overrides) as unknown as Record<string, unknown>;
 
 /** Valida una copia de los datos válidos tras aplicarle una mutación. */
 function issuesAfter(mutate: (data: Loose) => void): readonly ValidationIssue[] {
