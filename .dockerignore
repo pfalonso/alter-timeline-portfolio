@@ -1,0 +1,21 @@
+# Datos personales: nunca dentro de la imagen (se montan como volumen)
+data/
+public/data/life.json
+
+node_modules
+dist
+coverage
+out
+.git
+.github
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+docs
+tests
+*.log
+.env
+.env.*
+.DS_Store
+hr/

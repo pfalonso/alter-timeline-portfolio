@@ -1,0 +1,7 @@
+# Despliegue PÚBLICO: sirve solo data/public/life.json (sin eventos privados).
+#   npm run build:public-data
+#   docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
+services:
+  web:
+    volumes: !override
+      - ./data/public:/usr/share/nginx/userdata:ro

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, tipos, tests y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run validate:data -- public/data/life.example.json
+      - run: npm run test:coverage
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
+  docker:
+    name: Imagen Docker
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t alter-timeline-portfolio:ci .
+      - name: Prueba de humo del contenedor
+        run: |
+          docker run -d --name web -p 8080:80 alter-timeline-portfolio:ci
+          for i in $(seq 1 20); do curl -fsS http://localhost:8080/healthz && break || sleep 1; done
+          curl -fsS -o /dev/null http://localhost:8080/
+          curl -fsS -o /dev/null http://localhost:8080/data/life.example.json
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/data/life.json)" = "404"
+          docker rm -f web

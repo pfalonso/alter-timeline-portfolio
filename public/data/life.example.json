@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "owner": "Noa Ferrer Lindqvist",
+    "title": "Líneas de vida",
+    "tagline": "Ingeniera de sonido que acabó construyendo salas que escuchan. Persona ficticia: estos son datos de ejemplo.",
+    "locale": "es",
+    "contact": [
+      { "label": "Correo", "url": "https://example.com/contacto" },
+      { "label": "Código", "url": "https://example.com/noa/codigo" },
+      { "label": "Portfolio", "url": "https://example.com/noa" }
+    ]
+  },
+  "categories": [
+    { "id": "academico", "label": "Académico", "color": "#6EA8FF", "icon": "◈", "description": "Estudios reglados y formación" },
+    { "id": "profesional", "label": "Profesional", "color": "#FFB454", "icon": "▲", "description": "Trabajo por cuenta ajena" },
+    { "id": "proyectos", "label": "Proyectos", "color": "#B48CFF", "icon": "✦", "description": "Obra propia, instalaciones y herramientas" },
+    { "id": "personal", "label": "Personal", "color": "#FF7EB6", "icon": "●", "description": "Vida fuera del currículum" },
+    { "id": "gastronomia", "label": "Gastronomía", "color": "#7BE0A4", "icon": "◍", "description": "El desvío por los obradores" },
+    { "id": "eventos", "label": "Eventos", "color": "#5EE6E6", "icon": "◇", "description": "Charlas, festivales y premios" }
+  ],
+  "events": [
+    {
+      "id": "primer-sintetizador",
+      "title": "El primer sintetizador",
+      "subtitle": "Un kit soldado en la mesa de la cocina",
+      "date": { "start": "2008-12" },
+      "categories": ["personal"],
+      "summary": "Un kit de sintetizador por Reyes y un soldador prestado: el primer circuito que hizo ruido a propósito.",
+      "description": "Tardó tres semanas en sonar y cuando por fin lo hizo fue un zumbido horrible. Aun así, ahí empieza todo: la idea de que el sonido se puede construir con las manos.",
+      "location": "Gandia",
+      "importance": 1
+    },
+    {
+      "id": "grado-sonido-imagen",
+      "title": "Grado en Ingeniería de Sonido e Imagen",
+      "subtitle": "Universitat Politècnica de Llevant",
+      "date": { "start": "2010-09", "end": "2014-06" },
+      "categories": ["academico"],
+      "summary": "Cuatro años entre acústica, procesado de señal y cámaras anecoicas.",
+      "description": "La carrera le dio el vocabulario: transformadas, filtros, psicoacústica. El trabajo de fin de grado midió cómo cambia la percepción de un espacio cuando la reverberación reacciona al movimiento de quien lo recorre.\n\nDe aquella época queda la costumbre de dar una palmada al entrar en cualquier sala.",
+      "location": "Gandia",
+      "organization": "Universitat Politècnica de Llevant",
+      "skills": ["Acústica", "Procesado digital de señal", "MATLAB", "C++"],
+      "highlights": [
+        "Trabajo de fin de grado con matrícula de honor",
+        "Becaria del laboratorio de acústica de salas durante dos cursos"
+      ],
+      "importance": 3
+    },
+    {
+      "id": "erasmus-tampere",
+      "title": "Un semestre en Tampere",
+      "subtitle": "Intercambio · Finlandia",
+      "date": { "start": "2013-02", "end": "2013-07" },
+      "categories": ["academico", "personal"],
+      "summary": "Seis meses de nieve, saunas y un curso de audio interactivo que lo cambió todo.",
+      "description": "Fue a por asignaturas de procesado de audio y volvió obsesionada con dos cosas que no estaban en el plan: las instalaciones interactivas y el pan de centeno.",
+      "location": "Tampere, Finlandia",
+      "skills": ["Pure Data", "Inglés", "Audio interactivo"],
+      "importance": 2
+    },
+    {
+      "id": "obrador-masa-lenta",
+      "title": "Aprendiz en el obrador Masa Lenta",
+      "subtitle": "Madrugadas de harina antes de clase",
+      "date": { "start": "2013-09", "end": "2015-06" },
+      "categories": ["gastronomia"],
+      "summary": "Lo que empezó como nostalgia del pan finlandés acabó en dos años de turnos de madrugada.",
+      "description": "Otra Noa pudo quedarse aquí. La fermentación resultó ser otro sistema dinámico: tiempo, temperatura y paciencia. Aprendió a leer una masa igual que una forma de onda.",
+      "location": "València",
+      "organization": "Obrador Masa Lenta",
+      "skills": ["Fermentación", "Panadería artesana", "Trabajo en equipo de madrugada"],
+      "highlights": ["Responsable de la masa madre de centeno desde el segundo año"],
+      "importance": 2,
+      "branch": "obrador",
+      "branchFrom": "erasmus-tampere"
+    },
+    {
+      "id": "estudios-albufera",
+      "title": "Técnica de sonido",
+      "subtitle": "Estudios Albufera",
+      "date": { "start": "2014-09", "end": "2016-12" },
+      "categories": ["profesional"],
+      "summary": "Grabación y mezcla para documentales, publicidad y algún disco de bandas locales.",
+      "description": "El primer trabajo de verdad: micrófonos, cableado y clientes con prisa. Aprendió que un buen técnico es sobre todo alguien que escucha a las personas antes que a los altavoces.",
+      "location": "València",
+      "organization": "Estudios Albufera",
+      "skills": ["Pro Tools", "Mezcla 5.1", "Grabación en directo"],
+      "highlights": [
+        "Mezcla de sonido de 14 documentales",
+        "Rediseño del flujo de copias de seguridad del estudio"
+      ],
+      "importance": 2
+    },
+    {
+      "id": "hackathon-ruido-blanco",
+      "title": "Primer premio en Ruido Blanco",
+      "subtitle": "Hackathon de arte sonoro",
+      "date": { "start": "2015-05-23" },
+      "categories": ["eventos", "proyectos"],
+      "summary": "48 horas para construir una mesa que convierte los golpes de los comensales en percusión.",
+      "description": "El prototipo usaba micrófonos de contacto pegados con cinta bajo un tablero. Ganó, pero lo importante fue descubrir que prefería hacer cosas que suenan a grabar cosas que suenan.",
+      "location": "Barcelona",
+      "skills": ["Arduino", "Max/MSP", "Prototipado rápido"],
+      "links": [{ "label": "Memoria del prototipo", "url": "https://example.com/noa/ruido-blanco" }],
+      "importance": 2
+    },
+    {
+      "id": "cenas-sonoras",
+      "title": "Comer con los oídos",
+      "subtitle": "Serie de cenas sonoras efímeras",
+      "date": { "start": "2015-11", "end": "2016-10" },
+      "categories": ["gastronomia", "eventos", "proyectos"],
+      "summary": "Ocho cenas para veinte personas donde cada plato tenía su propio paisaje sonoro.",
+      "description": "El punto donde los dos mundos se tocaron: el obrador ponía el pan y ella ponía auriculares de conducción ósea. Se agotaron las ocho fechas.",
+      "location": "València",
+      "highlights": ["160 comensales en ocho sesiones", "Reseña en la prensa gastronómica local"],
+      "importance": 2,
+      "branch": "obrador"
+    },
+    {
+      "id": "mudanza-lisboa",
+      "title": "Mudanza a Lisboa",
+      "date": { "start": "2016-12" },
+      "categories": ["personal"],
+      "summary": "Dos maletas, una interfaz de audio y un piso en Graça con vistas al río.",
+      "location": "Lisboa, Portugal",
+      "importance": 1
+    },
+    {
+      "id": "lumen-atelier",
+      "title": "Diseñadora de interacción",
+      "subtitle": "Lumen Atelier",
+      "date": { "start": "2017-01", "end": "2019-08" },
+      "categories": ["profesional"],
+      "summary": "Luz y sonido reactivos para museos y escaparates; del cable XLR al sensor de profundidad.",
+      "description": "En Lumen pasó de técnica a diseñadora. Programaba sistemas que reaccionaban al público y aprendió a defender una idea delante de un cliente con un prototipo en lugar de un PDF.\n\nAquí aparece la pregunta que abre la siguiente bifurcación: ¿y si esto lo hiciera con mi propio nombre?",
+      "location": "Lisboa, Portugal",
+      "organization": "Lumen Atelier",
+      "skills": ["TouchDesigner", "GLSL", "Python", "Sensores de profundidad", "Gestión de clientes"],
+      "highlights": [
+        "Dirección técnica de 9 instalaciones permanentes",
+        "Sistema de calibración que redujo el montaje de tres días a uno"
+      ],
+      "links": [{ "label": "Selección de trabajos", "url": "https://example.com/lumen-atelier/trabajos" }],
+      "importance": 3
+    },
+    {
+      "id": "recetario-autoeditado",
+      "title": "Recetario de un obrador que ya no existe",
+      "subtitle": "Fanzine autoeditado",
+      "date": { "start": "2017-03" },
+      "categories": ["gastronomia", "proyectos"],
+      "summary": "Cuando Masa Lenta cerró, quedó un fanzine de 40 páginas con sus recetas y sus ruidos.",
+      "description": "La rama del pan se apaga aquí, con una tirada de 300 ejemplares y un código para escuchar la amasadora. La otra Noa, la panadera, sigue amasando en alguna parte.",
+      "importance": 1,
+      "branch": "obrador"
+    },
+    {
+      "id": "estudio-penumbra",
+      "title": "Nace Estudio Penumbra",
+      "subtitle": "Estudio propio de instalaciones sonoras",
+      "date": { "start": "2018-04", "end": "present" },
+      "categories": ["proyectos", "profesional"],
+      "summary": "Un estudio unipersonal (a ratos de tres) para piezas que necesitan oscuridad y paciencia.",
+      "description": "Empezó como proyecto de fines de semana mientras seguía en Lumen. Hoy es el lugar donde caben los encargos raros: salas que respiran, pasillos que recuerdan pasos.",
+      "location": "Lisboa · València",
+      "organization": "Estudio Penumbra",
+      "skills": ["Dirección creativa", "Presupuestos", "Audio espacial", "Rust"],
+      "highlights": ["12 piezas producidas", "Colaboraciones con tres museos y dos festivales"],
+      "links": [{ "label": "Estudio Penumbra", "url": "https://example.com/penumbra" }],
+      "importance": 3,
+      "branch": "penumbra",
+      "branchFrom": "lumen-atelier"
+    },
+    {
+      "id": "charla-onda-larga",
+      "title": "Charla en el congreso Onda Larga",
+      "subtitle": "«El silencio también es interfaz»",
+      "date": { "start": "2018-10-12" },
+      "categories": ["eventos"],
+      "summary": "Veinte minutos sobre por qué las instalaciones interactivas hablan demasiado.",
+      "location": "Oporto, Portugal",
+      "links": [{ "label": "Vídeo de la charla", "url": "https://example.com/onda-larga/2018/noa-ferrer" }],
+      "importance": 1
+    },
+    {
+      "id": "pausa-2019",
+      "title": "Tres meses de pausa",
+      "date": { "start": "2019-08", "end": "2019-10" },
+      "categories": ["personal"],
+      "summary": "Un parón necesario entre un trabajo y un máster. Solo visible con ?private=1.",
+      "description": "Este evento está marcado como privado: sirve de ejemplo de cómo se ocultan entradas que no quieres enseñar por defecto.",
+      "importance": 1,
+      "visibility": "private"
+    },
+    {
+      "id": "master-artes-digitales",
+      "title": "Máster en Artes Digitales",
+      "subtitle": "Escola Superior de Mídia do Tejo",
+      "date": { "start": "2019-10", "end": "2021-06" },
+      "categories": ["academico"],
+      "summary": "Volver a clase con treinta años para poner teoría a lo que ya hacía por intuición.",
+      "description": "La tesis, «Arquitecturas que escuchan», documentó seis instalaciones y propuso un método para evaluar si una pieza interactiva de verdad escucha o solo reacciona.",
+      "location": "Lisboa, Portugal",
+      "organization": "Escola Superior de Mídia do Tejo",
+      "skills": ["Investigación", "Escritura académica", "Audio ambisónico"],
+      "highlights": ["Tesis con distinción", "Beca de producción para la pieza final"],
+      "importance": 2
+    },
+    {
+      "id": "faro-interior",
+      "title": "Faro interior",
+      "subtitle": "Instalación para un depósito de agua abandonado",
+      "date": { "start": "2020-02" },
+      "categories": ["proyectos"],
+      "summary": "Un haz de luz que gira al ritmo de la respiración de quien entra.",
+      "description": "Catorce segundos de reverberación natural y un único altavoz. Se inauguró tres semanas antes del confinamiento y pasó un año a oscuras; reabrió en 2021.",
+      "location": "Setúbal, Portugal",
+      "skills": ["Sensores biométricos", "DMX", "Acústica de salas"],
+      "importance": 2,
+      "branch": "penumbra"
+    },
+    {
+      "id": "docencia-universidad",
+      "title": "Profesora asociada",
+      "subtitle": "Diseño de Sonido Interactivo",
+      "date": { "start": "2021-02", "end": "2023-06" },
+      "categories": ["academico", "profesional"],
+      "summary": "Una asignatura cuatrimestral: del micrófono de contacto a la primera pieza expuesta.",
+      "description": "Dar clase la obligó a ordenar lo que sabía. Cada curso terminaba con una exposición abierta en el vestíbulo de la facultad.",
+      "location": "Lisboa, Portugal",
+      "organization": "Escola Superior de Mídia do Tejo",
+      "skills": ["Docencia", "Diseño curricular", "Mentoría"],
+      "highlights": ["74 estudiantes en cinco cuatrimestres", "Evaluación docente media de 4,7 sobre 5"],
+      "importance": 2,
+      "branch": "docencia",
+      "branchFrom": "master-artes-digitales"
+    },
+    {
+      "id": "museo-mareas",
+      "title": "Directora técnica",
+      "subtitle": "Museo de las Mareas",
+      "date": { "start": "2021-09", "end": "present" },
+      "categories": ["profesional"],
+      "summary": "Responsable de todo lo que suena, brilla o se mueve en un museo dedicado al mar.",
+      "description": "Coordina un equipo de seis personas y la renovación de la exposición permanente. Menos soldador y más hojas de cálculo, pero también la primera vez que una pieza suya vive en un sitio durante años.",
+      "location": "València",
+      "organization": "Museo de las Mareas",
+      "skills": ["Liderazgo técnico", "Mantenimiento de exposiciones", "Node.js", "Redes Dante"],
+      "highlights": [
+        "Renovación de 1.200 m² de exposición permanente",
+        "Plan de mantenimiento que redujo las averías un 60 %"
+      ],
+      "links": [{ "label": "Museo de las Mareas", "url": "https://example.com/museo-mareas" }],
+      "importance": 3
+    },
+    {
+      "id": "escuela-circuitos-blandos",
+      "title": "Escuela de verano Circuitos Blandos",
+      "subtitle": "Taller intensivo de electrónica textil",
+      "date": { "start": "2022-07" },
+      "categories": ["eventos", "academico"],
+      "summary": "Una semana enseñando a coser sensores a veinte personas que nunca habían programado.",
+      "location": "Évora, Portugal",
+      "importance": 1,
+      "branch": "docencia"
+    },
+    {
+      "id": "herramienta-hilo",
+      "title": "hilo",
+      "subtitle": "Herramienta de código abierto para audio espacial",
+      "date": { "start": "2022-11" },
+      "categories": ["proyectos"],
+      "summary": "Un enrutador de audio multicanal escrito en Rust que nació para no volver a recablear una sala a mano.",
+      "description": "Lo que empezó como un script interno de Penumbra acabó teniendo documentación, colaboradores y usuarios en teatros que nunca ha pisado.",
+      "skills": ["Rust", "Open source", "Documentación"],
+      "highlights": ["Usada en más de 40 instalaciones", "23 personas han contribuido al código"],
+      "links": [
+        { "label": "Repositorio", "url": "https://example.com/noa/hilo" },
+        { "label": "Documentación", "url": "https://example.com/noa/hilo/docs" }
+      ],
+      "importance": 2,
+      "branch": "penumbra"
+    },
+    {
+      "id": "sala-de-los-ecos",
+      "title": "La Sala de los Ecos",
+      "subtitle": "Pieza permanente · premio Litoral de arte y tecnología",
+      "date": { "start": "2023-05" },
+      "categories": ["proyectos", "eventos", "profesional"],
+      "summary": "Una sala del museo que guarda durante un día las voces de quienes la visitan y las devuelve convertidas en marea.",
+      "description": "El proyecto donde se juntan todas las ramas: la acústica de la carrera, la paciencia del obrador, el oficio de Lumen y la libertad de Penumbra.\n\nRecibió el premio Litoral y es, de lejos, la sala donde la gente pasa más tiempo.",
+      "location": "València",
+      "organization": "Museo de las Mareas",
+      "skills": ["Audio ambisónico", "Síntesis granular", "Diseño de experiencia"],
+      "highlights": [
+        "Premio Litoral de arte y tecnología 2023",
+        "Más de 200.000 visitantes en su primer año",
+        "32 altavoces y ni una sola pantalla"
+      ],
+      "links": [{ "label": "Ficha de la pieza", "url": "https://example.com/museo-mareas/sala-de-los-ecos" }],
+      "importance": 3
+    },
+    {
+      "id": "gira-mareografo",
+      "title": "Gira de Mareógrafo",
+      "subtitle": "Pieza itinerante en cinco ciudades",
+      "date": { "start": "2024-09", "end": "2025-03" },
+      "categories": ["proyectos", "eventos"],
+      "summary": "Una instalación que cabe en dos flight cases y traduce la marea real de cada puerto en sonido.",
+      "location": "Vigo · Bilbao · Marsella · Génova · Split",
+      "skills": ["Producción de giras", "Logística", "APIs de datos abiertos"],
+      "highlights": ["Cinco puertos en siete meses"],
+      "importance": 2,
+      "branch": "penumbra"
+    },
+    {
+      "id": "travesia-pirineos",
+      "title": "Travesía de los Pirineos a pie",
+      "subtitle": "De mar a mar en 38 días",
+      "date": { "start": "2025-07", "end": "2025-08" },
+      "categories": ["personal"],
+      "summary": "Ochocientos kilómetros con una grabadora de campo y ningún plan para lo grabado.",
+      "location": "Del Cantábrico al Mediterráneo",
+      "importance": 1
+    }
+  ]
+}
