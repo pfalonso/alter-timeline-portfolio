@@ -13,8 +13,10 @@ estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las 
 - Tests: Vitest + @vitest/coverage-v8, entorno jsdom. Umbral global ≥ 75 % (lines, functions, branches, statements).
 - Lint: ESLint + typescript-eslint. `npm run typecheck` = `tsc --noEmit`.
 - Docker: multi-stage (node:22-alpine build → nginx:alpine). `docker-compose.yml` expone `8080:80`
-  y monta `./data/life.json` en `/usr/share/nginx/html/data/life.json:ro`.
-- Scripts npm: `dev`, `build`, `preview`, `test`, `test:coverage`, `lint`, `typecheck`, `validate:data`.
+  y monta `./data/life.json` en `/usr/share/nginx/html/data/life.json:ro` (implementado montando el directorio
+  `./data` en `/usr/share/nginx/userdata:ro`; ver DEV_NOTES, decisión 1). `docker-compose.public.yml` (override)
+  monta `./data/public` en su lugar para un despliegue público.
+- Scripts npm: `dev`, `build`, `preview`, `test`, `test:coverage`, `lint`, `typecheck`, `validate:data`, `build:public-data`.
 
 ## Datos (privacidad)
 
@@ -26,6 +28,10 @@ estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las 
 - En `npm run dev`, un plugin de Vite sirve `data/life.json` en `/data/life.json` si existe.
 - `schema/life.schema.json` — JSON Schema (draft 2020-12) equivalente al tipo de abajo.
 - `npm run validate:data [ruta]` valida un JSON con el mismo validador del dominio.
+- `visibility: "private"` **no es un control de acceso**: el filtrado es en el cliente y el JSON se sirve entero.
+  Para un servidor público, `npm run build:public-data [origen] [destino]` genera `data/public/life.json` sin
+  eventos privados (reengancha `branchFrom` al ancestro público más cercano y valida el resultado), y se despliega
+  con `docker compose -f docker-compose.yml -f docker-compose.public.yml up -d`.
 
 ### Esquema `LifeData`
 
@@ -113,5 +119,6 @@ src/
 ## Calidad
 
 - `npm run lint && npm run typecheck && npm run test:coverage && npm run build` debe pasar en limpio.
-- CI (GitHub Actions, `.github/workflows/ci.yml`): en push/PR a `develop` y `main` → lint, typecheck, test con cobertura, build, `docker build`.
+- CI (GitHub Actions, `.github/workflows/ci.yml`): en push/PR a `develop` y `main` → lint, typecheck, `validate:data` del ejemplo, test con cobertura, build, `docker build` + prueba de humo con `curl`.
+  `main` solo recibe cambios por PR desde `develop`.
 - Flujo git: `main` (estable) ← `develop` ← `feature/*`. Merge a `main` solo con CI verde.
