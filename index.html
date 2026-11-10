@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#04050d" />
+    <meta name="description" content="Portfolio interactivo: una vida contada como una línea temporal ramificada." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Línea temporal</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#index">Saltar al índice de eventos</a>
+    <div id="app" class="app app--loading">
+      <div id="stage" class="stage" data-keep-popup>
+        <div id="labels" class="labels"></div>
+      </div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <header id="hud" class="hud"></header>
+
+      <div class="toolbar" data-keep-popup>
+        <button id="index-toggle" class="controls__button controls__button--text" type="button" aria-controls="index">Índice</button>
+        <div id="controls" class="controls" role="group" aria-label="Controles de cámara"></div>
+      </div>
+
+      <section id="filters" class="filters" data-keep-popup></section>
+      <div id="ruler" class="ruler"></div>
+      <p id="help" class="help" aria-hidden="true"></p>
+
+      <nav id="index" class="index" hidden data-keep-popup></nav>
+      <aside id="popup" class="popup"></aside>
+      <div id="tooltip" class="tooltip"></div>
+      <div id="announcer" class="visually-hidden"></div>
+      <p id="loading" class="loading" role="status"></p>
+    </div>
+    <noscript>Esta página necesita JavaScript para mostrar la línea temporal.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    image: alter-timeline-portfolio:local
+    container_name: alter-timeline
+    ports:
+      - "8080:80"
+    volumes:
+      # Se monta el DIRECTORIO ./data (solo lectura), no el fichero suelto: así el contenedor
+      # arranca aunque ./data/life.json todavía no exista (con un bind de fichero inexistente,
+      # Docker crearía un directorio llamado life.json). nginx sirve /data/life.json desde aquí
+      # y, si falta, responde 404 → la web usa los datos de ejemplo.
+      #
+      # Alternativa equivalente (ruta literal del contrato), solo si el fichero YA existe:
+      #   - ./data/life.json:/usr/share/nginx/html/data/life.json:ro
+      - ./data:/usr/share/nginx/userdata:ro
+    restart: unless-stopped
