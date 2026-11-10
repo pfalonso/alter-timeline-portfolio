@@ -217,6 +217,26 @@ describe('TimelineLayout: ramas y branchFrom', () => {
     expect(branchOf(shown, 'side').points[0]).toEqual(nodeOf(shown, 'd-secret').position);
   });
 
+  it('si la rama empieza antes que su origen, se separa de la línea madre en su propia X', () => {
+    const layout = layoutOf(
+      dataWith([
+        makeEvent({ id: 'm-a', date: { start: '2010' } }),
+        makeEvent({ id: 'm-b', date: { start: '2016' } }),
+        makeEvent({ id: 'temprano', date: { start: '2013' }, branch: 'precoz', branchFrom: 'm-b' }),
+      ]),
+    );
+    const early = branchOf(layout, 'precoz');
+    const trunk = branchOf(layout, 'main');
+    const start = early.points[0];
+    expect(early.originEventId).toBe('m-b');
+    expect(start.x).toBeLessThan(nodeOf(layout, 'm-b').position.x);
+    expect(start.x).toBeCloseTo((3 - 0.5) * O.unitsPerYear, 3);
+    // El primer punto cae sobre el tronco a esa misma X (no a la altura del nodo de 2016).
+    const onTrunk = trunk.points.reduce((best, point) => (Math.abs(point.x - start.x) < Math.abs(best.x - start.x) ? point : best));
+    expect(Math.abs(start.y - onTrunk.y)).toBeLessThan(0.2);
+    expect(Math.abs(start.z - onTrunk.z)).toBeLessThan(0.2);
+  });
+
   it('una rama sin branchFrom nace del tronco un poco antes de su primer evento', () => {
     const layout = layoutOf(dataWith([makeEvent({ id: 'm', date: { start: '2010' } }), makeEvent({ id: 's', date: { start: '2014' }, branch: 'suelta' })]));
     const loose = branchOf(layout, 'suelta');

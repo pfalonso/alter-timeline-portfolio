@@ -235,7 +235,8 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 - Todo evento sin `branch` pertenece al tronco, `main`.
 - Para abrir una rama, pon el mismo `branch` a todos sus eventos y añade `branchFrom` **en al menos uno** de ellos (lo habitual es el primero) con el id del evento donde la vida se bifurca.
 - El origen puede estar en el tronco o en otra rama (ramas que nacen de ramas).
-- Una rama con algún evento en curso (`"end": "present"`) se prolonga hasta hoy. Una rama cerrada se desvanece poco después de su último evento.
+- Una rama con algún evento en curso (`"end": "present"`) se prolonga hasta hoy. Una rama cerrada (un camino que no siguió) se desvanece poco después de su último evento: el filamento se apaga y sus motas de energía se dispersan, suben y se disuelven en polvo.
+- Si una rama tiene eventos anteriores a su `branchFrom`, empieza antes que él y se separa de la línea madre a la altura (en X) de ese primer evento, no del nodo de origen.
 - Una rama sin `branchFrom` es válida: se despega del tronco poco antes de su primer evento.
 - La rama toma el color de la categoría principal de su primer evento. El tronco es siempre pálido.
 - Los carriles se reparten solos (arriba, abajo, más arriba, más abajo…) y se reutilizan cuando una rama anterior ya ha terminado.
