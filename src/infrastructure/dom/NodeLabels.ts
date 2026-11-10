@@ -2,7 +2,7 @@ import type { SelectionViewState, TimelineViewModel } from '../../application/po
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
-import { labelDistanceLimit, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
+import { clampLabelX, labelDistanceLimit, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
 
 interface Label {
   readonly element: HTMLElement;
@@ -47,14 +47,14 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
     this.labels.clear();
     for (const event of model.timeline.events) {
       const element = el('div', { class: `node-label node-label--i${event.importance}` }, [
-        el('span', { class: 'node-label__title', text: event.title }),
+        el('span', { class: 'node-label__title', text: event.labelTitle }),
         el('span', { class: 'node-label__date', text: String(event.start.year) }),
       ]);
       element.style.setProperty('--accent', model.timeline.primaryCategoryOf(event)?.color ?? '#ffffff');
       this.root.append(element);
       // Estimación de ancho (evita medir el DOM cada fotograma); el CSS limita el máximo.
       const perChar = event.importance === 3 ? 8.6 : 7;
-      this.labels.set(event.id, { element, width: Math.min(230, event.title.length * perChar + 18), shown: false });
+      this.labels.set(event.id, { element, width: Math.min(230, event.labelTitle.length * perChar + 18), shown: false });
     }
   }
 
@@ -73,11 +73,13 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       if (node.presence > 0.5) obstacles.push({ id: node.eventId, x: node.x, y: node.y, radius: node.radius * 1.5 });
       const pinned = node.highlighted || node.eventId === this.focusedId;
       const eligible = node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(node.importance));
-      if (!eligible) continue;
+      // Un rótulo cuyo nodo está fuera de pantalla no se pinta; si el nodo está dentro, el rótulo
+      // se desplaza lo necesario para no quedar cortado por el borde.
+      if (!eligible || node.x < 0 || node.x > frame.viewport.width) continue;
       const gap = node.radius * 2.1 + 10;
       candidates.push({
         id: node.eventId,
-        x: node.x,
+        x: clampLabelX(node.x, label.width, frame.viewport.width),
         ys: [node.y + gap, node.y - gap - LABEL_HEIGHT],
         width: label.width,
         height: LABEL_HEIGHT,

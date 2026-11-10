@@ -60,7 +60,14 @@ docker compose up --build
 Abre <http://localhost:8080>. Sin `data/life.json` verás los datos de ejemplo con el aviso «Datos de ejemplo». Para parar: `docker compose down`.
 
 > [!NOTE]
-> Según `docs/DEV_NOTES.md`, `docker build` no se pudo ejecutar en el entorno donde se desarrolló el proyecto (sin acceso a los registros de imágenes). La configuración de nginx sí se probó con un nginx local que reproducía las rutas del contenedor. Mira el estado actual en [`docs/QA_REPORT.md`](docs/QA_REPORT.md).
+> La imagen se construye y se prueba en cada push y pull request en la integración continua (job «Imagen Docker» de `.github/workflows/ci.yml`: `docker build` y una prueba de humo con `curl` contra `/healthz`, `/`, `/data/life.example.json` y el 404 de `/data/life.json`). Ver [5.12](#512-j-flujo-git-e-integración-continua).
+
+Para un servidor **público**, no sirvas `data/life.json` tal cual si contiene eventos privados: genera antes la versión pública y monta esa (ver [3.8](#38-eventos-privados-y-private1)):
+
+```bash
+npm run build:public-data          # data/life.json → data/public/life.json, sin eventos privados
+docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
+```
 
 ### En local
 
@@ -96,6 +103,7 @@ npm run validate:data
 | --- | --- | --- | --- |
 | `public/data/life.example.json` | Datos ficticios de demostración | Sí | Sí |
 | `data/life.json` | Tus datos reales | **No** (`/data/*` en `.gitignore`) | **No** (`data/` en `.dockerignore`) |
+| `data/public/life.json` | Tus datos sin eventos privados, generados con `npm run build:public-data` | **No** | **No**; se monta con `docker-compose.public.yml` |
 | `schema/life.schema.json` | JSON Schema (draft 2020-12) de la forma del documento | Sí | No hace falta |
 
 `.gitignore` ignora todo `data/` salvo `data/.gitkeep`, y también `public/data/life.json` por si alguien lo copia ahí por error.
@@ -182,7 +190,8 @@ Raíz del documento:
 | Campo | Tipo | Obligatorio | Descripción |
 | --- | --- | --- | --- |
 | `id` | texto kebab-case | Sí | Identificador único del evento |
-| `title` | texto no vacío | Sí | Título (rótulo del nodo, tooltip, pop-up, índice) |
+| `title` | texto no vacío | Sí | Título (tooltip, pop-up, índice y, si no hay `shortTitle`, rótulo del nodo) |
+| `shortTitle` | texto no vacío, máx. 40 caracteres | No | Versión corta del título para el rótulo del nodo en la escena. Útil para títulos largos, que el rótulo cortaría con «…». El tooltip, el pop-up y el índice siguen mostrando `title` |
 | `date` | `{ start, end? }` | Sí | Ver «Fechas» más abajo |
 | `categories` | lista de ids | Sí | Al menos una. **La primera es la principal** y da color al nodo; las siguientes (hasta tres) añaden acentos de color |
 | `summary` | texto no vacío | Sí | Una o dos frases: cabecera del pop-up, índice y anuncio para lectores de pantalla |
@@ -218,6 +227,7 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `end` ≥ `start` | Se tiene en cuenta la precisión: `start: "2019-03"`, `end: "2019"` es válido porque 2019 contiene marzo |
 | URLs | `links[].url`, `media[].url` y `meta.contact[].url` deben ser http(s) absolutas |
 | `media` | `type` solo puede ser `"image"`; `alt` debe ser un texto |
+| `shortTitle` | Opcional; si está, texto no vacío de 40 caracteres como máximo |
 | `importance`, `visibility` | Solo los valores permitidos |
 | `branch` | Id en kebab-case |
 | `branchFrom` | El evento existe; no es el propio evento; no pertenece a la misma rama |
@@ -233,7 +243,8 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 - Todo evento sin `branch` pertenece al tronco, `main`.
 - Para abrir una rama, pon el mismo `branch` a todos sus eventos y añade `branchFrom` **en al menos uno** de ellos (lo habitual es el primero) con el id del evento donde la vida se bifurca.
 - El origen puede estar en el tronco o en otra rama (ramas que nacen de ramas).
-- Una rama con algún evento en curso (`"end": "present"`) se prolonga hasta hoy. Una rama cerrada se desvanece poco después de su último evento.
+- Una rama con algún evento en curso (`"end": "present"`) se prolonga hasta hoy. Una rama cerrada (un camino que no siguió) se desvanece poco después de su último evento: el filamento se apaga y sus motas de energía se dispersan, suben y se disuelven en polvo.
+- Si una rama tiene eventos anteriores a su `branchFrom`, empieza antes que él y se separa de la línea madre a la altura (en X) de ese primer evento, no del nodo de origen.
 - Una rama sin `branchFrom` es válida: se despega del tronco poco antes de su primer evento.
 - La rama toma el color de la categoría principal de su primer evento. El tronco es siempre pálido.
 - Los carriles se reparten solos (arriba, abajo, más arriba, más abajo…) y se reutilizan cuando una rama anterior ya ha terminado.
@@ -293,6 +304,17 @@ Si una rama nace de un evento privado que está oculto, la rama se dibuja nacien
 
 > [!WARNING]
 > **`visibility: "private"` no es un control de acceso.** El filtrado se hace en el navegador (`TimelineFactory`): el fichero `life.json` se descarga entero, con los eventos privados dentro, y cualquiera puede leerlo en `/data/life.json` o activar `?private=1`. Sirve para tener dos vistas del mismo fichero, no para guardar secretos. Lo que no deba ver nadie no debe estar en el `life.json` que despliegues.
+
+**Versión publicable: `npm run build:public-data`.** El script `scripts/build-public-data.ts` lee `data/life.json`, lo valida y escribe `data/public/life.json` **sin** los eventos privados (y sin el campo `visibility`). Si una rama nacía de un evento privado, su `branchFrom` se reengancha al ancestro público más cercano siguiendo la cadena de orígenes; si no hay ninguno, la rama nace del tronco. Las categorías que solo usaban eventos privados se eliminan. El resultado se vuelve a validar antes de escribirlo. Admite rutas propias: `npm run build:public-data -- origen.json destino.json`. Códigos de salida: `0` bien, `1` el origen o el resultado no validan (no se escribe nada), `2` no se puede leer el origen.
+
+Para desplegar esa versión, `docker-compose.public.yml` sustituye el volumen de `docker-compose.yml` por `./data/public`:
+
+```bash
+npm run build:public-data
+docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
+```
+
+`data/public/` está dentro de `data/`, así que tampoco entra en git ni en la imagen.
 
 ---
 
@@ -1140,13 +1162,14 @@ flowchart LR
 ```
 
 - La imagen final solo contiene nginx, su configuración y `dist/`. Ni Node, ni `node_modules`, ni el código fuente.
-- `data/` está en `.dockerignore`: tus datos no entran ni siquiera en la etapa de build.
+- `data/` y `hr/` están en `.dockerignore`: tus datos no entran ni siquiera en la etapa de build.
 - `docker-compose.yml` define un servicio `web` (contenedor `alter-timeline`, imagen `alter-timeline-portfolio:local`, `restart: unless-stopped`).
+- Despliegue público: `docker-compose.public.yml` es un *override* que monta `./data/public` (generado con `npm run build:public-data`, sin eventos privados) en lugar de `./data`. Ver [3.8](#38-eventos-privados-y-private1).
 - Si prefieres montar el fichero suelto, nginx también lo busca en `/usr/share/nginx/html/data/life.json`, pero el fichero debe existir antes de arrancar (si no, Docker crea un directorio con ese nombre).
 
 ### 5.12 (j) Flujo git e integración continua
 
-Modelo de ramas: `main` (estable) ← `develop` (integración) ← `feature/*` (trabajo). A `main` solo se llega con la integración continua en verde.
+Modelo de ramas: `main` (estable) ← `develop` (integración) ← `feature/*` (trabajo). `main` solo recibe cambios por pull request desde `develop`, con la integración continua en verde.
 
 ```mermaid
 gitGraph
@@ -1174,16 +1197,24 @@ flowchart LR
     trigger(["push o pull request<br/>a develop o main"])
     lint["npm run lint<br/>incluye reglas de arquitectura"]
     type["npm run typecheck"]
+    data["npm run validate:data<br/>datos de ejemplo"]
     test["npm run test:coverage<br/>umbral 75 %"]
     build["npm run build"]
-    docker["docker build"]
+    docker["docker build<br/>+ prueba de humo con curl"]
     ok(["CI en verde:<br/>se puede fusionar"])
 
-    trigger --> lint --> type --> test --> build --> docker --> ok
+    trigger --> lint --> type --> data --> test --> build --> docker --> ok
 ```
 
+El workflow está en `.github/workflows/ci.yml` y se ejecuta en cada push y pull request a `develop` o `main`, con dos jobs:
+
+| Job | Pasos |
+| --- | --- |
+| `quality` (Lint, tipos, tests y build) | `npm ci`, `lint`, `typecheck`, `validate:data -- public/data/life.example.json`, `test:coverage` (sube `coverage/` como artefacto), `build` |
+| `docker` (Imagen Docker), tras `quality` | `docker build` y prueba de humo del contenedor: `/healthz`, `/` y `/data/life.example.json` responden 200; `/data/life.json` responde 404 (la imagen no lleva datos personales) |
+
 > [!NOTE]
-> Este es el flujo definido en `docs/CONTRACT.md` (`.github/workflows/ci.yml`). En el momento de escribir esta documentación el fichero del workflow todavía no estaba en el repositorio; consulta [`docs/QA_REPORT.md`](docs/QA_REPORT.md) para el estado real. Los nombres de rama y la etiqueta del primer diagrama son ilustrativos.
+> Los nombres de rama y la etiqueta del primer diagrama son ilustrativos.
 
 ---
 
@@ -1255,7 +1286,7 @@ Hoy la interfaz está solo en español. Lo que ya existe:
 Lo que haría falta para un segundo idioma:
 
 1. Convertir `STRINGS` en un diccionario por idioma elegido a partir de `meta.locale` e inyectarlo en las piezas DOM desde `main.ts`.
-2. Mover a ese diccionario los textos que aún están escritos en el sitio: «Cuándo», «Dónde» y «Con» en `EventPopup`, «hoy» en `YearRuler`, y los de `index.html` (enlace de salto, botón «Índice», etiqueta de los controles, `<noscript>`).
+2. Mover a ese diccionario los textos que aún están escritos en `index.html` (enlace de salto, botón «Índice», etiqueta de los controles, `<noscript>`). Los del pop-up y la regla de años ya están en `STRINGS`.
 3. Los mensajes del validador y de los errores de dominio también están en español; viven en el dominio y tendrían que devolver códigos en lugar de frases.
 4. El contenido (títulos, descripciones) es un único idioma por fichero: para dos idiomas harían falta dos `life.json` o ampliar el esquema.
 
@@ -1275,6 +1306,7 @@ Lo que haría falta para un segundo idioma:
 | `npm run lint` | ESLint con typescript-eslint y las reglas de arquitectura |
 | `npm run typecheck` | `tsc --noEmit` (TypeScript en modo estricto) |
 | `npm run validate:data` | Valida un JSON de datos (ver [3.4](#34-validar-npm-run-validatedata)) |
+| `npm run build:public-data` | Genera `data/public/life.json` sin eventos privados para un despliegue público (ver [3.8](#38-eventos-privados-y-private1)) |
 
 La cadena completa que debe pasar antes de fusionar:
 
@@ -1369,7 +1401,7 @@ window.__timelineDebug.open('id')   // abre el pop-up de un evento
 - `data/life.json` está fuera del repositorio (`.gitignore`) y fuera de la imagen (`.dockerignore`): solo existe en tu máquina y en el volumen montado.
 - La imagen publicada contiene únicamente los datos ficticios de ejemplo.
 - `/data/life.json` se sirve sin caché (`no-store`).
-- **Todo lo que haya en el `life.json` desplegado es público**, incluidos los eventos `private` (ver [3.8](#38-eventos-privados-y-private1)). No pongas en él nada que no quieras publicar.
+- **Todo lo que haya en el `life.json` desplegado es público**, incluidos los eventos `private` (ver [3.8](#38-eventos-privados-y-private1)). Para un servidor público, despliega la salida de `npm run build:public-data` con `docker-compose.public.yml`, que ya no contiene los eventos privados.
 - La web no usa cookies, almacenamiento local ni analítica. El único estado que guarda es el filtro, en la propia URL.
 
 ---
@@ -1383,7 +1415,7 @@ window.__timelineDebug.open('id')   // abre el pop-up de un evento
 | Alternativa a la escena 3D | Índice de eventos en DOM (lista ordenada de botones) con el mismo contenido y el mismo pop-up |
 | Enlace de salto | «Saltar al índice de eventos», primer elemento enfocable |
 | Teclado | Toda la navegación tiene atajo (ver [4.1](#41-navegación)). Los atajos no interfieren con `Enter` y `Espacio` sobre botones y enlaces |
-| Pop-up | `role="dialog"`, `aria-modal`, `aria-labelledby`. Atrapa el foco con `Tab` y `Shift`+`Tab`, y lo devuelve al elemento anterior al cerrar |
+| Pop-up | Diálogo **no modal**: `role="dialog"` y `aria-labelledby`, sin `aria-modal`, porque es un panel lateral y la escena, los filtros y el índice siguen operables. Al abrirse recibe el foco; `Tab` sale de él por el orden natural; al cerrarse devuelve el foco al elemento anterior (salvo que el usuario ya lo haya llevado a otro control) |
 | Lector de pantalla | Región `aria-live` que anuncia título, fechas y resumen del evento enfocado; el contador de eventos también es `aria-live` |
 | Filtros | Botones con `aria-pressed`, agrupados con `role="group"` y etiqueta |
 | Escena | `role="application"`, enfocable, con una etiqueta que explica los atajos y remite al índice |
@@ -1423,19 +1455,17 @@ Tomadas de `docs/DEV_NOTES.md` y del propio código. Para el estado de las compr
 | Enlaces profundos | No se puede enlazar a un evento concreto (`?event=id` no existe). Solo el filtro vive en la URL |
 | Idioma | Interfaz solo en español. `meta.locale` afecta al formato de fechas y al atributo `lang`, no a los textos |
 | Muchas ramas | Con más de cuatro ramas simultáneas la escena crece en vertical y el encuadre por defecto se queda corto |
-| Rótulos | Su anchura se estima por número de caracteres, no se mide |
+| Rótulos | Su anchura se estima por número de caracteres, no se mide. Un título largo se corta con «…» en el rótulo (no en el tooltip ni en el pop-up): para evitarlo, `shortTitle` |
 | Rendimiento | Medido solo con renderizado por software (unos 4 fps a 1440×900). Sin datos en GPU real |
 | Navegadores | Probado solo en Chrome sin interfaz. Sin pruebas en Firefox, Safari ni dispositivos táctiles reales |
-| Docker | `docker build` sin ejecutar en el entorno de desarrollo (registros de imágenes bloqueados). La configuración de nginx sí se probó con un nginx local |
-| CI | El workflow de GitHub Actions no estaba en el repositorio al escribir esta documentación |
+| Docker | `docker build` solo se ejecuta en la CI (en el entorno de desarrollo los registros de imágenes están bloqueados) |
 | JSON Schema | No se valida contra el schema con ninguna librería; es documentación y ayuda para el editor |
-| Pop-up | Declara `aria-modal="true"` pero es un panel lateral: la escena, los filtros y el índice siguen siendo operables con el ratón |
 | Presupuesto de partículas | Se calcula al cargar; cambiar la preferencia de movimiento o el tamaño de ventana no lo recalcula hasta recargar |
 
 ### Hoja de ruta
 
-- [ ] Construir y probar la imagen Docker en CI o en una máquina con acceso al registro.
-- [ ] Añadir el workflow de CI (`lint`, `typecheck`, `test:coverage`, `build`, `docker build`).
+- [x] Construir y probar la imagen Docker en CI.
+- [x] Workflow de CI (`lint`, `typecheck`, `validate:data`, `test:coverage`, `build`, `docker build` + prueba de humo).
 - [ ] Enlace profundo a eventos (`?event=id`), reutilizando el patrón de `UrlFilterStateStore`.
 - [ ] Internacionalización de la interfaz (ver [6.5](#65-internacionalización-futura)).
 - [ ] Medir el rendimiento en GPU real y, si hace falta, ofrecer un nivel de calidad reducido (bloom, nebulosa).

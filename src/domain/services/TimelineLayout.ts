@@ -131,7 +131,10 @@ export class TimelineLayout {
       const parent = planById.get(plan.origin.branch);
       if (!parent || parent === plan) return;
       resolveOrigin(parent);
-      plan.originPosition = positionOn(parent, nodeX.get(plan.origin.id) ?? plan.startX);
+      // Normalmente startX es la X del evento de origen y la rama sale de su nodo. Si la rama tiene
+      // eventos anteriores a su origen, empieza antes: entonces se separa de la línea madre a esa
+      // altura (en la misma X), en vez de nacer «flotando» con la Y/Z del nodo de origen.
+      plan.originPosition = positionOn(parent, Math.min(nodeX.get(plan.origin.id) ?? plan.startX, plan.startX));
     };
     plans.forEach(resolveOrigin);
 

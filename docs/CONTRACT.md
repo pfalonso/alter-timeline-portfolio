@@ -13,8 +13,10 @@ estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las 
 - Tests: Vitest + @vitest/coverage-v8, entorno jsdom. Umbral global ≥ 75 % (lines, functions, branches, statements).
 - Lint: ESLint + typescript-eslint. `npm run typecheck` = `tsc --noEmit`.
 - Docker: multi-stage (node:22-alpine build → nginx:alpine). `docker-compose.yml` expone `8080:80`
-  y monta `./data/life.json` en `/usr/share/nginx/html/data/life.json:ro`.
-- Scripts npm: `dev`, `build`, `preview`, `test`, `test:coverage`, `lint`, `typecheck`, `validate:data`.
+  y monta `./data/life.json` en `/usr/share/nginx/html/data/life.json:ro` (implementado montando el directorio
+  `./data` en `/usr/share/nginx/userdata:ro`; ver DEV_NOTES, decisión 1). `docker-compose.public.yml` (override)
+  monta `./data/public` en su lugar para un despliegue público.
+- Scripts npm: `dev`, `build`, `preview`, `test`, `test:coverage`, `lint`, `typecheck`, `validate:data`, `build:public-data`.
 
 ## Datos (privacidad)
 
@@ -26,6 +28,10 @@ estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las 
 - En `npm run dev`, un plugin de Vite sirve `data/life.json` en `/data/life.json` si existe.
 - `schema/life.schema.json` — JSON Schema (draft 2020-12) equivalente al tipo de abajo.
 - `npm run validate:data [ruta]` valida un JSON con el mismo validador del dominio.
+- `visibility: "private"` **no es un control de acceso**: el filtrado es en el cliente y el JSON se sirve entero.
+  Para un servidor público, `npm run build:public-data [origen] [destino]` genera `data/public/life.json` sin
+  eventos privados (reengancha `branchFrom` al ancestro público más cercano y valida el resultado), y se despliega
+  con `docker compose -f docker-compose.yml -f docker-compose.public.yml up -d`.
 
 ### Esquema `LifeData`
 
@@ -52,6 +58,7 @@ interface Category {
 interface LifeEvent {
   id: string;                 // kebab-case, único
   title: string;
+  shortTitle?: string;        // rótulo corto en la escena (máx. 40 caracteres); si falta, title
   subtitle?: string;          // p. ej. puesto · empresa
   date: { start: string; end?: string }; // "YYYY", "YYYY-MM" o "YYYY-MM-DD"; end puede ser "present"
   categories: string[];       // ≥1 id de categoría; la primera es la principal (color del nodo)
@@ -105,12 +112,13 @@ src/
 - **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados se atenúan/desvanecen con transición, no desaparecen en seco. Estado reflejado en la URL.
 - Marcas de año sobre el eje. HUD con nombre, tagline y contador de eventos visibles.
 - VFX: bloom, partículas fluyendo por las ramas, campo de polvo/estrellas con parallax, halo pulsante en nodos, niebla de profundidad, pulso al seleccionar.
-- Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog", aria-modal).
+- Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog" no modal: es un panel lateral y el resto sigue operable, así que no lleva `aria-modal` ni atrapa el foco; ver DOC_DISCREPANCIES A6).
 - Responsive (móvil: pop-up a pantalla completa, gestos táctiles). Fallback legible si no hay WebGL.
 - Rendimiento: partículas con `Points`/instancing, pixelRatio limitado a 2, pausar render con la pestaña oculta.
 
 ## Calidad
 
 - `npm run lint && npm run typecheck && npm run test:coverage && npm run build` debe pasar en limpio.
-- CI (GitHub Actions, `.github/workflows/ci.yml`): en push/PR a `develop` y `main` → lint, typecheck, test con cobertura, build, `docker build`.
+- CI (GitHub Actions, `.github/workflows/ci.yml`): en push/PR a `develop` y `main` → lint, typecheck, `validate:data` del ejemplo, test con cobertura, build, `docker build` + prueba de humo con `curl`.
+  `main` solo recibe cambios por PR desde `develop`.
 - Flujo git: `main` (estable) ← `develop` ← `feature/*`. Merge a `main` solo con CI verde.

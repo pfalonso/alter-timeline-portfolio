@@ -145,7 +145,7 @@ describe('NodeLabels', () => {
     expect(measured).toBe(3);
   });
 
-  it('el ancho estimado crece con el título y tiene un máximo', () => {
+  it('el ancho estimado crece con el título y tiene un máximo (se nota al apartarlo del borde)', () => {
     const root = mount('div');
     const labels = new NodeLabels(root);
     labels.render(
@@ -153,14 +153,37 @@ describe('NodeLabels', () => {
         events: { 'a-school': { title: 'x'.repeat(200) }, 'e-side-two': { title: 'y' } },
       }),
     );
-    // Título larguísimo (ancho máx. 230): centrado en −110 aún asoma; uno corto en esa X queda fuera.
-    labels.onProjected(frame([node('a-school', -110, 100), node('e-side-two', -110, 300)]));
+    // Un nodo pegado al borde izquierdo: el rótulo se desplaza hasta que cabe entero (margen 8 px).
+    labels.onProjected(frame([node('a-school', 4, 100), node('e-side-two', 4, 300)]));
     const [long, , , short] = [...root.querySelectorAll<HTMLElement>('.node-label')];
     expect(shown(long)).toBe(true);
-    expect(shown(short)).toBe(false);
-    // …pero nunca más de 230 px: centrado en −120 ya no asoma.
-    labels.onProjected(frame([node('a-school', -120, 100)]));
-    expect(shown(long)).toBe(false);
+    expect(shown(short)).toBe(true);
+    // Largo: ancho máximo 230 → centro en 8 + 115. Corto: 1 × 7 + 18 = 25 → centro en 8 + 12,5.
+    expect(translation(long)[0]).toBe(123);
+    expect(translation(short)[0]).toBeCloseTo(20.5);
+  });
+
+  it('un rótulo de un nodo junto al borde derecho tampoco se corta', () => {
+    const { labels, label } = setup();
+    labels.onProjected(frame([node('b-job', VIEWPORT.width - 2, 100)]));
+    const [x] = translation(label('Primer trabajo'));
+    expect(x).toBeLessThan(VIEWPORT.width - 2);
+    expect(shown(label('Primer trabajo'))).toBe(true);
+  });
+
+  it('no rotula un nodo cuyo centro ya está fuera de pantalla', () => {
+    const { labels, label } = setup();
+    labels.onProjected(frame([node('b-job', -5, 100), node('a-school', VIEWPORT.width + 5, 100)]));
+    expect(shown(label('Primer trabajo'))).toBe(false);
+    expect(shown(label('Escuela'))).toBe(false);
+  });
+
+  it('usa el título corto (shortTitle) si existe', () => {
+    const root = mount('div');
+    const labels = new NodeLabels(root);
+    labels.render(unsafeModel(buildModel(), { events: { 'b-job': { title: 'Un título larguísimo de verdad', shortTitle: 'Corto' } } }));
+    expect(texts(root, '.node-label__title')).toContain('Corto');
+    expect(texts(root, '.node-label__title')).not.toContain('Un título larguísimo de verdad');
   });
 
   it('un evento sin categoría conocida usa un acento neutro', () => {

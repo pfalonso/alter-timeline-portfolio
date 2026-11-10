@@ -38,7 +38,7 @@ ejecución que el total).
 | Dominio | `tests/domain/**` (11) | `PartialDate` (formatos, bisiestos, precisión, comparación, formato con locale inválido); validador (cada regla con su ruta y mensaje, errores acumulados en orden de documento, ciclos de ramas, nunca lanza); `Timeline`; `TimelineFactory` (visibilidad `private`, valores por defecto, filtro de URLs); `TimelineLayout` (determinismo, eje X, `branchFrom` exacto, origen oculto, ramas anidadas, carriles, tramos, límites); `EventFilter`; `isHttpUrl`; errores. |
 | Aplicación | `tests/application/**` (2) | Los cuatro casos de uso y `TimelineController` con vista, repositorio y almacén falsos: orden de llamadas, filtro restaurado, selección/navegación, conciliación al filtrar, fallo de carga. |
 | HTTP / URL | `tests/infrastructure/http`, `storage` (2) | 200; 404 → ejemplo; 403/500; JSON mal formado; JSON que no valida (aviso + `rejectedIssues`); error de red en uno y en ambos; `primary: null`. Filtro en la query (ida y vuelta, `cat=` ≠ sin `cat`, conserva ruta, parámetros y hash). |
-| DOM | `tests/infrastructure/dom/**` (13) | `FilterBar`; `EventPopup` (`role="dialog"`, `aria-modal`, foco al abrir, devolución del foco, trampa de Tab, clic fuera, enlaces `rel="noopener noreferrer"`, media); `Tooltip`; `Hud`; `EventList`; `KeyboardShortcuts`; `LiveAnnouncer`; `ViewControls`; `YearRuler`; `NodeLabels`; `labelLayout`; `CompositeTimelineView`; `dom.ts`. |
+| DOM | `tests/infrastructure/dom/**` (13) | `FilterBar`; `EventPopup` (`role="dialog"` no modal sin `aria-modal`, foco al abrir, devolución del foco, Tab sin trampa, clic fuera, enlaces `rel="noopener noreferrer"`, media); `Tooltip`; `Hud`; `EventList`; `KeyboardShortcuts`; `LiveAnnouncer`; `ViewControls`; `YearRuler`; `NodeLabels`; `labelLayout`; `CompositeTimelineView`; `dom.ts`. |
 | three | `tests/infrastructure/three/**` (10) | `math`, `CameraRig`, `RenderLoop` (pausa con pestaña oculta, delta acotado), `PointerInput` (toque, arrastre, pellizco, rueda), texturas, `NodeMesh`, efectos, `SceneBuilder`, `ThreeTimelineView` con backend falso (tamaño, pixelRatio ≤ 2, proyección, filtro, selección, hover, clic), `webgl.ts` y `PostFX` con three mockeado. |
 | Datos | `tests/data/example-data.test.ts` | `public/data/life.example.json` pasa el validador del dominio sin errores, solo tiene URLs http(s), no contiene marcado HTML y se puede disponer con y sin privados. |
 | Seguridad | `tests/security/xss.test.ts` | Ver abajo. |
@@ -116,9 +116,12 @@ Observaciones sobre el producto (no se han cambiado; son decisiones, no fallos c
    sean posteriores a su `branchFrom`. Si el primer evento de la rama es anterior, el layout
    arranca la rama antes del nodo de origen (a su altura, pero en otra X), y la bifurcación no
    sale visualmente del nodo. Valdría una regla más en el validador.
+   **Resuelto (11/11/2026):** la rama se separa ahora de la línea madre en su propia X (test en
+   `TimelineLayout.test.ts`); no se añade regla al validador porque es un caso legítimo.
 2. **`aria-modal="true"` en un panel que no es modal.** El contrato lo pide, pero la escena y los
    filtros siguen siendo utilizables con el ratón mientras el pop-up está abierto (DEV_NOTES,
    decisión 5). Para un lector de pantalla, `aria-modal` declara inerte todo lo demás.
+   **Resuelto (11/11/2026):** el pop-up pasa a ser un diálogo no modal (sin `aria-modal` ni trampa de Tab).
 3. **`media` se filtra en dos capas, no en tres.** Los enlaces pasan por validador, fábrica y
    `safeLink()`; las imágenes solo por validador y fábrica (`EventPopup` asigna `img.src` sin
    volver a comprobarlo). No es explotable con el flujo actual.

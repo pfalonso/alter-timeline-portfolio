@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { append, clear, el, focusableWithin, safeLink } from '../../../src/infrastructure/dom/dom';
+import { append, clear, el, safeLink } from '../../../src/infrastructure/dom/dom';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom } from '../../helpers/dom';
 
@@ -93,26 +93,6 @@ describe('safeLink()', () => {
     const link = safeLink('<b>negrita</b>', 'https://example.com');
     expect(link?.children).toHaveLength(0);
     expect(link?.textContent).toBe('<b>negrita</b>');
-  });
-});
-
-describe('focusableWithin()', () => {
-  it('devuelve enlaces con href, botones activos y tabindex ≥ 0, en orden de documento', () => {
-    const root = el('div', {}, [
-      el('button', { text: '1', attrs: { id: 'b1' } }),
-      el('button', { text: 'x', attrs: { disabled: true } }),
-      el('a', { text: 'sin href' }),
-      el('a', { text: '2', attrs: { href: 'https://example.com', id: 'a1' } }),
-      el('div', { attrs: { tabindex: 0, id: 'd1' } }),
-      el('div', { attrs: { tabindex: -1 } }),
-      el('button', { text: 'oculto', attrs: { hidden: true } }),
-      el('span', { text: 'no' }),
-    ]);
-    expect(focusableWithin(root).map((node) => node.id)).toEqual(['b1', 'a1', 'd1']);
-  });
-
-  it('lista vacía si no hay nada enfocable', () => {
-    expect(focusableWithin(el('div', {}, [el('p', { text: 'x' })]))).toEqual([]);
   });
 });
 

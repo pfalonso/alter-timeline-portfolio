@@ -28,6 +28,7 @@ export class TimelineFactory {
     return new LifeEvent({
       id: raw.id,
       title: raw.title,
+      shortTitle: raw.shortTitle?.trim() || undefined,
       subtitle: raw.subtitle,
       start: PartialDate.parse(raw.date.start),
       end: raw.date.end !== undefined && !ongoing ? PartialDate.parse(raw.date.end) : null,

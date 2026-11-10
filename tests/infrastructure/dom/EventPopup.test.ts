@@ -34,10 +34,11 @@ const pointerDown = (target: EventTarget): void => {
 };
 
 describe('EventPopup: accesibilidad del diálogo', () => {
-  it('es un diálogo modal etiquetado por su título y empieza oculto', () => {
+  it('es un diálogo NO modal etiquetado por su título y empieza oculto', () => {
     const { root, popup } = setup();
     expect(root.getAttribute('role')).toBe('dialog');
-    expect(root.getAttribute('aria-modal')).toBe('true');
+    // Panel lateral sin velo: el resto de la página sigue operable, así que no declara aria-modal.
+    expect(root.hasAttribute('aria-modal')).toBe(false);
     expect(root.getAttribute('aria-labelledby')).toBe('popup-title');
     expect(root.tabIndex).toBe(-1);
     expect(root.hidden).toBe(true);
@@ -339,48 +340,15 @@ describe('EventPopup: gestión del foco', () => {
     expect(nextButton(root).disabled).toBe(true);
   });
 
-  it('Tab en el último elemento vuelve al primero (el foco no sale del diálogo)', () => {
+  it('no atrapa el foco: Tab y Mayús+Tab salen del panel por el orden natural', () => {
     const { root, popup } = setup();
     popup.applySelection(selection('b-job', true));
     nextButton(root).focus();
-    const event = press(nextButton(root), 'Tab');
-    expect(event.defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(closeButton(root));
-  });
-
-  it('Mayús+Tab en el primero (o en el propio diálogo) salta al último', () => {
-    const { root, popup } = setup();
-    popup.applySelection(selection('b-job', true));
+    expect(press(nextButton(root), 'Tab').defaultPrevented).toBe(false);
     closeButton(root).focus();
-    expect(press(closeButton(root), 'Tab', { shiftKey: true }).defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(nextButton(root));
-
+    expect(press(closeButton(root), 'Tab', { shiftKey: true }).defaultPrevented).toBe(false);
     root.focus();
-    expect(press(root, 'Tab', { shiftKey: true }).defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(nextButton(root));
-  });
-
-  it('el último enfocable tiene en cuenta los botones desactivados', () => {
-    const { root, popup } = setup();
-    popup.applySelection(selection('b-job', true, { hasNext: false }));
-    const link = root.querySelector<HTMLAnchorElement>('.popup__links a');
-    closeButton(root).focus();
-    press(closeButton(root), 'Tab', { shiftKey: true });
-    expect(document.activeElement).toBe(prevButton(root));
-
-    popup.applySelection(selection('b-job', true, { hasPrevious: false, hasNext: false }));
-    closeButton(root).focus();
-    press(closeButton(root), 'Tab', { shiftKey: true });
-    expect(document.activeElement).toBe(link);
-  });
-
-  it('Tab en mitad del diálogo sigue el orden natural (no se intercepta)', () => {
-    const { root, popup } = setup();
-    popup.applySelection(selection('b-job', true));
-    closeButton(root).focus();
-    expect(press(closeButton(root), 'Tab').defaultPrevented).toBe(false);
-    prevButton(root).focus();
-    expect(press(prevButton(root), 'Tab', { shiftKey: true }).defaultPrevented).toBe(false);
+    expect(press(root, 'Tab', { shiftKey: true }).defaultPrevented).toBe(false);
   });
 
   it('otras teclas y Tab con el pop-up cerrado no se interceptan', () => {

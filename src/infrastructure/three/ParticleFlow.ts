@@ -14,7 +14,17 @@ import type { FrameContext } from './types';
 export interface FlowPath {
   readonly path: PathTable;
   readonly color: string;
+  /**
+   * Fracción final de la rama en la que las motas se dispersan y se apagan, como si la rama se
+   * deshiciera en polvo (ramas que no llegan al presente). 0 o ausente = final normal.
+   */
+  readonly dissolve?: number;
 }
+
+/** Cuánto se separan del eje, como máximo, las motas que se disuelven (multiplica su órbita). */
+export const DISSOLVE_SPREAD = 6;
+/** Cuánto ascienden las motas al final de una rama que se disuelve (unidades de mundo). */
+export const DISSOLVE_RISE = 1.4;
 
 export interface ParticleFlowOptions {
   /** Partículas por unidad de longitud de rama. */
@@ -62,7 +72,10 @@ interface Particle {
   readonly orbit: number;
 }
 
-/** Motas de energía que recorren las ramas hacia el futuro (un solo `Points`). */
+/**
+ * Motas de energía que recorren las ramas hacia el futuro (un solo `Points`). En las ramas que
+ * terminan (`dissolve`) las motas se dispersan, suben y se apagan: una vida que no siguió.
+ */
 export class ParticleFlow implements SceneEffect {
   readonly points: Points<BufferGeometry, ShaderMaterial>;
   readonly count: number;
@@ -145,14 +158,21 @@ export class ParticleFlow implements SceneEffect {
     const { positions, alphas } = this;
     for (let i = 0; i < this.count; i += 1) {
       const particle = this.particles[i];
-      const { path } = this.paths[particle.pathIndex];
-      particle.t += (particle.speed * this.options.speed * delta) / Math.max(1, path.length);
+      const { path, dissolve = 0 } = this.paths[particle.pathIndex];
+      const tail = dissolve > 0 ? Math.max(0, (particle.t - (1 - dissolve)) / dissolve) : 0;
+      // En la zona de disolución las motas frenan: se quedan flotando mientras se apagan.
+      const slow = 1 - 0.55 * tail;
+      particle.t += (particle.speed * this.options.speed * delta * slow) / Math.max(1, path.length);
       if (particle.t > 1) particle.t -= 1;
       path.sample(particle.t, positions, i * 3);
+      const k = dissolve > 0 ? Math.max(0, (particle.t - (1 - dissolve)) / dissolve) : 0;
+      const scatter = k * k;
+      const orbit = particle.orbit * (1 + scatter * DISSOLVE_SPREAD);
       const angle = particle.angle + time * particle.spin;
-      positions[i * 3 + 1] += Math.cos(angle) * particle.orbit;
-      positions[i * 3 + 2] += Math.sin(angle) * particle.orbit;
-      alphas[i] = smoothstep(0, 0.04, particle.t) * (1 - smoothstep(0.9, 1, particle.t));
+      positions[i * 3 + 1] += Math.cos(angle) * orbit + scatter * DISSOLVE_RISE * (0.4 + particle.orbit);
+      positions[i * 3 + 2] += Math.sin(angle) * orbit;
+      const fadeOut = dissolve > 0 ? 1 - smoothstep(0.45, 1, k) : 1 - smoothstep(0.9, 1, particle.t);
+      alphas[i] = smoothstep(0, 0.04, particle.t) * fadeOut;
     }
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.aAlpha.needsUpdate = true;

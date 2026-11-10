@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { labelDistanceLimit, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
+import { clampLabelX, labelDistanceLimit, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
 
 const VIEWPORT = { width: 800, height: 600 };
 
@@ -103,5 +103,21 @@ describe('labelDistanceLimit', () => {
     expect(labelDistanceLimit(2)).toBe(58);
     expect(labelDistanceLimit(1)).toBe(30);
     expect(labelDistanceLimit(1)).toBeLessThan(labelDistanceLimit(2));
+  });
+});
+
+describe('clampLabelX', () => {
+  it('deja igual una etiqueta que ya cabe', () => {
+    expect(clampLabelX(500, 100, 1000)).toBe(500);
+  });
+
+  it('la aparta de los bordes izquierdo y derecho respetando el margen', () => {
+    expect(clampLabelX(10, 100, 1000)).toBe(58);
+    expect(clampLabelX(995, 100, 1000)).toBe(942);
+    expect(clampLabelX(10, 100, 1000, 0)).toBe(50);
+  });
+
+  it('si la etiqueta es más ancha que el visor, la centra', () => {
+    expect(clampLabelX(10, 400, 300)).toBe(150);
   });
 });

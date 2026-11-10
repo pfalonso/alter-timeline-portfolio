@@ -81,7 +81,9 @@ export class SceneBuilder {
         flowSpeed: 0.11,
         fogDensity,
       };
-      return { curve: new BranchCurve(branch.id, branch.points, style), color: style.color };
+      // Una rama que no llega al presente se deshace en polvo al final (ver ParticleFlow).
+      const dissolve = !isTrunk && !branch.open ? style.fadeOut : 0;
+      return { curve: new BranchCurve(branch.id, branch.points, style), color: style.color, dissolve };
     });
 
     // Tramos de duración: un filamento más grueso y tenue del color de la categoría.
@@ -116,7 +118,7 @@ export class SceneBuilder {
       );
     });
 
-    const flowPaths: FlowPath[] = branches.map(({ curve, color }) => ({ path: curve.path, color }));
+    const flowPaths: FlowPath[] = branches.map(({ curve, color, dissolve }) => ({ path: curve.path, color, dissolve }));
     const { minX, maxX, minY, maxY } = layout.bounds;
     const wide: [number, number] = [minX - 260, maxX + 260];
     const starLayers: StarLayer[] = [

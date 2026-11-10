@@ -168,6 +168,34 @@ describe('ParticleFlow', () => {
     }
   });
 
+  it('en una rama que se disuelve, al final las motas se dispersan, suben y se apagan', () => {
+    const flow = new ParticleFlow([{ ...path(), dissolve: 0.3 }], { density: 60 });
+    const position = flow.points.geometry.attributes.position.array;
+    const alpha = flow.points.geometry.attributes.aAlpha.array;
+    let maxSpread = 0;
+    for (let i = 0; i < flow.count; i += 1) {
+      const x = position[i * 3];
+      const spread = Math.hypot(position[i * 3 + 1], position[i * 3 + 2]);
+      // Antes de la zona de disolución se comportan como siempre.
+      if (x < 6.5) expect(spread).toBeLessThan(0.9);
+      if (x > 9) maxSpread = Math.max(maxSpread, spread);
+      if (x > 9.95) expect(alpha[i]).toBeLessThan(0.05);
+      if (x > 7.2 && x < 8) expect(alpha[i]).toBeGreaterThan(0.7);
+    }
+    expect(maxSpread).toBeGreaterThan(1.2);
+  });
+
+  it('las motas frenan en la zona de disolución', () => {
+    const normal = new ParticleFlow([path()], { density: 30, speed: 1 });
+    const dissolving = new ParticleFlow([{ ...path(), dissolve: 0.5 }], { density: 30, speed: 1 });
+    const start = xs(normal);
+    normal.update(frameContext({ delta: 0.05, time: 0 }));
+    dissolving.update(frameContext({ delta: 0.05, time: 0 }));
+    const moved = (flow: ParticleFlow): number =>
+      xs(flow).reduce((sum, x, i) => (start[i] > 6 && start[i] < 9 ? sum + Math.max(0, x - start[i]) : sum), 0);
+    expect(moved(dissolving)).toBeLessThan(moved(normal));
+  });
+
   it('se desvanecen en los extremos de la rama', () => {
     const flow = new ParticleFlow([path()], { density: 40 });
     const alpha = flow.points.geometry.attributes.aAlpha.array;

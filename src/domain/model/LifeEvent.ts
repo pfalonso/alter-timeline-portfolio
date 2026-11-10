@@ -8,6 +8,8 @@ export const DEFAULT_IMPORTANCE: Importance = 2;
 export interface LifeEventProps {
   readonly id: string;
   readonly title: string;
+  /** Versión corta del título para los rótulos de la escena (opcional). */
+  readonly shortTitle?: string;
   readonly subtitle?: string;
   readonly start: PartialDate;
   /** Fecha de fin; `null` si es puntual o si sigue en curso. */
@@ -33,6 +35,7 @@ export interface LifeEventProps {
 export class LifeEvent implements LifeEventProps {
   readonly id!: string;
   readonly title!: string;
+  readonly shortTitle?: string;
   readonly subtitle?: string;
   readonly start!: PartialDate;
   readonly end!: PartialDate | null;
@@ -54,6 +57,11 @@ export class LifeEvent implements LifeEventProps {
   constructor(props: LifeEventProps) {
     Object.assign(this, props);
     Object.freeze(this);
+  }
+
+  /** Texto del rótulo en la escena: el título corto si lo hay; si no, el título. */
+  get labelTitle(): string {
+    return this.shortTitle ?? this.title;
   }
 
   /** La primera categoría es la principal: da color al nodo. */

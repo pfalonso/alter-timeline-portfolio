@@ -42,6 +42,18 @@ describe('TimelineFactory', () => {
     });
   });
 
+  it('shortTitle se recorta y alimenta labelTitle; sin él, labelTitle es el título', () => {
+    const data = makeData();
+    data.events[0].shortTitle = '  Cole  ';
+    const timeline = factory.create(data, { now: NOW });
+    const first = timeline.getEvent(data.events[0].id);
+    expect(first?.shortTitle).toBe('Cole');
+    expect(first?.labelTitle).toBe('Cole');
+    const other = timeline.getEvent(data.events[1].id);
+    expect(other?.shortTitle).toBeUndefined();
+    expect(other?.labelTitle).toBe(other?.title);
+  });
+
   describe('visibilidad', () => {
     it('por defecto oculta los eventos privados', () => {
       const timeline = factory.create(makeData(), { now: NOW });
