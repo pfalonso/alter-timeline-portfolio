@@ -21,7 +21,8 @@ export const STRINGS = {
   overview: 'Vista general',
   ongoing: 'En curso',
   privateEvent: 'Privado',
-  helpKeys: '← → saltar · Enter abrir · Esc cerrar · arrastra o desplaza para viajar',
+  helpKeys: 'clic en un nodo para abrirlo · ← → saltar · Enter abrir · Esc cerrar · arrastra o desplaza para viajar',
+  helpTouch: 'toca un nodo para abrirlo · desliza para viajar · pellizca para acercar',
   stageLabel:
     'Línea temporal 3D interactiva. Usa las flechas izquierda y derecha para saltar entre eventos y Enter para abrir el detalle. El índice de eventos ofrece el mismo contenido en forma de lista.',
   noWebgl: 'Tu navegador no puede mostrar la escena 3D (WebGL no disponible). Aquí tienes la línea temporal en formato lista.',

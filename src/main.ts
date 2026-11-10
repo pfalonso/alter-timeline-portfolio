@@ -50,7 +50,8 @@ async function bootstrap(): Promise<void> {
   const app = byId('app');
   const loading = byId('loading');
   loading.textContent = STRINGS.loading;
-  byId('help').textContent = STRINGS.helpKeys;
+  // En pantallas táctiles no hay teclado ni rueda: se explican los gestos.
+  byId('help').textContent = window.matchMedia('(pointer: coarse)').matches ? STRINGS.helpTouch : STRINGS.helpKeys;
 
   const href = window.location.href;
   const debug = readUrlFlag(href, 'debug');
