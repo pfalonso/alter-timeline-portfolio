@@ -116,6 +116,8 @@ Observaciones sobre el producto (no se han cambiado; son decisiones, no fallos c
    sean posteriores a su `branchFrom`. Si el primer evento de la rama es anterior, el layout
    arranca la rama antes del nodo de origen (a su altura, pero en otra X), y la bifurcación no
    sale visualmente del nodo. Valdría una regla más en el validador.
+   **Resuelto (11/11/2026):** la rama se separa ahora de la línea madre en su propia X (test en
+   `TimelineLayout.test.ts`); no se añade regla al validador porque es un caso legítimo.
 2. **`aria-modal="true"` en un panel que no es modal.** El contrato lo pide, pero la escena y los
    filtros siguen siendo utilizables con el ratón mientras el pop-up está abierto (DEV_NOTES,
    decisión 5). Para un lector de pantalla, `aria-modal` declara inerte todo lo demás.
