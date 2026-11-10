@@ -1286,7 +1286,7 @@ Hoy la interfaz está solo en español. Lo que ya existe:
 Lo que haría falta para un segundo idioma:
 
 1. Convertir `STRINGS` en un diccionario por idioma elegido a partir de `meta.locale` e inyectarlo en las piezas DOM desde `main.ts`.
-2. Mover a ese diccionario los textos que aún están escritos en el sitio: «Cuándo», «Dónde» y «Con» en `EventPopup`, «hoy» en `YearRuler`, y los de `index.html` (enlace de salto, botón «Índice», etiqueta de los controles, `<noscript>`).
+2. Mover a ese diccionario los textos que aún están escritos en `index.html` (enlace de salto, botón «Índice», etiqueta de los controles, `<noscript>`). Los del pop-up y la regla de años ya están en `STRINGS`.
 3. Los mensajes del validador y de los errores de dominio también están en español; viven en el dominio y tendrían que devolver códigos en lugar de frases.
 4. El contenido (títulos, descripciones) es un único idioma por fichero: para dos idiomas harían falta dos `life.json` o ampliar el esquema.
 

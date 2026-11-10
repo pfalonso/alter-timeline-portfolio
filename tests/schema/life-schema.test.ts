@@ -128,6 +128,8 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
     'data:text/html,x',
     'ftp://example.com',
     '//example.com',
+    'HTTPS://EXAMPLE.COM',
+    'Http://example.com',
     '/relativa',
     ' https://example.com',
     'https://example.com con espacios',

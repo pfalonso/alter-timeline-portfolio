@@ -32,7 +32,7 @@
   "$defs": {
     "nonEmptyString": { "type": "string", "pattern": "\\S" },
     "kebabId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
-    "httpUrl": { "type": "string", "format": "uri", "pattern": "^https?://\\S+$" },
+    "httpUrl": { "type": "string", "format": "uri", "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://\\S+$" },
     "partialDate": {
       "type": "string",
       "pattern": "^\\d{4}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\\d|3[01]))?)?$",
@@ -100,7 +100,7 @@
         },
         "importance": { "enum": [1, 2, 3], "default": 2 },
         "branch": { "$ref": "#/$defs/kebabId", "default": "main" },
-        "branchFrom": { "type": "string", "description": "Id del evento (de otra rama) del que nace esta rama" },
+        "branchFrom": { "$ref": "#/$defs/kebabId", "description": "Id del evento (de otra rama) del que nace esta rama" },
         "visibility": { "enum": ["public", "private"], "default": "public" }
       }
     }

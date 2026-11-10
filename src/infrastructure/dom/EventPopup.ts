@@ -117,9 +117,9 @@ export class EventPopup implements TimelineViewPart {
     const addFact = (term: string, value: string | undefined): void => {
       if (value) facts.append(el('div', {}, [el('dt', { text: term }), el('dd', { text: value })]));
     };
-    addFact('Cuándo', event.formatDateRange(timeline.meta.locale, STRINGS.present));
-    addFact('Dónde', event.location);
-    addFact('Con', event.organization);
+    addFact(STRINGS.when, event.formatDateRange(timeline.meta.locale, STRINGS.present));
+    addFact(STRINGS.where, event.location);
+    addFact(STRINGS.with, event.organization);
 
     const origin = event.branchFrom ? timeline.getEvent(event.branchFrom) : undefined;
 

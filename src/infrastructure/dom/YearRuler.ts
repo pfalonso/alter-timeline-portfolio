@@ -3,11 +3,12 @@ import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
 import { yearStep } from './labelLayout';
+import { STRINGS } from './strings';
 
 /** Regla inferior con las marcas de año, alineada con los meridianos de la escena. */
 export class YearRuler implements TimelineViewPart, ProjectionListener {
   private readonly ticks = new Map<number, HTMLElement>();
-  private readonly now = el('div', { class: 'ruler__now', text: 'hoy' });
+  private readonly now = el('div', { class: 'ruler__now', text: STRINGS.today });
 
   constructor(private readonly root: HTMLElement) {
     root.setAttribute('aria-hidden', 'true');

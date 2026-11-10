@@ -14,7 +14,7 @@ export interface NodeHoverListener {
   onNodeHover(eventId: string | null, at: ScreenPoint): void;
 }
 
-/** Tooltip de hover: título + fechas + resumen corto. */
+/** Tooltip de hover: categoría principal + título completo + fechas. */
 export class Tooltip implements TimelineViewPart, NodeHoverListener {
   private timeline: Timeline | null = null;
   private readonly title = el('strong', { class: 'tooltip__title' });
