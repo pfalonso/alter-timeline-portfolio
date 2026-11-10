@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+*.log
+.DS_Store
+
+# Datos personales reales: NUNCA al repositorio
+/data/*
+!/data/.gitkeep
+/public/data/life.json
+/hr/
