@@ -182,7 +182,8 @@ Raíz del documento:
 | Campo | Tipo | Obligatorio | Descripción |
 | --- | --- | --- | --- |
 | `id` | texto kebab-case | Sí | Identificador único del evento |
-| `title` | texto no vacío | Sí | Título (rótulo del nodo, tooltip, pop-up, índice) |
+| `title` | texto no vacío | Sí | Título (tooltip, pop-up, índice y, si no hay `shortTitle`, rótulo del nodo) |
+| `shortTitle` | texto no vacío, máx. 40 caracteres | No | Versión corta del título para el rótulo del nodo en la escena. Útil para títulos largos, que el rótulo cortaría con «…». El tooltip, el pop-up y el índice siguen mostrando `title` |
 | `date` | `{ start, end? }` | Sí | Ver «Fechas» más abajo |
 | `categories` | lista de ids | Sí | Al menos una. **La primera es la principal** y da color al nodo; las siguientes (hasta tres) añaden acentos de color |
 | `summary` | texto no vacío | Sí | Una o dos frases: cabecera del pop-up, índice y anuncio para lectores de pantalla |
@@ -218,6 +219,7 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `end` ≥ `start` | Se tiene en cuenta la precisión: `start: "2019-03"`, `end: "2019"` es válido porque 2019 contiene marzo |
 | URLs | `links[].url`, `media[].url` y `meta.contact[].url` deben ser http(s) absolutas |
 | `media` | `type` solo puede ser `"image"`; `alt` debe ser un texto |
+| `shortTitle` | Opcional; si está, texto no vacío de 40 caracteres como máximo |
 | `importance`, `visibility` | Solo los valores permitidos |
 | `branch` | Id en kebab-case |
 | `branchFrom` | El evento existe; no es el propio evento; no pertenece a la misma rama |
@@ -1423,7 +1425,7 @@ Tomadas de `docs/DEV_NOTES.md` y del propio código. Para el estado de las compr
 | Enlaces profundos | No se puede enlazar a un evento concreto (`?event=id` no existe). Solo el filtro vive en la URL |
 | Idioma | Interfaz solo en español. `meta.locale` afecta al formato de fechas y al atributo `lang`, no a los textos |
 | Muchas ramas | Con más de cuatro ramas simultáneas la escena crece en vertical y el encuadre por defecto se queda corto |
-| Rótulos | Su anchura se estima por número de caracteres, no se mide |
+| Rótulos | Su anchura se estima por número de caracteres, no se mide. Un título largo se corta con «…» en el rótulo (no en el tooltip ni en el pop-up): para evitarlo, `shortTitle` |
 | Rendimiento | Medido solo con renderizado por software (unos 4 fps a 1440×900). Sin datos en GPU real |
 | Navegadores | Probado solo en Chrome sin interfaz. Sin pruebas en Firefox, Safari ni dispositivos táctiles reales |
 | Docker | `docker build` sin ejecutar en el entorno de desarrollo (registros de imágenes bloqueados). La configuración de nginx sí se probó con un nginx local |

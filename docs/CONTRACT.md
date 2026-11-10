@@ -52,6 +52,7 @@ interface Category {
 interface LifeEvent {
   id: string;                 // kebab-case, único
   title: string;
+  shortTitle?: string;        // rótulo corto en la escena (máx. 40 caracteres); si falta, title
   subtitle?: string;          // p. ej. puesto · empresa
   date: { start: string; end?: string }; // "YYYY", "YYYY-MM" o "YYYY-MM-DD"; end puede ser "present"
   categories: string[];       // ≥1 id de categoría; la primera es la principal (color del nodo)

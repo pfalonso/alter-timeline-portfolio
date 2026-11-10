@@ -79,6 +79,17 @@ export function layoutLabels(
   return result;
 }
 
+/**
+ * Desplaza en horizontal el centro de una etiqueta para que no se salga del visor (deja `margin`
+ * píxeles a cada lado). Si la etiqueta es más ancha que el visor, la centra.
+ */
+export function clampLabelX(x: number, width: number, viewportWidth: number, margin = 8): number {
+  const min = margin + width / 2;
+  const max = viewportWidth - margin - width / 2;
+  if (min > max) return viewportWidth / 2;
+  return Math.min(max, Math.max(min, x));
+}
+
 /** Cada cuántos años se rotula la regla según el espacio disponible entre marcas. */
 export function yearStep(pixelsPerYear: number, minLabelSpacing = 56): number {
   if (!(pixelsPerYear > 0)) return 10;

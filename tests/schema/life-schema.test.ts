@@ -75,7 +75,7 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
     expect(Object.keys(defs.event.properties ?? {}).sort()).toEqual(
       [
         'branch', 'branchFrom', 'categories', 'date', 'description', 'highlights', 'id', 'importance', 'links', 'location',
-        'media', 'organization', 'skills', 'subtitle', 'summary', 'title', 'visibility',
+        'media', 'organization', 'shortTitle', 'skills', 'subtitle', 'summary', 'title', 'visibility',
       ].sort(),
     );
     expect(Object.keys(defs.category.properties ?? {}).sort()).toEqual(['color', 'description', 'icon', 'id', 'label']);

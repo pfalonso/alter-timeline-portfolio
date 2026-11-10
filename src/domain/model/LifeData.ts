@@ -24,6 +24,8 @@ export interface CategoryData {
 export interface LifeEventData {
   id: string;
   title: string;
+  /** Título corto para los rótulos de la escena (máx. 40 caracteres). */
+  shortTitle?: string;
   subtitle?: string;
   date: { start: string; end?: string };
   categories: string[];

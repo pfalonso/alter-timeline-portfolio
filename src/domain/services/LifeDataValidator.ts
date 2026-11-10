@@ -5,6 +5,9 @@ import { MAIN_BRANCH } from '../model/LifeEvent';
 import { PartialDate } from '../model/PartialDate';
 import { isHttpUrl } from './safeUrl';
 
+/** Longitud máxima del título corto que se usa en los rótulos de la escena. */
+export const SHORT_TITLE_MAX = 40;
+
 export interface ValidationResult {
   readonly ok: boolean;
   readonly issues: readonly ValidationIssue[];
@@ -171,6 +174,14 @@ export class LifeDataValidator {
       c.kebabId(event, path, ids);
       c.requiredString(event, 'title', path);
       c.requiredString(event, 'summary', path);
+      if (event.shortTitle !== undefined) {
+        const short = event.shortTitle;
+        if (typeof short !== 'string' || short.trim().length === 0) {
+          c.add(`${path}.shortTitle`, 'si se indica, debe ser un texto no vacío');
+        } else if (short.trim().length > SHORT_TITLE_MAX) {
+          c.add(`${path}.shortTitle`, `debe tener como máximo ${SHORT_TITLE_MAX} caracteres`);
+        }
+      }
       for (const key of ['subtitle', 'description', 'location', 'organization']) {
         c.optionalString(event, key, path);
       }

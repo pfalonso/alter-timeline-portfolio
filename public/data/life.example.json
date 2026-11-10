@@ -34,6 +34,7 @@
     {
       "id": "grado-sonido-imagen",
       "title": "Grado en Ingeniería de Sonido e Imagen",
+      "shortTitle": "Ingeniería de Sonido e Imagen",
       "subtitle": "Universitat Politècnica de Llevant",
       "date": { "start": "2010-09", "end": "2014-06" },
       "categories": ["academico"],
@@ -149,6 +150,7 @@
     {
       "id": "recetario-autoeditado",
       "title": "Recetario de un obrador que ya no existe",
+      "shortTitle": "Recetario autoeditado",
       "subtitle": "Fanzine autoeditado",
       "date": { "start": "2017-03" },
       "categories": ["gastronomia", "proyectos"],

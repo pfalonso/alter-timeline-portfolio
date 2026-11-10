@@ -63,6 +63,7 @@
       "properties": {
         "id": { "$ref": "#/$defs/kebabId" },
         "title": { "$ref": "#/$defs/nonEmptyString" },
+        "shortTitle": { "type": "string", "minLength": 1, "maxLength": 40, "description": "Título corto para los rótulos de la escena; si falta se usa title" },
         "subtitle": { "type": "string" },
         "date": {
           "type": "object",

@@ -184,6 +184,14 @@ describe('LifeDataValidator: eventos', () => {
     expectSingleIssue((data) => (data.events[0][key] = 3), `events[0].${key}`, /debe ser un texto/);
   });
 
+  it('shortTitle es opcional, no vacío y de 40 caracteres como máximo', () => {
+    expect(issuesAfter((data) => (data.events[0].shortTitle = 'Corto'))).toEqual([]);
+    expect(issuesAfter((data) => (data.events[0].shortTitle = 'x'.repeat(40)))).toEqual([]);
+    expectSingleIssue((data) => (data.events[0].shortTitle = '  '), 'events[0].shortTitle', /no vacío/);
+    expectSingleIssue((data) => (data.events[0].shortTitle = 3), 'events[0].shortTitle', /no vacío/);
+    expectSingleIssue((data) => (data.events[0].shortTitle = 'x'.repeat(41)), 'events[0].shortTitle', /como máximo 40/);
+  });
+
   it.each(['skills', 'highlights'])('%s: lista de textos no vacíos', (key) => {
     expectSingleIssue((data) => (data.events[0][key] = 'uno'), `events[0].${key}`, /lista de textos/);
     const issues = issuesAfter((data) => (data.events[0][key] = ['ok', '', 3, '  ']));
