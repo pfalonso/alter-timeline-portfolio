@@ -1,4 +1,5 @@
 import type { FilterViewState, TimelineViewHandlers, TimelineViewModel } from '../../application/ports';
+import type { LineStyle, Timeline } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
 import { STRINGS } from './strings';
@@ -23,6 +24,7 @@ export class FilterBar implements TimelineViewPart {
     this.root.setAttribute('aria-label', STRINGS.filtersLabel);
 
     const counts = model.timeline.countByCategory();
+    const styles = dominantStyles(model.timeline);
     const list = el('div', { class: 'filters__chips' });
     for (const category of model.timeline.categories) {
       const chip = el(
@@ -37,7 +39,7 @@ export class FilterBar implements TimelineViewPart {
           },
         },
         [
-          el('span', { class: 'chip__dot', attrs: { 'aria-hidden': 'true' } }),
+          el('span', { class: `chip__dot chip__dot--${styles.get(category.id) ?? 'neutral'}`, attrs: { 'aria-hidden': 'true' } }),
           category.icon ? el('span', { class: 'chip__icon', text: category.icon, attrs: { 'aria-hidden': 'true' } }) : null,
           el('span', { class: 'chip__label', text: category.label }),
           el('span', { class: 'chip__count', text: String(counts.get(category.id) ?? 0) }),
@@ -74,4 +76,33 @@ export class FilterBar implements TimelineViewPart {
     this.allButton?.toggleAttribute('disabled', state.activeCategoryIds.size === this.chips.size);
     this.noneButton?.toggleAttribute('disabled', state.activeCategoryIds.size === 0);
   }
+}
+
+/**
+ * Lenguaje de forma de cada categoría en los chips: el de la línea en la que más eventos tiene
+ * (empate: la primera en aparecer). Así el chip habla el mismo idioma visual que sus nodos.
+ */
+export function dominantStyles(timeline: Timeline): Map<string, LineStyle> {
+  const tally = new Map<string, Map<LineStyle, number>>();
+  for (const event of timeline.events) {
+    const style = timeline.lineStyleOf(event.branch);
+    for (const id of event.categoryIds) {
+      const counts = tally.get(id) ?? new Map<LineStyle, number>();
+      counts.set(style, (counts.get(style) ?? 0) + 1);
+      tally.set(id, counts);
+    }
+  }
+  const result = new Map<string, LineStyle>();
+  for (const [id, counts] of tally) {
+    let best: LineStyle = 'neutral';
+    let max = 0;
+    for (const [style, count] of counts) {
+      if (count > max) {
+        best = style;
+        max = count;
+      }
+    }
+    result.set(id, best);
+  }
+  return result;
 }

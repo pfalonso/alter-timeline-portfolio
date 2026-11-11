@@ -1,5 +1,5 @@
 import type { TimelineViewModel } from '../../application/ports';
-import type { Timeline } from '../../domain/model';
+import type { LineStyle, Timeline } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
 import { STRINGS } from './strings';
@@ -19,6 +19,7 @@ interface LegendLine {
   readonly label: string;
   readonly color: string;
   readonly main: boolean;
+  readonly style: LineStyle;
   readonly status: string | null;
   readonly description?: string;
 }
@@ -75,6 +76,7 @@ export class LineLegend implements TimelineViewPart {
           },
         },
         [
+          el('span', { class: `line__mark line__mark--${line.style}`, attrs: { 'aria-hidden': 'true' } }),
           el('span', { class: 'line__swatch', attrs: { 'aria-hidden': 'true' } }),
           el('span', { class: 'line__label', text: line.label }),
           line.status ? el('span', { class: 'line__status', text: line.status }) : null,
@@ -132,6 +134,7 @@ export class LineLegend implements TimelineViewPart {
         label: line?.label ?? (branch.main ? STRINGS.mainLine : branch.id),
         color,
         main: branch.main,
+        style: timeline.lineStyleOf(branch.id),
         status: this.statusOf(timeline, branch),
         description: line?.description,
       };

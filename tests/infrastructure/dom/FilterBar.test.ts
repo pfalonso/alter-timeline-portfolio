@@ -134,3 +134,21 @@ describe('FilterBar', () => {
     expect(root.querySelector<HTMLElement>('.chip')?.title).toBe('"><script>x</script>');
   });
 });
+
+describe('dominantStyles', () => {
+  it('cada categoría toma el lenguaje de forma de la línea donde más eventos tiene', async () => {
+    const { dominantStyles } = await import('../../../src/infrastructure/dom/FilterBar');
+    const { TimelineFactory } = await import('../../../src/domain/services');
+    const { makeData, NOW } = await import('../../helpers/fixtures');
+    const data = makeData();
+    data.branches = [{ id: 'side', label: 'Lado', style: 'organic' }];
+    const timeline = new TimelineFactory().create(data, { now: NOW });
+    const styles = dominantStyles(timeline);
+    for (const category of timeline.categories) {
+      const events = timeline.events.filter((event) => event.categoryIds.includes(category.id));
+      if (events.length === 0) continue;
+      expect(['organic', 'neutral']).toContain(styles.get(category.id));
+    }
+    expect([...styles.values()]).toContain('organic');
+  });
+});

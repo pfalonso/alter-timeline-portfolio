@@ -1818,3 +1818,33 @@ a {
     animation: none;
   }
 }
+
+/* ---- Lenguaje de forma por línea (rectilíneo / orgánico / neutro) en chips y leyenda ---- */
+.chip__dot--geometric {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.9);
+}
+
+.chip__dot--organic {
+  border-radius: 62% 38% 55% 45% / 48% 60% 40% 52%;
+  transform: rotate(-18deg) scale(1.1, 0.95);
+}
+
+.line__mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--line-color);
+  background: color-mix(in srgb, var(--line-color) 35%, transparent);
+  border-radius: 50%;
+}
+
+.line__mark--geometric {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.85);
+}
+
+.line__mark--organic {
+  border-radius: 62% 38% 55% 45% / 48% 60% 40% 52%;
+  transform: rotate(-18deg) scale(1.15, 1);
+}

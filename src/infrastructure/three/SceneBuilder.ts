@@ -9,7 +9,7 @@ import { ParticleFlow, type FlowPath } from './ParticleFlow';
 import type { SceneEffect } from './SceneEffect';
 import { SelectionPulse } from './SelectionPulse';
 import { Starfield, type StarLayer } from './Starfield';
-import { createGlowTexture, createRingTexture } from './textures';
+import { createRingTexture } from './textures';
 import { YearMarkers } from './YearMarkers';
 
 export interface ScenePalette {
@@ -69,7 +69,7 @@ export class SceneBuilder {
   build(model: TimelineViewModel): BuiltScene {
     const { timeline, layout } = model;
     const { palette, fogDensity, particleBudget } = this.options;
-    const assets = new NodeAssets(createGlowTexture(), createRingTexture());
+    const assets = new NodeAssets(createRingTexture());
 
     const colorOfEvent = (eventId: string): string => {
       const event = timeline.getEvent(eventId);
@@ -137,13 +137,12 @@ export class SceneBuilder {
 
     const nodes = layout.nodes.map((node, index) => {
       const event = timeline.getEvent(node.eventId);
-      const secondary = event ? timeline.categoriesOf(event).slice(1, 4).map((category) => category.color) : [];
       return new NodeMesh(
         {
           eventId: node.eventId,
           position: node.position,
           color: colorOfEvent(node.eventId),
-          secondaryColors: secondary,
+          style: timeline.lineStyleOf(node.branch),
           importance: event?.importance ?? 2,
           phase: index * 1.37,
         },

@@ -29,11 +29,11 @@ describe('SceneBuilder', () => {
     });
   });
 
-  it('las categorías secundarias se ven como satélites del nodo', () => {
+  it('la forma de cada nodo sale del estilo de su línea (por defecto según el id)', () => {
     const built = new SceneBuilder().build(model);
-    // El cuerpo es el tercer hijo del grupo: núcleo + jaula + satélites.
-    const satellites = built.nodes.map((node) => node.group.children[2].children.length - 2);
-    expect(satellites).toEqual([0, 1, 0, 1]);
+    expect(built.nodes.map((node) => node.style)).toEqual(
+      model.layout.nodes.map((node) => model.timeline.lineStyleOf(node.branch)),
+    );
   });
 
   it('crea una curva por rama: el tronco pálido, cada bifurcación con el color de su primer evento', () => {

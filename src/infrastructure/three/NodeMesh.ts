@@ -1,90 +1,68 @@
-import {
-  AdditiveBlending,
-  Color,
-  EdgesGeometry,
-  Group,
-  IcosahedronGeometry,
-  LineBasicMaterial,
-  LineSegments,
-  Mesh,
-  MeshBasicMaterial,
-  OctahedronGeometry,
-  SphereGeometry,
-  Sprite,
-  SpriteMaterial,
-  type BufferGeometry,
-  type Texture,
-} from 'three';
+import { Color, Group, Mesh, NormalBlending, PlaneGeometry, ShaderMaterial, type BufferGeometry, type Texture } from 'three';
+import type { LineStyle } from '../../domain/model';
 import type { Vec3 } from '../../domain/services';
-import { damp, smoothstep } from './math';
+import { GLYPH_FRAGMENT, GLYPH_VERTEX } from './glyphShader';
+import { damp } from './math';
 import type { FrameContext } from './types';
 
 export interface NodeSpec {
   readonly eventId: string;
   readonly position: Vec3;
   readonly color: string;
-  /** Colores de las categorías secundarias (satélites en órbita). */
-  readonly secondaryColors: readonly string[];
+  /** Colores de las categorías secundarias (ya no se dibujan; se conservan por compatibilidad). */
+  readonly secondaryColors?: readonly string[];
   readonly importance: 1 | 2 | 3;
-  /** Desfase para que los nodos no pulsen al unísono. */
+  /** Lenguaje de forma de la línea a la que pertenece (por defecto, neutro). */
+  readonly style?: LineStyle;
+  /** Desfase para que los nodos no respiren al unísono (y semilla de la forma orgánica). */
   readonly phase: number;
 }
 
-/** Geometrías y texturas compartidas por todos los nodos. */
+/** Recursos compartidos por todos los nodos: el cuadro del glifo y la textura de anillo del pulso. */
 export class NodeAssets {
-  readonly core: BufferGeometry = new IcosahedronGeometry(1, 1);
-  readonly shell: BufferGeometry = new EdgesGeometry(new OctahedronGeometry(1, 0));
-  readonly satellite: BufferGeometry = new SphereGeometry(1, 8, 6);
+  readonly quad: BufferGeometry = new PlaneGeometry(2, 2);
 
-  constructor(
-    readonly glow: Texture,
-    readonly ring: Texture,
-  ) {}
+  constructor(readonly ring: Texture) {}
 
   dispose(): void {
-    this.core.dispose();
-    this.shell.dispose();
-    this.satellite.dispose();
-    this.glow.dispose();
+    this.quad.dispose();
     this.ring.dispose();
   }
 }
 
-/** Jerarquía: mayor = nodo grande; medio = mediano; menor = punto pequeño. */
-export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.17, 2: 0.4, 3: 0.74 };
+/** Jerarquía: mayor = glifo grande; medio = forma mediana; menor = marca pequeña. */
+export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.2, 2: 0.42, 3: 0.7 };
 
-/**
- * Cómo se presenta cada nivel de importancia. Los menores son puntos sin halo, sin jaula ni
- * satélites (solo aparecen al pasar por encima o al enfocarlos); los mayores llevan halo amplio
- * y un anillo siempre visible.
- */
+/** Cómo se presenta cada peso. */
 export interface NodeTier {
-  /** Opacidad del halo en reposo (se suma el realce por hover/foco). */
-  readonly halo: number;
-  /** Escala del halo respecto al radio. */
-  readonly haloScale: number;
-  /** Opacidad del anillo en reposo. */
-  readonly ring: number;
-  /** Opacidad de la jaula giratoria en reposo. */
-  readonly shell: number;
-  readonly satellites: boolean;
+  /** Media anchura del cuadro del glifo, en radios (deja sitio al aura y a los trazos exteriores). */
+  readonly extent: number;
+  /** Aura de pigmento en reposo. */
+  readonly aura: boolean;
+  /** Cuánto crece el glifo al señalarlo (los menores, más: si no, cuesta ver dónde está el cursor). */
+  readonly lift: number;
 }
 
 export const NODE_TIERS: Record<1 | 2 | 3, NodeTier> = {
-  1: { halo: 0, haloScale: 6, ring: 0, shell: 0, satellites: false },
-  2: { halo: 0.2, haloScale: 6.5, ring: 0, shell: 0.6, satellites: true },
-  3: { halo: 0.36, haloScale: 8.5, ring: 0.42, shell: 0.85, satellites: true },
+  1: { extent: 2.2, aura: false, lift: 0.9 },
+  2: { extent: 2.6, aura: false, lift: 0.22 },
+  3: { extent: 4.4, aura: true, lift: 0.16 },
 };
+export const STYLE_CODE: Record<LineStyle, number> = { geometric: 0, organic: 1, neutral: 2 };
 /** Presencia de un nodo filtrado: se atenúa, no desaparece. */
 export const DIMMED_PRESENCE = 0.1;
+/** Color del papel (para rellenos suaves y marcas interiores). */
+export const GLYPH_PAPER = '#171029';
 
-/** Un evento en la escena: núcleo cristalino, jaula giratoria, halo pulsante, anillo y satélites. */
+/** Un evento en la escena: glifo procedural que mira a la cámara; su pigmento se expande al señalarlo. */
 export class NodeMesh {
   readonly group = new Group();
   readonly eventId: string;
   readonly radius: number;
   readonly importance: 1 | 2 | 3;
   readonly color: string;
+  readonly style: LineStyle;
+  readonly glyph: Mesh<BufferGeometry, ShaderMaterial>;
 
   private presenceValue = 1;
   private presenceTarget = 1;
@@ -92,72 +70,44 @@ export class NodeMesh {
   private hoverTarget = 0;
   private focus = 0;
   private focusTarget = 0;
-
-  private readonly coreMaterial: MeshBasicMaterial;
-  private readonly shellMaterial: LineBasicMaterial;
-  private readonly haloMaterial: SpriteMaterial;
-  private readonly ringMaterial: SpriteMaterial;
-  private readonly satelliteMaterials: MeshBasicMaterial[] = [];
-  private readonly body = new Group();
-  private readonly shell: LineSegments;
-  private readonly halo: Sprite;
-  private readonly ring: Sprite;
-  private readonly satellites: Mesh[] = [];
-  private readonly phase: number;
-  private nearFade = 1;
+  private readonly material: ShaderMaterial;
   private readonly tier: NodeTier;
+  private readonly phase: number;
 
   constructor(spec: NodeSpec, assets: NodeAssets) {
     this.eventId = spec.eventId;
     this.importance = spec.importance;
     this.radius = NODE_RADIUS[spec.importance];
     this.color = spec.color;
+    this.style = spec.style ?? 'neutral';
     this.phase = spec.phase;
+    this.tier = NODE_TIERS[spec.importance];
     this.group.name = `node:${spec.eventId}`;
     this.group.position.set(spec.position.x, spec.position.y, spec.position.z);
 
-    const base = new Color(spec.color);
-    this.coreMaterial = new MeshBasicMaterial({
-      color: base.clone().lerp(new Color('#ffffff'), 0.22),
-      transparent: true,
-    });
-    const core = new Mesh(assets.core, this.coreMaterial);
-    core.scale.setScalar(this.radius);
-
-    this.shellMaterial = new LineBasicMaterial({ color: base, transparent: true, opacity: 0.75, depthWrite: false });
-    this.shell = new LineSegments(assets.shell, this.shellMaterial);
-    this.shell.scale.setScalar(this.radius * 1.95);
-
-    this.haloMaterial = new SpriteMaterial({
-      map: assets.glow,
-      color: base,
+    this.material = new ShaderMaterial({
+      vertexShader: GLYPH_VERTEX,
+      fragmentShader: GLYPH_FRAGMENT,
       transparent: true,
       depthWrite: false,
-      blending: AdditiveBlending,
+      blending: NormalBlending,
+      uniforms: {
+        uColor: { value: new Color(spec.color) },
+        uPaper: { value: new Color(GLYPH_PAPER) },
+        uStyle: { value: STYLE_CODE[this.style] },
+        uTier: { value: spec.importance },
+        uExtent: { value: this.tier.extent },
+        uPresence: { value: 1 },
+        uAttention: { value: 0 },
+        uTime: { value: 0 },
+        uSeed: { value: spec.phase % 97 },
+      },
     });
-    this.halo = new Sprite(this.haloMaterial);
-
-    this.ringMaterial = new SpriteMaterial({
-      map: assets.ring,
-      color: base.clone().lerp(new Color('#ffffff'), 0.3),
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    });
-    this.ring = new Sprite(this.ringMaterial);
-
-    this.body.add(core, this.shell);
-    this.tier = NODE_TIERS[spec.importance];
-    (this.tier.satellites ? spec.secondaryColors : []).forEach((hex) => {
-      const material = new MeshBasicMaterial({ color: new Color(hex).lerp(new Color('#ffffff'), 0.25), transparent: true });
-      const satellite = new Mesh(assets.satellite, material);
-      satellite.scale.setScalar(this.radius * 0.24);
-      this.satelliteMaterials.push(material);
-      this.satellites.push(satellite);
-      this.body.add(satellite);
-    });
-    this.group.add(this.halo, this.ring, this.body);
+    this.glyph = new Mesh(assets.quad, this.material);
+    this.glyph.name = `glyph:${spec.eventId}`;
+    // Después de las líneas: el relleno del glifo las tapa al pasar por el nodo.
+    this.glyph.renderOrder = 5;
+    this.group.add(this.glyph);
     this.apply(0);
   }
 
@@ -170,9 +120,14 @@ export class NodeMesh {
     return this.hoverTarget > 0 || this.focusTarget > 0;
   }
 
-  /** Escala actual del cuerpo (para calcular el radio aparente). */
+  /** Escala actual del glifo respecto a su tamaño en reposo (para el radio aparente). */
   get scale(): number {
-    return this.body.scale.x;
+    return this.glyph.scale.x / (this.radius * this.tier.extent);
+  }
+
+  /** Atención actual (0..1): cuánto se ha expandido el pigmento por hover/foco. */
+  get attention(): number {
+    return Math.max(this.hover, this.focus);
   }
 
   setVisible(visible: boolean, immediate = false): void {
@@ -198,51 +153,24 @@ export class NodeMesh {
       this.hover = damp(this.hover, this.hoverTarget, 10, frame.delta);
       this.focus = damp(this.focus, this.focusTarget, 6, frame.delta);
     }
-    // De cerca el halo se contiene para que el color de la categoría no se queme a blanco.
-    const distance = frame.camera.position.distanceTo(this.group.position);
-    this.nearFade = 0.5 + 0.5 * smoothstep(14, 46, distance);
+    // El glifo siempre mira a la cámara.
+    this.glyph.quaternion.copy(frame.camera.quaternion);
     this.apply(frame.reducedMotion ? 0 : frame.time);
   }
 
   dispose(): void {
     this.group.removeFromParent();
-    this.coreMaterial.dispose();
-    this.shellMaterial.dispose();
-    this.haloMaterial.dispose();
-    this.ringMaterial.dispose();
-    for (const material of this.satelliteMaterials) material.dispose();
+    this.material.dispose();
   }
 
   private apply(time: number): void {
     const p = this.presenceValue;
-    const beat = Math.sin(time * 1.25 + this.phase);
-    const r = this.radius;
-    const tier = this.tier;
-    // Un nodo menor crece bastante al señalarlo: si no, es difícil de ver dónde está el cursor.
-    const lift = this.importance === 1 ? 0.9 : 0.22;
-    const focusLift = this.importance === 1 ? 0.7 : 0.16;
-    const attention = Math.max(this.hover, this.focus);
-
-    this.body.scale.setScalar((0.6 + 0.4 * p) * (1 + lift * this.hover + focusLift * this.focus));
-    this.coreMaterial.opacity = 0.12 + 0.88 * p;
-    this.shellMaterial.opacity = Math.min(1, tier.shell + 0.75 * attention) * p * p;
-    this.shell.rotation.set(time * 0.23 + this.phase, time * 0.41 + this.phase * 2, 0);
-
-    const haloScale = r * tier.haloScale * (1 + 0.1 * beat + 0.3 * this.hover + 0.25 * this.focus);
-    this.halo.scale.set(haloScale, haloScale, 1);
-    const haloBase = tier.halo > 0 ? tier.halo + 0.08 * beat : 0;
-    this.haloMaterial.opacity = (haloBase + 0.22 * this.hover + 0.18 * this.focus) * p * p * this.nearFade;
-
-    const ringScale = r * (5.2 + 0.25 * beat + 1.2 * this.focus);
-    this.ring.scale.set(ringScale, ringScale, 1);
-    this.ringMaterial.opacity = Math.min(1, tier.ring + 0.85 * this.focus + 0.35 * this.hover) * p;
-
-    this.satellites.forEach((satellite, index) => {
-      const angle = time * 0.7 + this.phase + (index * Math.PI * 2) / this.satellites.length;
-      const tilt = 0.5 + index * 0.9;
-      const orbit = r * 2.7;
-      satellite.position.set(Math.cos(angle) * orbit, Math.sin(angle) * Math.cos(tilt) * orbit, Math.sin(angle) * Math.sin(tilt) * orbit);
-      this.satelliteMaterials[index].opacity = p;
-    });
+    const breath = 1 + 0.025 * Math.sin(time * 0.9 + this.phase);
+    const grow = (0.6 + 0.4 * p) * (1 + this.tier.lift * this.hover + this.tier.lift * 0.8 * this.focus) * breath;
+    this.glyph.scale.setScalar(this.radius * this.tier.extent * grow);
+    const uniforms = this.material.uniforms;
+    uniforms.uPresence.value = 0.12 + 0.88 * p;
+    uniforms.uAttention.value = this.attention;
+    uniforms.uTime.value = time + this.phase;
   }
 }
