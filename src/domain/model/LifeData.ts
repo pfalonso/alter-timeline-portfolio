@@ -41,6 +41,8 @@ export interface LifeEventData {
   branch?: string;
   branchFrom?: string;
   visibility?: 'public' | 'private';
+  /** Frase (≤ 160 caracteres) que enlaza con el evento anterior del recorrido de la historia. */
+  bridge?: string;
 }
 
 export interface LifeMetaData {
@@ -77,10 +79,29 @@ export interface BranchInfoData {
   focus?: FocusPeriodData[];
 }
 
+/** Arco temporal (capítulo). Los arcos son contiguos y no se solapan. */
+export interface ArcData {
+  id: string;
+  title: string;
+  subtitle?: string;
+  start: string;
+  /** Fecha de fin o "present". */
+  end: string;
+  summary?: string;
+}
+
+/** Recorrido guiado: ids de eventos en orden cronológico. */
+export interface StoryData {
+  title?: string;
+  path: string[];
+}
+
 export interface LifeData {
   schemaVersion: 1;
   meta: LifeMetaData;
   categories: CategoryData[];
   events: LifeEventData[];
   branches?: BranchInfoData[];
+  arcs?: ArcData[];
+  story?: StoryData;
 }

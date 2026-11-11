@@ -1,5 +1,6 @@
 import type { Category } from '../model/Category';
-import type { BranchInfoData, LifeData, LifeEventData } from '../model/LifeData';
+import type { LifeArc } from '../model/LifeArc';
+import type { ArcData, BranchInfoData, LifeData, LifeEventData } from '../model/LifeData';
 import { DEFAULT_IMPORTANCE, LifeEvent, MAIN_BRANCH } from '../model/LifeEvent';
 import { DEFAULT_FOCUS_LEVEL, type LifeLine } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
@@ -22,7 +23,20 @@ export class TimelineFactory {
       .filter((event) => options.includePrivate === true || event.visibility !== 'private')
       .map((event) => this.toEvent(event, data.meta.mainBranch ?? MAIN_BRANCH));
     const lines = (data.branches ?? []).map((line) => this.toLine(line));
-    return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now), lines);
+    const arcs = (data.arcs ?? []).map((arc) => this.toArc(arc));
+    const story = data.story ? { title: data.story.title, path: [...data.story.path] } : undefined;
+    return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now), lines, { arcs, story });
+  }
+
+  private toArc(raw: ArcData): LifeArc {
+    return {
+      id: raw.id,
+      title: raw.title,
+      subtitle: raw.subtitle,
+      start: PartialDate.parse(raw.start),
+      end: raw.end === PRESENT ? null : PartialDate.parse(raw.end),
+      summary: raw.summary,
+    };
   }
 
   private toLine(raw: BranchInfoData): LifeLine {
@@ -66,6 +80,7 @@ export class TimelineFactory {
       branch: raw.branch ?? mainBranch,
       branchFrom: raw.branchFrom,
       isPrivate: raw.visibility === 'private',
+      bridge: raw.bridge?.trim() || undefined,
     });
   }
 }

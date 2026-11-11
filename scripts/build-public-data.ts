@@ -30,6 +30,7 @@ interface RawData {
   categories: { id: string }[];
   events: RawEvent[];
   branches?: RawLine[];
+  story?: { title?: string; path: string[]; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -65,6 +66,8 @@ export function toPublicData(data: RawData): RawData {
   const categories = data.categories.filter((category) => used.has(category.id));
   const result: RawData = { ...data, categories, events };
   if (data.branches) result.branches = publicLines(data.branches, events, byId, publicAncestor, data.meta?.mainBranch ?? 'main');
+  // El recorrido de la historia pierde los pasos privados; los arcos (capítulos) se conservan.
+  if (data.story) result.story = { ...data.story, path: data.story.path.filter((id) => byId.has(id) && !isPrivate(byId.get(id))) };
   return result;
 }
 

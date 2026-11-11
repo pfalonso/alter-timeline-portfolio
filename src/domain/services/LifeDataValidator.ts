@@ -7,6 +7,8 @@ import { isHttpUrl } from './safeUrl';
 
 /** Longitud máxima del título corto que se usa en los rótulos de la escena. */
 export const SHORT_TITLE_MAX = 40;
+/** Longitud máxima de la frase puente de la historia. */
+export const BRIDGE_MAX = 160;
 
 export interface ValidationResult {
   readonly ok: boolean;
@@ -112,6 +114,8 @@ export class LifeDataValidator {
     this.validateLines(input.branches, graph, mainBranch, collector);
     this.checkMainBranch(input, graph, mainBranch, collector);
     this.checkOriginCycles(graph, mainBranch, collector);
+    this.validateArcs(input.arcs, collector);
+    this.validateStory(input.story, input.events, collector);
 
     const ok = collector.issues.length === 0;
     return ok ? { ok, issues: [], data: input as unknown as LifeData } : { ok, issues: collector.issues };
@@ -210,6 +214,14 @@ export class LifeDataValidator {
 
       if (event.importance !== undefined && ![1, 2, 3].includes(event.importance as number)) {
         c.add(`${path}.importance`, 'debe ser 1, 2 o 3');
+      }
+      if (event.bridge !== undefined) {
+        const bridge = event.bridge;
+        if (typeof bridge !== 'string' || bridge.trim().length === 0) {
+          c.add(`${path}.bridge`, 'si se indica, debe ser un texto no vacío');
+        } else if (bridge.trim().length > BRIDGE_MAX) {
+          c.add(`${path}.bridge`, `debe tener como máximo ${BRIDGE_MAX} caracteres (tiene ${bridge.trim().length})`);
+        }
       }
       if (event.visibility !== undefined && event.visibility !== 'public' && event.visibility !== 'private') {
         c.add(`${path}.visibility`, 'debe ser "public" o "private"');
@@ -431,6 +443,95 @@ export class LifeDataValidator {
       if (period.level !== undefined && ![1, 2, 3].includes(period.level as number)) {
         c.add(`${itemPath}.level`, 'debe ser 1, 2 o 3');
       }
+    });
+  }
+
+  /** `arcs[]`: capítulos con id único, fechas válidas, `end >= start` y sin solaparse entre sí. */
+  private validateArcs(arcs: unknown, c: IssueCollector): void {
+    if (arcs === undefined) return;
+    if (!Array.isArray(arcs)) {
+      c.add('arcs', 'debe ser una lista de arcos { id, title, start, end }');
+      return;
+    }
+    const seen = new Set<string>();
+    const spans: { index: number; id: string; start: PartialDate; end: PartialDate | null }[] = [];
+    arcs.forEach((arc, index) => {
+      const path = `arcs[${index}]`;
+      if (!isRecord(arc)) {
+        c.add(path, 'debe ser un objeto { id, title, start, end }');
+        return;
+      }
+      const id = c.kebabId(arc, path, seen);
+      c.requiredString(arc, 'title', path);
+      c.optionalString(arc, 'subtitle', path);
+      c.optionalString(arc, 'summary', path);
+      if (arc.end === undefined) c.add(`${path}.end`, 'es obligatorio (fecha o "present")');
+      const before = c.issues.length;
+      this.validateDate(arc, path, c);
+      const start = PartialDate.tryParse(arc.start);
+      const end = arc.end === PRESENT ? null : PartialDate.tryParse(arc.end);
+      if (c.issues.length === before && start && (end || arc.end === PRESENT)) {
+        spans.push({ index, id: id ?? `#${index}`, start, end });
+      }
+    });
+    // Sin solapes: ordenados por inicio, cada arco empieza cuando (o después de que) acaba el anterior.
+    spans.sort((a, b) => a.start.compareTo(b.start));
+    for (let i = 1; i < spans.length; i += 1) {
+      const previous = spans[i - 1];
+      const current = spans[i];
+      const overlaps = previous.end === null || current.start.toDecimalYear() < previous.end.toDecimalYear() - 1e-9;
+      if (overlaps) {
+        c.add(
+          `arcs[${current.index}].start`,
+          `el arco "${current.id}" se solapa con "${previous.id}" (que termina en ${previous.end?.toString() ?? '"present"'})`,
+        );
+      }
+    }
+  }
+
+  /** `story`: recorrido con ids de eventos existentes, sin repetir y en orden cronológico. */
+  private validateStory(story: unknown, events: unknown, c: IssueCollector): void {
+    if (story === undefined) return;
+    if (!isRecord(story)) {
+      c.add('story', 'debe ser un objeto { title?, path }');
+      return;
+    }
+    c.optionalString(story, 'title', 'story');
+    if (!Array.isArray(story.path)) {
+      c.add('story.path', 'es obligatorio y debe ser una lista de ids de eventos');
+      return;
+    }
+    const starts = new Map<string, PartialDate | null>();
+    if (Array.isArray(events)) {
+      for (const event of events) {
+        if (isRecord(event) && typeof event.id === 'string') {
+          starts.set(event.id, isRecord(event.date) ? PartialDate.tryParse(event.date.start) : null);
+        }
+      }
+    }
+    const seen = new Set<string>();
+    let previous: { id: string; start: PartialDate } | null = null;
+    story.path.forEach((id, index) => {
+      const path = `story.path[${index}]`;
+      if (typeof id !== 'string') {
+        c.add(path, 'debe ser el id de un evento');
+        return;
+      }
+      if (!starts.has(id)) {
+        c.add(path, `el evento "${id}" no existe`);
+        return;
+      }
+      if (seen.has(id)) {
+        c.add(path, `el evento "${id}" está repetido en el recorrido`);
+        return;
+      }
+      seen.add(id);
+      const start = starts.get(id);
+      if (!start) return;
+      if (previous && start.compareTo(previous.start) < 0) {
+        c.add(path, `"${id}" (${start.toString()}) es anterior a "${previous.id}" (${previous.start.toString()}): el recorrido debe ir en orden cronológico`);
+      }
+      previous = { id, start };
     });
   }
 

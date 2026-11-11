@@ -37,7 +37,13 @@
       "type": "array",
       "items": { "$ref": "#/$defs/branch" },
       "description": "Líneas vitales con nombre: origen, fusión, until y periodos de foco. Opcional."
-    }
+    },
+    "arcs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/arc" },
+      "description": "Arcos temporales (capítulos) contiguos y sin solapes. Opcional."
+    },
+    "story": { "$ref": "#/$defs/story" }
   },
   "$defs": {
     "nonEmptyString": { "type": "string", "pattern": "\\S" },
@@ -90,11 +96,65 @@
           "required": ["branch", "event"],
           "properties": {
             "branch": { "$ref": "#/$defs/kebabId", "description": "Línea en la que converge (distinta de esta)" },
-            "event": { "$ref": "#/$defs/kebabId", "description": "Evento de esa línea donde se produce la fusión" }
+            "arc": {
+      "type": "object",
+      "required": ["id", "title", "start", "end"],
+      "description": "Capítulo: banda sutil en la escena y grupo en el índice. end >= start y sin solaparse con otros arcos (lo comprueba validate:data).",
+      "properties": {
+        "id": { "$ref": "#/$defs/kebabId" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "subtitle": { "type": "string" },
+        "start": { "$ref": "#/$defs/partialDate" },
+        "end": { "anyOf": [{ "$ref": "#/$defs/partialDate" }, { "const": "present" }] },
+        "summary": { "type": "string" }
+      }
+    },
+    "story": {
+      "type": "object",
+      "required": ["path"],
+      "description": "Recorrido del modo historia («Ver la historia»).",
+      "properties": {
+        "title": { "type": "string" },
+        "path": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabId" },
+          "description": "Ids de eventos existentes, sin repetir y en orden cronológico"
+        }
+      }
+    },
+    "event": { "$ref": "#/$defs/kebabId", "description": "Evento de esa línea donde se produce la fusión" }
           }
         },
         "until": { "const": "present", "description": "La línea sigue viva hasta hoy; incompatible con mergeInto" },
         "focus": { "type": "array", "items": { "$ref": "#/$defs/focusPeriod" } }
+      }
+    },
+    "arc": {
+      "type": "object",
+      "required": ["id", "title", "start", "end"],
+      "description": "Capítulo: banda sutil en la escena y grupo en el índice. end >= start y sin solaparse con otros arcos (lo comprueba validate:data).",
+      "properties": {
+        "id": { "$ref": "#/$defs/kebabId" },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "subtitle": { "type": "string" },
+        "start": { "$ref": "#/$defs/partialDate" },
+        "end": { "anyOf": [{ "$ref": "#/$defs/partialDate" }, { "const": "present" }] },
+        "summary": { "type": "string" }
+      }
+    },
+    "story": {
+      "type": "object",
+      "required": ["path"],
+      "description": "Recorrido del modo historia («Ver la historia»).",
+      "properties": {
+        "title": { "type": "string" },
+        "path": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabId" },
+          "description": "Ids de eventos existentes, sin repetir y en orden cronológico"
+        }
       }
     },
     "event": {
@@ -138,7 +198,8 @@
             }
           }
         },
-        "importance": { "enum": [1, 2, 3], "default": 2 },
+        "importance": { "enum": [1, 2, 3], "default": 2, "description": "1 menor (punto sin halo ni rótulo), 2 medio, 3 mayor (halo, anillo y rótulo siempre visible)" },
+        "bridge": { "type": "string", "minLength": 1, "maxLength": 160, "description": "Frase que conecta con el evento anterior del recorrido (modo historia)" },
         "branch": { "$ref": "#/$defs/kebabId", "default": "main", "description": "Línea vital; por defecto la central (meta.mainBranch, \"main\" si no se indica)" },
         "branchFrom": { "$ref": "#/$defs/kebabId", "description": "Id del evento (de otra rama) del que nace esta rama" },
         "visibility": { "enum": ["public", "private"], "default": "public" }

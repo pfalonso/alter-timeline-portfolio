@@ -1,3 +1,4 @@
+import { arcEndYear, arcStartYear } from '../model/LifeArc';
 import type { LifeEvent } from '../model/LifeEvent';
 import type { Timeline } from '../model/Timeline';
 import { focusIntensityAt } from './LineFocus';
@@ -40,6 +41,13 @@ export interface LayoutMerge {
   readonly position: Vec3;
 }
 
+/** Capítulo proyectado sobre el eje X. */
+export interface LayoutArc {
+  readonly id: string;
+  readonly startX: number;
+  readonly endX: number;
+}
+
 export interface YearMark {
   readonly year: number;
   readonly x: number;
@@ -61,6 +69,8 @@ export interface TimelineLayoutResult {
   readonly nowX: number;
   /** Separación vertical efectiva entre carriles (puede ser menor que `laneSpacing`). */
   readonly laneSpacing: number;
+  /** Arcos temporales (capítulos) en X, en orden. */
+  readonly arcs: readonly LayoutArc[];
 }
 
 export interface LayoutOptions {
@@ -221,7 +231,23 @@ export class TimelineLayout {
         maxX = Math.max(maxX, point.x);
       }
     }
-    return { nodes, branches, years, bounds: { minX, maxX, minY, maxY }, nowX: round(nowX), laneSpacing: round(laneSpacing) };
+    const arcs: LayoutArc[] = timeline.arcs.map((arc) => {
+      const end = arcEndYear(arc);
+      return {
+        id: arc.id,
+        startX: round(toX(arcStartYear(arc))),
+        endX: round(Number.isFinite(end) ? Math.min(toX(end), Math.max(lastX, maxX)) : Math.max(lastX, maxX)),
+      };
+    });
+    return {
+      nodes,
+      branches,
+      years,
+      bounds: { minX, maxX, minY, maxY },
+      nowX: round(nowX),
+      laneSpacing: round(laneSpacing),
+      arcs,
+    };
   }
 
   /** X de cada nodo, separando los que caerían demasiado juntos en la misma rama. */

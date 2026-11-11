@@ -3,7 +3,9 @@ export type { DataSource, LoadedLifeData, TimelineRepository } from './TimelineR
 export type {
   FilterViewState,
   NavigationDirection,
+  NavigationGranularity,
   SelectionViewState,
+  StoryViewState,
   TimelineView,
   TimelineViewHandlers,
   TimelineViewModel,
