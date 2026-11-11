@@ -231,6 +231,45 @@ real es `webgl.ts` y `PostFX.ts`.
     de selección 0,45 / 0,25: tinta luminosa, no neón. Las motas de `ParticleFlow` son gotas de
     pigmento del color de su línea (menos densidad, menos blanco).
 
+27. **Eje ordinal y espaciado uniforme** (12/11/2026, feedback: «si antes era confuso ahora es un
+    cacao; que los nodos siempre tengan la misma distancia»). Sustituye a la escala temporal, al
+    apilado de la banda (decisión 23) y a las ondas de los carriles. `TimelineLayout.compute(timeline,
+    visibleIds?)`: los visibles se ordenan con `compareOrdinal` (fecha, importancia desc, central
+    primero, id) y `x = índice × nodeStep` (3,6). Todos los nodos en y = z = 0. Cada línea tiene
+    «estaciones» (origen visible, sus nodos, nodo de fusión): entre dos estaciones contiguas (sin
+    nodos en medio) va recta por la banda; si hay nodos ajenos, `y = carril × min(ss((x−a)/r),
+    ss((b−x)/r))` con `smoothstep` (Hermite, tangentes horizontales: monótona, sin *overshoot*) y
+    `r = min(0,75 paso, (b−a)/2)`. Antes de la primera y tras la última estación va por su carril
+    (salvo la central si no hay nodos antes/después). Carriles: el *interval scheduling* de la
+    decisión 13 en X ordinal; la central ocupa el primer nivel de abajo y las alturas se reparten en
+    `[0,6, 1,15] × paso` (Z hasta −1,4). El muestreo añade los bordes exactos de cada rampa para que
+    la Catmull-Rom centrípeta no redondee las esquinas. El foco de cada punto usa el año interpolado
+    entre nodos (lineal a trozos; tras el último, hacia hoy) y el fin de los periodos, la inversa.
+    `nowX` = último nodo + 0,8 pasos. Regla: `years` solo donde cambia el año (en el primer nodo de
+    ese año); `YearRuler` rotula por prioridad (décadas > lustros > pares) con 52 px mínimos y los
+    meridianos 3D van medio paso antes (entre nodos). Capítulos: de su primer nodo − ½ paso al último
+    + ½ (el último abierto llega a hoy); sin nodos visibles no aparecen. `ledTo`: arco por encima
+    (`y = h·sen(πs)`, `h = clamp(1,6 + 0,45·(pasos−1), ≤ 6,5)`, z +0,3), radio 0,035, realce 0,22
+    en reposo, 1,6 si el nodo señalado/enfocado (o el paso de la historia) es uno de sus extremos y
+    0,1 para las demás mientras tanto (`BuiltScene.highlightLinks`).
+    **Filtros**: `LoadTimeline.relayout` → `FilterViewState.layout` (opcional). La vista reconstruye
+    la escena si cambian los nodos; el primer filtro tras `render` (el guardado) se encuadra sin
+    animar; los siguientes deslizan los nodos (`NodeMesh.slideFrom`, 0,75 s, *ease in-out*), las
+    líneas aparecen desde cero (`BranchCurve.fadeIn`) y la cámara se traslada (`CameraRig.shiftX`)
+    lo que se movió el nodo más cercano a su centro. Con movimiento reducido, todo inmediato.
+    `NodeLabels` alterna arriba/abajo entre los nodos medios y mayores (los que se rotulan solos).
+    **Cámara**: la apertura encuadra ~14 nodos (menos en pantallas estrechas, mínimo 5) con «hoy» a
+    la derecha; la vista general cabe entera (tope 250; zoom máximo 260); guiñada 0,1 y cabeceo
+    0,12 (antes 0,2/0,16) para que el paso constante se perciba constante.
+    **Ruido**: motas a 0,7/unidad (máx. 900) y casi apagadas en la banda (`BAND_CLEAR_MIN` 0,12);
+    `bandFade` deja las líneas al 50 % en su carril; costuras (30 motas, núcleo 1,1) y remolinos (14)
+    más pequeños; bloom 0,36/0,42/0,38 con golpe de selección acotado (`MAX_KICK` 0,14), que era lo
+    que sobreexponía junto a fusiones y remolinos. Acuarela: pesos de paleta afilados (`w³`, domina
+    un pigmento), `tame()` desatura y enfría los amarillos (amarillo sobre ciruela daba oliva),
+    densidad y fuerza menores (0,085) y el centro (banda) más limpio. Separadores de capítulo y
+    meridianos más tenues. Filtros y ayuda suben a `pad + 58px`: la franja de capítulos ya no pisa
+    la última fila de chips.
+
 ## Comprobación visual automatizada
 
 `scripts/ui-check.mjs` abre la web en Chrome headless (WebGL por software) y recorre: escena,

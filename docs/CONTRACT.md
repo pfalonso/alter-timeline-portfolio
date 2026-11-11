@@ -174,15 +174,15 @@ src/
 
 - Dependencias solo hacia dentro: infrastructure → application → domain. Dominio y aplicación no importan `three` ni tocan `document`/`window`/`fetch`.
 - SOLID: una responsabilidad por clase, puertos pequeños, inyección por constructor, extensible sin modificar (nuevas categorías = datos; nuevos efectos = nuevas clases que implementan una interfaz `SceneEffect`).
-- `TimelineLayout` es puro y determinista: de `Timeline` → `{ nodes: {eventId, position{x,y,z}, branch}, branches: {id, points[], focus[], main, merge}, links: {from, to, fromBranch, toBranch, points[]}, band: {minY, maxY} }`. El eje X es el tiempo; los nodos van a la banda central y cada rama se desvía en Y/Z hacia su carril entre ellos (nace en `origin` o `branchFrom`).
+- `TimelineLayout` es puro y determinista: de `Timeline` (y, opcionalmente, los ids visibles) → `{ nodes: {eventId, position{x,y,z}, branch, index}, branches: {id, points[], focus[], laneY, main, merge}, links: {from, to, fromBranch, toBranch, points[]}, years, arcs, nodeStep, band }`. El eje X es **ordinal**: los nodos visibles, en orden cronológico (desempate: importancia, línea central, id), se separan siempre `nodeStep`. Todos en y = 0; cada línea pasa por los suyos y entre ellos viaja por su carril cercano (±0,6–1,15 pasos) con curvas monótonas. Los `ledTo` son arcos por encima de la banda. Al filtrar se recalcula con los visibles.
 
 ## UX obligatoria
 
 - Línea temporal 3D navegable: arrastrar/scroll para recorrer el tiempo, zoom, y teclas ←/→ para saltar entre eventos
   (de importancia ≥ 2; Mayús+←/→ nodo a nodo). Modo historia guiado por `story.path` (botón y tecla H).
 - Nodo: hover → tooltip (título + fechas); clic/Enter → **pop-up** con todo el detalle del evento; Esc o clic fuera lo cierra; la cámara vuela al nodo.
-- **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados se atenúan/desvanecen con transición, no desaparecen en seco. Estado reflejado en la URL.
-- Marcas de año sobre el eje. HUD con nombre, tagline y contador de eventos visibles.
+- **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados salen del eje y los visibles se deslizan a su nueva posición (transición suave), no saltan en seco. Estado reflejado en la URL.
+- Regla ordinal: una marca donde cambia el año entre nodos consecutivos (en el primer nodo de ese año) y los capítulos como tramos que abarcan sus nodos. HUD con nombre, tagline y contador de eventos visibles.
 - VFX: fondo de acuarela en movimiento con parallax leve (estático con movimiento reducido), bloom contenido, motas de pigmento fluyendo por las ramas, aura de pigmento en los nodos mayores, niebla del color del papel, pulso al seleccionar.
 - Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog" no modal: es un panel lateral y el resto sigue operable, así que no lleva `aria-modal` ni atrapa el foco; ver DOC_DISCREPANCIES A6).
 - Responsive (móvil: pop-up a pantalla completa, gestos táctiles). Fallback legible si no hay WebGL.
