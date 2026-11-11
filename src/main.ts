@@ -68,7 +68,7 @@ async function bootstrap(): Promise<void> {
   );
   const filterStore = new UrlFilterStateStore(window.location, window.history);
   const tooltip = new Tooltip(byId('tooltip'));
-  const labels = new NodeLabels(byId('labels'), [byId('hud'), byId('filters')]);
+  const labels = new NodeLabels(byId('labels'), [byId('hud'), byId('filters'), byId('controls'), byId('ruler')]);
   const ruler = new YearRuler(byId('ruler'));
   const eventList = new EventList(byId('index'), byId<HTMLButtonElement>('index-toggle'));
 
@@ -99,6 +99,12 @@ async function bootstrap(): Promise<void> {
       reducedMotion,
       hoverListener: tooltip,
       projectionListeners: [labels, ruler],
+      safeInsets: () =>
+        measureSafeInsets(
+          stage,
+          { always: byId('controls'), ifWide: byId('hud') },
+          { always: byId('filters'), ifWide: byId('help') },
+        ),
     });
     parts.push(three);
     new ViewControls(byId('controls'), three);
@@ -137,3 +143,28 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap();
+
+/**
+ * Franjas de la escena tapadas por la interfaz. Arriba cuenta siempre la fila de controles; abajo,
+ * el borde superior de los filtros. Los bloques que ocupan casi todo el ancho (en móvil, la cabecera
+ * y la ayuda) también reservan su franja: la escena no tiene un hueco lateral por el que asomar.
+ * Se miden al encuadrar, no cada fotograma.
+ */
+function measureSafeInsets(
+  stage: HTMLElement,
+  top: { always: HTMLElement; ifWide: HTMLElement },
+  bottom: { always: HTMLElement; ifWide: HTMLElement },
+): { top: number; bottom: number } {
+  const area = stage.getBoundingClientRect();
+  const gap = 12;
+  const rects = (pair: { always: HTMLElement; ifWide: HTMLElement }): DOMRect[] =>
+    [pair.always, pair.ifWide]
+      .map((element) => element.getBoundingClientRect())
+      .filter((rect, i) => rect.height > 0 && (i === 0 || rect.width >= area.width * 0.6));
+  const topRects = rects(top);
+  const bottomRects = rects(bottom);
+  return {
+    top: topRects.length ? Math.max(0, Math.max(...topRects.map((rect) => rect.bottom)) - area.top + gap) : 0,
+    bottom: bottomRects.length ? Math.max(0, area.bottom - Math.min(...bottomRects.map((rect) => rect.top)) + gap) : 0,
+  };
+}

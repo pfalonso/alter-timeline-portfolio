@@ -9,7 +9,7 @@ import type { TimelineLayoutResult } from '../../domain/services';
 import type { TimelineViewPart } from '../dom/CompositeTimelineView';
 import type { NodeHoverListener } from '../dom/Tooltip';
 import { CameraRig } from './CameraRig';
-import { pickNode } from './math';
+import { bandFraction, bandOffset, pickNode, verticalExtent, type SafeInsets } from './math';
 import type { NodeMesh } from './NodeMesh';
 import { PointerInput } from './PointerInput';
 import type { PostProcessing } from './PostFX';
@@ -36,9 +36,15 @@ export interface ThreeTimelineViewDeps {
   readonly projectionListeners?: readonly ProjectionListener[];
   readonly maxPixelRatio?: number;
   readonly devicePixelRatio?: () => number;
+  /** Franjas (px) tapadas por la cabecera/controles y por filtros/regla; por defecto, ninguna. */
+  readonly safeInsets?: () => SafeInsets;
 }
 
 const DEFAULT_DISTANCE = 44;
+/** Tope del alejamiento inicial: más lejos, los nodos se vuelven demasiado pequeños. */
+const OPENING_MAX_DISTANCE = 80;
+/** Margen vertical (mundo) alrededor de las ramas al encuadrar: radio de los nodos y halos. */
+const FRAME_MARGIN = 2.2;
 const DETAIL_DISTANCE = 21;
 /** Por encima de este ancho el pop-up es un panel lateral y el encuadre se desplaza. */
 const SIDE_PANEL_MIN_WIDTH = 900;
@@ -107,16 +113,25 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     }
 
     const { bounds, nowX } = model.layout;
-    this.overviewDistance = Math.min(105, this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.04);
-    this.rig.setBounds({ minX: bounds.minX, maxX: bounds.maxX, minY: bounds.minY - 2, maxY: bounds.maxY + 2 });
+    const insets = this.insets();
+    const band = bandFraction(this.viewport.height, insets);
+    // Vista general: cabe todo el ancho y todo el alto (más margen) dentro de la franja libre.
+    this.overviewDistance = Math.min(
+      105,
+      Math.max(
+        this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.04,
+        this.rig.distanceToFitHeight(bounds.maxY - bounds.minY + 2 * FRAME_MARGIN, band),
+      ),
+    );
+    // El encuadre desplaza la cámara para centrar en la franja libre: los límites admiten ese margen.
+    const shift = Math.abs(bandOffset(this.viewport.height, insets)) * 2 * this.rig.halfHeightAt(this.overviewDistance);
+    this.rig.setBounds({ minX: bounds.minX, maxX: bounds.maxX, minY: bounds.minY - 2 - shift, maxY: bounds.maxY + 2 + shift });
 
     // Apertura: de la vista general al presente.
-    const centerY = (bounds.minY + bounds.maxY) / 2;
-    this.rig.flyTo({ x: (bounds.minX + bounds.maxX) / 2, y: centerY }, this.overviewDistance);
+    this.rig.flyTo(this.overviewTarget(), this.overviewDistance);
     this.rig.snap();
-    const distance = this.defaultDistance();
-    const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
-    this.rig.flyTo({ x: nowX - halfWidth * 0.7, y: centerY * 0.6 }, distance);
+    const opening = this.openingView(model.layout, nowX);
+    this.rig.flyTo(opening, opening.distance);
     if (this.deps.reducedMotion()) this.rig.snap();
 
     this.deps.loop.start((delta, time) => this.frame(delta, time));
@@ -159,8 +174,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
 
   showOverview(): void {
     if (!this.layout) return;
-    const { bounds } = this.layout;
-    this.rig.flyTo({ x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }, this.overviewDistance);
+    this.rig.flyTo(this.overviewTarget(), this.overviewDistance);
   }
 
   /** Coordenadas de pantalla (píxeles CSS de la ventana) de cada nodo; para depuración y tests E2E. */
@@ -178,6 +192,43 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
         node.x <= this.viewport.width &&
         node.y <= this.viewport.height,
     }));
+  }
+
+  private insets(): SafeInsets {
+    return this.deps.safeInsets?.() ?? { top: 0, bottom: 0 };
+  }
+
+  /** Y de cámara que deja `centerY` en el centro de la franja libre a una distancia dada. */
+  private bandCenterY(centerY: number, distance: number): number {
+    const offset = bandOffset(this.viewport.height, this.insets());
+    return centerY - offset * 2 * this.rig.halfHeightAt(distance);
+  }
+
+  private overviewTarget(): { x: number; y: number } {
+    const { bounds } = this.layout as TimelineLayoutResult;
+    return { x: (bounds.minX + bounds.maxX) / 2, y: this.bandCenterY((bounds.minY + bounds.maxY) / 2, this.overviewDistance) };
+  }
+
+  /**
+   * Encuadre inicial cerca de hoy: «hoy» queda a la derecha y la cámara se aleja lo justo para que
+   * las ramas visibles quepan en vertical entre la cabecera y los filtros.
+   */
+  private openingView(layout: TimelineLayoutResult, nowX: number): { x: number; y: number; distance: number } {
+    const band = bandFraction(this.viewport.height, this.insets());
+    let distance = this.defaultDistance();
+    let extent = { minY: layout.bounds.minY, maxY: layout.bounds.maxY };
+    // Dos pasadas: la distancia cambia el ancho visible y con él qué ramas entran en cuadro.
+    for (let pass = 0; pass < 2; pass += 1) {
+      const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
+      const x = nowX - halfWidth * 0.7;
+      extent = verticalExtent(layout.branches, x - halfWidth, x + halfWidth) ?? extent;
+      distance = Math.min(
+        OPENING_MAX_DISTANCE,
+        Math.max(this.defaultDistance(), this.rig.distanceToFitHeight(extent.maxY - extent.minY + 2 * FRAME_MARGIN, band)),
+      );
+    }
+    const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
+    return { x: nowX - halfWidth * 0.7, y: this.bandCenterY((extent.minY + extent.maxY) / 2, distance), distance };
   }
 
   /** En pantallas estrechas la cámara se aleja para que quepan varios años. */

@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, createRandom, damp, lerp, PathTable, pickNode, smoothstep, type Pickable } from '../../../src/infrastructure/three/math';
+import {
+  bandFraction,
+  bandOffset,
+  clamp,
+  createRandom,
+  damp,
+  lerp,
+  PathTable,
+  pickNode,
+  smoothstep,
+  verticalExtent,
+  type Pickable,
+} from '../../../src/infrastructure/three/math';
 
 describe('clamp / lerp / smoothstep', () => {
   it('clamp acota a [min, max]', () => {
@@ -181,5 +193,32 @@ describe('pickNode', () => {
     const nodes = [node('big', 100, 100, { radius: 40 }), node('small', 130, 100, { radius: 5 })];
     expect(pickNode(nodes, 128, 100)).toBe('small');
     expect(pickNode(nodes, 105, 100)).toBe('big');
+  });
+});
+
+describe('encuadre: franja libre y extensión vertical', () => {
+  it('bandFraction resta las franjas reservadas y nunca baja del mínimo', () => {
+    expect(bandFraction(1000, { top: 0, bottom: 0 })).toBe(1);
+    expect(bandFraction(1000, { top: 100, bottom: 300 })).toBeCloseTo(0.6, 10);
+    expect(bandFraction(1000, { top: 600, bottom: 600 })).toBe(0.35);
+    expect(bandFraction(0, { top: 0, bottom: 0 })).toBe(1);
+  });
+
+  it('bandOffset: positivo si la franja libre queda por encima del centro, acotado', () => {
+    expect(bandOffset(1000, { top: 0, bottom: 0 })).toBe(0);
+    expect(bandOffset(1000, { top: 100, bottom: 300 })).toBeCloseTo(0.1, 10);
+    expect(bandOffset(1000, { top: 300, bottom: 100 })).toBeCloseTo(-0.1, 10);
+    // Abajo tapa casi todo: la franja mínima (35 %) sigue dentro de la ventana.
+    expect(bandOffset(1000, { top: 0, bottom: 900 })).toBeCloseTo(0.325, 10);
+  });
+
+  it('verticalExtent mira solo los puntos dentro del intervalo de X', () => {
+    const branches = [
+      { points: [{ x: 0, y: 1, z: 0 }, { x: 10, y: 5, z: 0 }] },
+      { points: [{ x: 5, y: -3, z: 0 }, { x: 20, y: -9, z: 0 }] },
+    ];
+    expect(verticalExtent(branches, 0, 10)).toEqual({ minY: -3, maxY: 5 });
+    expect(verticalExtent(branches, 15, 25)).toEqual({ minY: -9, maxY: -9 });
+    expect(verticalExtent(branches, 30, 40)).toBeNull();
   });
 });

@@ -98,3 +98,46 @@ export function pickNode(nodes: readonly Pickable[], x: number, y: number, minRa
   }
   return best;
 }
+
+/** Franjas de la ventana (píxeles CSS) tapadas por la interfaz: la escena se encuadra entre ellas. */
+export interface SafeInsets {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+/** Fracción mínima del alto que se reserva a la escena aunque la interfaz ocupe más. */
+const MIN_BAND = 0.35;
+
+/** Fracción del alto de la ventana libre para la escena (entre las franjas reservadas). */
+export function bandFraction(viewportHeight: number, insets: SafeInsets): number {
+  const height = Math.max(1, viewportHeight);
+  return clamp(1 - (insets.top + insets.bottom) / height, MIN_BAND, 1);
+}
+
+/**
+ * Desplazamiento vertical (en fracción del alto) del centro de la franja libre respecto al centro
+ * de la ventana: positivo si la franja queda por encima. Se limita para que la franja mínima quepa.
+ */
+export function bandOffset(viewportHeight: number, insets: SafeInsets): number {
+  const height = Math.max(1, viewportHeight);
+  const limit = (1 - bandFraction(viewportHeight, insets)) / 2;
+  return clamp((insets.bottom - insets.top) / (2 * height), -limit, limit);
+}
+
+/** Extensión vertical de las ramas dentro de [fromX, toX], o `null` si ninguna pasa por ahí. */
+export function verticalExtent(
+  branches: readonly { readonly points: readonly Vec3[] }[],
+  fromX: number,
+  toX: number,
+): { minY: number; maxY: number } | null {
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const branch of branches) {
+    for (const point of branch.points) {
+      if (point.x < fromX || point.x > toX) continue;
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
+  }
+  return minY <= maxY ? { minY, maxY } : null;
+}

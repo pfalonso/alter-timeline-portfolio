@@ -247,7 +247,8 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 - Si una rama tiene eventos anteriores a su `branchFrom`, empieza antes que él y se separa de la línea madre a la altura (en X) de ese primer evento, no del nodo de origen.
 - Una rama sin `branchFrom` es válida: se despega del tronco poco antes de su primer evento.
 - La rama toma el color de la categoría principal de su primer evento. El tronco es siempre pálido.
-- Los carriles se reparten solos (arriba, abajo, más arriba, más abajo…) y se reutilizan cuando una rama anterior ya ha terminado.
+- Los carriles se reparten solos: cada rama ocupa el carril libre más cercano al de su rama madre (sin cruzar el tronco si puede evitarlo) y los carriles de ramas ya terminadas se reutilizan. El número de carriles depende de cuántas ramas conviven a la vez, no del total.
+- Con muchas ramas simultáneas la separación vertical entre carriles se comprime (hasta un mínimo) para que la escena no crezca sin límite; la cámara inicial y la vista general (`0` / `◇`) encuadran el alto real de las ramas entre la cabecera y los filtros.
 
 Mini ejemplo: un tronco con dos eventos y una rama `obrador` que nace del intercambio.
 

@@ -39,6 +39,7 @@ interface Options {
   maxPixelRatio?: number;
   render?: boolean;
   bare?: boolean;
+  insets?: { top: number; bottom: number };
 }
 
 interface Harness {
@@ -99,6 +100,7 @@ function harness(options: Options = {}): Harness {
     ...(options.bare ? {} : { hoverListener: { onNodeHover: hover }, projectionListeners: [{ onProjected: (frame) => frames.push(frame) }] }),
     ...(options.devicePixelRatio === undefined ? {} : { devicePixelRatio: () => options.devicePixelRatio as number }),
     ...(options.maxPixelRatio === undefined ? {} : { maxPixelRatio: options.maxPixelRatio }),
+    ...(options.insets === undefined ? {} : { safeInsets: () => options.insets as { top: number; bottom: number } }),
   });
   const handlers = fakeHandlers();
   view.bind(handlers);
@@ -545,5 +547,35 @@ describe('ThreeTimelineView: controles de cámara', () => {
     expect(positions['e-side-two'].y).toBe(Math.round(20 + h.node('e-side-two').y));
     // A distancia de detalle, el primer evento (8 años antes) no cabe en pantalla.
     expect(positions['a-school'].visible).toBe(false);
+  });
+});
+
+describe('ThreeTimelineView: encuadre con franjas reservadas', () => {
+  const meanY = (h: Harness): number => {
+    const nodes = h.last().nodes;
+    return nodes.reduce((sum, node) => sum + node.y, 0) / nodes.length;
+  };
+
+  it('la vista general centra las ramas en la franja libre, no en la ventana', () => {
+    const free = harness();
+    free.view.showOverview();
+    free.step();
+    const reserved = harness({ insets: { top: 0, bottom: 400 } });
+    reserved.view.showOverview();
+    reserved.step();
+    // Con la mitad inferior tapada, las ramas suben hacia la franja libre de arriba.
+    expect(meanY(reserved)).toBeLessThan(meanY(free) - 100);
+    expect(meanY(reserved)).toBeLessThan(400);
+  });
+
+  it('con franjas que tapan casi todo, se reserva una franja mínima y la cámara se aleja', () => {
+    const free = harness();
+    free.view.showOverview();
+    free.step();
+    const tight = harness({ insets: { top: 390, bottom: 390 } });
+    tight.view.showOverview();
+    tight.step();
+    expect(Number.isFinite(meanY(tight))).toBe(true);
+    expect(tight.last().cameraDistance).toBeGreaterThanOrEqual(free.last().cameraDistance);
   });
 });

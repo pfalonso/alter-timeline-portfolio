@@ -72,6 +72,13 @@ describe('CameraRig: geometría', () => {
     expect(rig.halfHeightAt(distance) * 2 * 2).toBeCloseTo(100, 8);
   });
 
+  it('distanceToFitHeight encaja un alto en la fracción pedida del alto visible', () => {
+    const { rig } = rigWith({}, 2);
+    expect(rig.halfHeightAt(rig.distanceToFitHeight(30)) * 2).toBeCloseTo(30, 8);
+    expect(rig.halfHeightAt(rig.distanceToFitHeight(30, 0.5)) * 2 * 0.5).toBeCloseTo(30, 8);
+    expect(Number.isFinite(rig.distanceToFitHeight(30, 0))).toBe(true);
+  });
+
   it('distanceToFitWidth no se dispara con aspectos degenerados', () => {
     const { rig } = rigWith({}, 0.01);
     expect(rig.distanceToFitWidth(10)).toBeCloseTo(10 / 2 / (TAN * 0.2), 8);

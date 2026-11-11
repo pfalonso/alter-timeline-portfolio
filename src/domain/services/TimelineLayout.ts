@@ -46,13 +46,19 @@ export interface TimelineLayoutResult {
   readonly bounds: LayoutBounds;
   /** X correspondiente a "hoy". */
   readonly nowX: number;
+  /** Separación vertical efectiva entre carriles (puede ser menor que `laneSpacing`). */
+  readonly laneSpacing: number;
 }
 
 export interface LayoutOptions {
   /** Unidades de mundo por año (eje X = tiempo). */
   readonly unitsPerYear: number;
-  /** Separación vertical entre carriles. */
+  /** Separación vertical entre carriles (la máxima; se comprime si hay muchos carriles). */
   readonly laneSpacing: number;
+  /** Separación vertical mínima: la compresión nunca baja de aquí. */
+  readonly minLaneSpacing: number;
+  /** Altura objetivo (por encima o por debajo del tronco) del carril más alejado. */
+  readonly maxLaneSpread: number;
   /** Retroceso en Z por carril. */
   readonly laneDepth: number;
   /** Años que tarda una rama en alcanzar su carril tras bifurcarse. */
@@ -72,6 +78,8 @@ export interface LayoutOptions {
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   unitsPerYear: 5,
   laneSpacing: 4.6,
+  minLaneSpacing: 2.6,
+  maxLaneSpread: 10,
   laneDepth: 2.4,
   blendYears: 1.1,
   sampleStep: 0.5,
@@ -89,8 +97,14 @@ interface BranchPlan {
   endX: number;
   open: boolean;
   lane: number;
+  laneY: number;
+  laneZ: number;
   originPosition: Vec3;
 }
+
+/** Coste de mover una rama de su carril madre a otro: distancia en carriles + castigo por cruzar el tronco. */
+const TRUNK_CROSSING_COST = 1.5;
+const MAX_LANE = 64;
 
 const smoothstep = (t: number): number => {
   const c = Math.min(1, Math.max(0, t));
@@ -119,7 +133,7 @@ export class TimelineLayout {
 
     const nodeX = this.assignNodeX(timeline, toX);
     const plans = this.planBranches(timeline, nodeX, toX, toX(range.start), lastX);
-    this.assignLanes(plans);
+    const laneSpacing = this.assignLanes(plans);
 
     const planById = new Map(plans.map((plan) => [plan.id, plan]));
     const resolved = new Set<string>();
@@ -174,7 +188,7 @@ export class TimelineLayout {
         maxX = Math.max(maxX, point.x);
       }
     }
-    return { nodes, branches, years, bounds: { minX, maxX, minY, maxY }, nowX: round(nowX) };
+    return { nodes, branches, years, bounds: { minX, maxX, minY, maxY }, nowX: round(nowX), laneSpacing: round(laneSpacing) };
   }
 
   /** X de cada nodo, separando los que caerían demasiado juntos en la misma rama. */
@@ -212,6 +226,8 @@ export class TimelineLayout {
           endX: lastX + pad * 0.5,
           open: true,
           lane: 0,
+          laneY: 0,
+          laneZ: 0,
           originPosition: { x: firstX - pad, y: 0, z: 0 },
         });
         continue;
@@ -239,35 +255,76 @@ export class TimelineLayout {
         endX: open ? lastX + pad * 0.5 : lastEndX + o.tailYears * o.unitsPerYear,
         open,
         lane: 0,
+        laneY: 0,
+        laneZ: 0,
         originPosition: { x: startX, y: 0, z: 0 },
       });
     }
     return plans;
   }
 
-  /** Reparte carriles (+1, −1, +2, −2…) reutilizando los que ya han quedado libres. */
-  private assignLanes(plans: BranchPlan[]): void {
-    const gap = this.options.unitsPerYear * 0.8;
+  /**
+   * Reparte carriles como un *interval scheduling*: cada rama, por orden de nacimiento, ocupa el
+   * carril libre más cercano al de su rama madre (los carriles de ramas ya cerradas se reutilizan),
+   * evitando cruzar el tronco. Así el nº de carriles depende de cuántas ramas conviven a la vez, no
+   * del total. Después la separación vertical se comprime para que el carril más alejado no pase
+   * de `maxLaneSpread` (sin bajar de `minLaneSpacing`). Devuelve la separación usada.
+   */
+  private assignLanes(plans: BranchPlan[]): number {
+    const o = this.options;
+    const gap = o.unitsPerYear * 0.8;
     const occupiedUntil = new Map<number, number>();
+    const laneOf = new Map<string, number>([[MAIN_BRANCH, 0]]);
     const side = plans
       .filter((plan) => plan.id !== MAIN_BRANCH)
       .sort((a, b) => a.startX - b.startX || a.id.localeCompare(b.id));
+    const isFree = (lane: number, x: number): boolean => (occupiedUntil.get(lane) ?? -Infinity) + gap <= x;
     for (const plan of side) {
-      for (let n = 1; ; n += 1) {
-        const lane = n % 2 === 1 ? (n + 1) / 2 : -n / 2;
-        if ((occupiedUntil.get(lane) ?? -Infinity) + gap <= plan.startX) {
-          plan.lane = lane;
-          occupiedUntil.set(lane, plan.endX);
-          break;
-        }
+      const parent = plan.origin ? (laneOf.get(plan.origin.branch) ?? 0) : 0;
+      // Lado con menos carriles ocupados ahora mismo: desempata las ramas que salen del tronco.
+      let up = 0;
+      let down = 0;
+      for (const [lane, until] of occupiedUntil) {
+        if (until + gap <= plan.startX) continue;
+        if (lane > 0) up += 1;
+        else down += 1;
       }
+      const preferUp = up <= down;
+      const cost = (lane: number): number =>
+        Math.abs(lane - parent) + (parent !== 0 && Math.sign(lane) !== Math.sign(parent) ? TRUNK_CROSSING_COST : 0);
+      let best = 0;
+      for (let n = 1; n <= MAX_LANE; n += 1) {
+        for (const lane of preferUp ? [n, -n] : [-n, n]) {
+          if (!isFree(lane, plan.startX)) continue;
+          const better =
+            best === 0 ||
+            cost(lane) < cost(best) ||
+            // Mismo coste: el más cercano al tronco (y, a igual distancia, el del lado preferido,
+            // que es el primero que se prueba).
+            (cost(lane) === cost(best) && Math.abs(lane) < Math.abs(best));
+          if (better) best = lane;
+        }
+        // Ningún carril más lejano puede mejorar al encontrado.
+        if (best !== 0 && n - Math.abs(parent) > cost(best)) break;
+      }
+      plan.lane = best;
+      laneOf.set(plan.id, best);
+      occupiedUntil.set(best, plan.endX);
     }
+
+    const reach = Math.max(1, ...side.map((plan) => Math.abs(plan.lane)));
+    const spacing = Math.min(o.laneSpacing, Math.max(o.minLaneSpacing, o.maxLaneSpread / reach));
+    const depth = o.laneDepth * (spacing / o.laneSpacing);
+    for (const plan of side) {
+      plan.laneY = plan.lane * spacing;
+      plan.laneZ = -Math.abs(plan.lane) * depth;
+    }
+    return spacing;
   }
 
   private pointOnBranch(plan: BranchPlan, x: number): Vec3 {
     const o = this.options;
-    const laneY = plan.lane * o.laneSpacing;
-    const laneZ = -Math.abs(plan.lane) * o.laneDepth;
+    const { laneY, laneZ } = plan;
     const waveY = o.waveAmplitude * Math.sin(x * 0.13 + plan.lane * 1.7);
     const waveZ = o.waveAmplitude * 0.8 * Math.cos(x * 0.09 + plan.lane * 0.9);
     if (plan.id === MAIN_BRANCH) return { x: round(x), y: round(waveY), z: round(waveZ) };
