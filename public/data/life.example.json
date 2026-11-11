@@ -79,7 +79,7 @@
       "summary": "Todo empieza aquí: las líneas que recorren esta página ya estaban en ella, aunque tardaran años en encenderse.",
       "description": "Nadie en la familia se dedicaba al sonido, al arte ni a la cocina. Pero en casa siempre había una radio encendida, una libreta con dibujos en los márgenes y una olla al fuego.\n\nCada línea de esta vida sale de este punto. Lo que cambia con los años no es qué líneas existen, sino cuál se ilumina.",
       "location": "Gandia",
-      "importance": 2
+      "importance": 3
     },
     {
       "id": "primeros-cuadernos",
@@ -98,7 +98,8 @@
       "description": "Llenaba cuadernos cuadriculados con plantas de edificios que no podían existir: salas redondas para cantar, pasillos para susurrar, un sótano solo para tormentas.",
       "location": "Gandia",
       "branch": "artes-visuales",
-      "importance": 1
+      "importance": 1,
+      "bridge": "Antes de saber qué era el sonido, Noa ya dibujaba los sitios donde sonaba."
     },
     {
       "id": "coro-instituto",
@@ -115,7 +116,8 @@
       "summary": "Cuatro cursos de contralto en un coro que ensayaba en el gimnasio, con su eco imposible.",
       "description": "El director colocaba a las voces según cómo rebotaba el sonido en las espalderas. Fue la primera vez que oyó que una sala también canta.",
       "location": "Gandia",
-      "importance": 1
+      "importance": 1,
+      "bridge": "Los planos se quedan en el cajón: en el instituto descubre que una sala también canta."
     },
     {
       "id": "primer-sintetizador",
@@ -131,7 +133,8 @@
       "description": "Tardó tres semanas en sonar y cuando por fin lo hizo fue un zumbido horrible. Aun así, ahí empieza todo: la idea de que el sonido se puede construir con las manos.",
       "location": "Gandia",
       "importance": 1,
-      "branch": "creacion"
+      "branch": "creacion",
+      "bridge": "Del coro al circuito: con el primer sueldo de verano compra un sintetizador de segunda mano."
     },
     {
       "id": "grado-sonido-imagen",
@@ -159,7 +162,8 @@
         "Trabajo de fin de grado con matrícula de honor",
         "Becaria del laboratorio de acústica de salas durante dos cursos"
       ],
-      "importance": 3
+      "importance": 3,
+      "bridge": "La curiosidad pide método. Elige una ingeniería para entender lo que ya hacía de oído."
     },
     {
       "id": "erasmus-tampere",
@@ -181,7 +185,8 @@
         "Inglés",
         "Audio interactivo"
       ],
-      "importance": 2
+      "importance": 2,
+      "bridge": "A mitad de carrera, el frío de Tampere le enseña que el silencio también se diseña."
     },
     {
       "id": "obrador-masa-lenta",
@@ -207,7 +212,8 @@
         "Responsable de la masa madre de centeno desde el segundo año"
       ],
       "importance": 2,
-      "branch": "cocina"
+      "branch": "cocina",
+      "bridge": "De vuelta, necesita las manos ocupadas: las madrugadas de obrador equilibran la teoría."
     },
     {
       "id": "estudios-albufera",
@@ -233,7 +239,8 @@
         "Mezcla de sonido de 14 documentales",
         "Rediseño del flujo de copias de seguridad del estudio"
       ],
-      "importance": 2
+      "importance": 2,
+      "bridge": "Con el título en la mano, el oficio empieza de verdad: cables, sesiones y mucha escucha."
     },
     {
       "id": "hackathon-ruido-blanco",
@@ -261,7 +268,8 @@
         }
       ],
       "importance": 2,
-      "branch": "creacion"
+      "branch": "creacion",
+      "bridge": "Por las noches, el código: un fin de semana de hackathon convierte una idea en premio."
     },
     {
       "id": "cenas-sonoras",
@@ -307,7 +315,7 @@
         "Diseño de iluminación"
       ],
       "branch": "artes-visuales",
-      "importance": 2
+      "importance": 1
     },
     {
       "id": "mudanza-lisboa",
@@ -320,7 +328,8 @@
       ],
       "summary": "Dos maletas, una interfaz de audio y un piso en Graça con vistas al río.",
       "location": "Lisboa, Portugal",
-      "importance": 1
+      "importance": 1,
+      "bridge": "El estudio se le queda pequeño. Una oferta en Lisboa cierra el capítulo de aprender."
     },
     {
       "id": "lumen-atelier",
@@ -354,7 +363,8 @@
           "url": "https://example.com/lumen-atelier/trabajos"
         }
       ],
-      "importance": 3
+      "importance": 3,
+      "bridge": "En Lisboa el sonido se cruza con la interacción: diseña espacios que responden."
     },
     {
       "id": "recetario-autoeditado",
@@ -390,7 +400,7 @@
       "description": "Allí entendió que el lenguaje visual y el sonoro se estaban acercando: sus piezas ya no se podían describir solo con una de las dos palabras. Un año después, ambos caminos se unieron en el máster.",
       "location": "Oporto",
       "branch": "artes-visuales",
-      "importance": 2
+      "importance": 1
     },
     {
       "id": "estudio-penumbra",
@@ -425,7 +435,8 @@
         }
       ],
       "importance": 3,
-      "branch": "creacion"
+      "branch": "creacion",
+      "bridge": "Lo que hacía en sus ratos libres pide nombre propio: nace su estudio."
     },
     {
       "id": "charla-onda-larga",
@@ -460,7 +471,8 @@
       "summary": "Un parón necesario entre un trabajo y un máster. Solo visible con ?private=1.",
       "description": "Este evento está marcado como privado: sirve de ejemplo de cómo se ocultan entradas que no quieres enseñar por defecto.",
       "importance": 1,
-      "visibility": "private"
+      "visibility": "private",
+      "bridge": "Tanto a la vez pasa factura. Para tres meses antes de decidir el siguiente paso."
     },
     {
       "id": "master-artes-digitales",
@@ -486,7 +498,8 @@
         "Tesis con distinción",
         "Beca de producción para la pieza final"
       ],
-      "importance": 2
+      "importance": 2,
+      "bridge": "Vuelve con una pregunta clara y un máster para responderla."
     },
     {
       "id": "faro-interior",
@@ -568,7 +581,8 @@
           "url": "https://example.com/museo-mareas"
         }
       ],
-      "importance": 3
+      "importance": 3,
+      "bridge": "Todas las líneas convergen en un encargo: dirigir la técnica de un museo que escucha."
     },
     {
       "id": "escuela-circuitos-blandos",
@@ -652,7 +666,8 @@
           "url": "https://example.com/museo-mareas/sala-de-los-ecos"
         }
       ],
-      "importance": 3
+      "importance": 3,
+      "bridge": "Dos años después, la sala que imaginaba en sus cuadernos de niña existe."
     },
     {
       "id": "gira-mareografo",
@@ -677,7 +692,8 @@
         "Cinco puertos en siete meses"
       ],
       "importance": 2,
-      "branch": "creacion"
+      "branch": "creacion",
+      "bridge": "La obra sale del museo: Mareógrafo viaja y la escucha se vuelve compartida."
     },
     {
       "id": "travesia-pirineos",
@@ -800,5 +816,61 @@
         }
       ]
     }
-  ]
+  ],
+  "arcs": [
+    {
+      "id": "antes-del-ruido",
+      "title": "Antes del ruido",
+      "subtitle": "Gandia, infancia y adolescencia",
+      "start": "1993",
+      "end": "2010-08",
+      "summary": "La radio siempre encendida, cuadernos llenos de planos y un coro de instituto: todas las líneas ya están ahí, aunque ninguna brilla todavía."
+    },
+    {
+      "id": "aprender-a-escuchar",
+      "title": "Aprender a escuchar",
+      "subtitle": "Valencia, Tampere y el primer oficio",
+      "start": "2010-09",
+      "end": "2016-12",
+      "summary": "Una ingeniería, un semestre en el norte, un obrador de madrugada y el primer estudio de grabación: aprende el oficio con las manos y con los oídos."
+    },
+    {
+      "id": "lisboa",
+      "title": "Lisboa",
+      "subtitle": "Interacción, estudio propio y una pausa",
+      "start": "2017-01",
+      "end": "2021-08",
+      "summary": "El sonido se cruza con la interacción. Nace Estudio Penumbra, llega el cansancio y un máster le devuelve la pregunta que importa."
+    },
+    {
+      "id": "salas-que-escuchan",
+      "title": "Salas que escuchan",
+      "subtitle": "Museo de las Mareas",
+      "start": "2021-09",
+      "end": "present",
+      "summary": "Las líneas convergen: dirige la técnica de un museo, enseña y construye la sala que dibujaba de niña."
+    }
+  ],
+  "story": {
+    "title": "Cómo Noa aprendió a construir salas que escuchan",
+    "path": [
+      "nacimiento",
+      "primeros-cuadernos",
+      "coro-instituto",
+      "primer-sintetizador",
+      "grado-sonido-imagen",
+      "erasmus-tampere",
+      "obrador-masa-lenta",
+      "estudios-albufera",
+      "hackathon-ruido-blanco",
+      "mudanza-lisboa",
+      "lumen-atelier",
+      "estudio-penumbra",
+      "pausa-2019",
+      "master-artes-digitales",
+      "museo-mareas",
+      "sala-de-los-ecos",
+      "gira-mareografo"
+    ]
+  }
 }
