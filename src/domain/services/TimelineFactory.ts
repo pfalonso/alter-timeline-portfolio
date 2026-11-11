@@ -1,6 +1,7 @@
 import type { Category } from '../model/Category';
-import type { LifeData, LifeEventData } from '../model/LifeData';
+import type { BranchInfoData, LifeData, LifeEventData } from '../model/LifeData';
 import { DEFAULT_IMPORTANCE, LifeEvent, MAIN_BRANCH } from '../model/LifeEvent';
+import { DEFAULT_FOCUS_LEVEL, type LifeLine } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
 import { Timeline } from '../model/Timeline';
 import { PRESENT } from './LifeDataValidator';
@@ -19,11 +20,29 @@ export class TimelineFactory {
     const categories: Category[] = data.categories.map((category) => ({ ...category }));
     const events = data.events
       .filter((event) => options.includePrivate === true || event.visibility !== 'private')
-      .map((event) => this.toEvent(event));
-    return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now));
+      .map((event) => this.toEvent(event, data.meta.mainBranch ?? MAIN_BRANCH));
+    const lines = (data.branches ?? []).map((line) => this.toLine(line));
+    return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now), lines);
   }
 
-  private toEvent(raw: LifeEventData): LifeEvent {
+  private toLine(raw: BranchInfoData): LifeLine {
+    return {
+      id: raw.id,
+      label: raw.label,
+      color: raw.color,
+      description: raw.description,
+      originEventId: raw.origin,
+      mergeInto: raw.mergeInto ? { branch: raw.mergeInto.branch, eventId: raw.mergeInto.event } : undefined,
+      untilPresent: raw.until === PRESENT,
+      focus: (raw.focus ?? []).map((period) => ({
+        start: PartialDate.parse(period.start),
+        end: period.end === undefined || period.end === PRESENT ? null : PartialDate.parse(period.end),
+        level: period.level ?? DEFAULT_FOCUS_LEVEL,
+      })),
+    };
+  }
+
+  private toEvent(raw: LifeEventData, mainBranch: string): LifeEvent {
     const ongoing = raw.date.end === PRESENT;
     return new LifeEvent({
       id: raw.id,
@@ -44,7 +63,7 @@ export class TimelineFactory {
       links: (raw.links ?? []).filter((link) => isHttpUrl(link.url)),
       media: (raw.media ?? []).filter((item) => isHttpUrl(item.url)),
       importance: raw.importance ?? DEFAULT_IMPORTANCE,
-      branch: raw.branch ?? MAIN_BRANCH,
+      branch: raw.branch ?? mainBranch,
       branchFrom: raw.branchFrom,
       isPrivate: raw.visibility === 'private',
     });

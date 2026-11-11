@@ -1157,6 +1157,107 @@ a {
   position: fixed;
 }
 
+/* ───────── Leyenda de líneas vitales ───────── */
+
+.lines {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 12px;
+}
+
+.lines[hidden] {
+  display: none;
+}
+
+.lines__title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lines__toggle {
+  display: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 2px 0;
+}
+
+.lines__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  --line-color: #a9d4ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  text-shadow: 0 0 8px rgba(4, 5, 13, 0.9);
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.line__swatch {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line-color);
+  box-shadow: 0 0 8px var(--line-color);
+}
+
+.line--main .line__swatch {
+  height: 5px;
+}
+
+.line--main .line__label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.line__status {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.line--main .line__status {
+  color: color-mix(in srgb, var(--line-color) 75%, white);
+}
+
+.line:hover,
+.line:focus-visible,
+.line--active,
+.line[aria-pressed='true'] {
+  color: #fff;
+}
+
+.lines--highlighting .line:not(.line--active) {
+  opacity: 0.45;
+}
+
+.index__line {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
 /* ───────── Responsive ───────── */
 
 @media (max-width: 900px) {
@@ -1206,6 +1307,16 @@ a {
     color: var(--ink-soft);
   }
 
+  /* Con la leyenda de líneas (una fila más) la ayuda sube lo mismo. */
+  .app:has(.lines:not([hidden])) .help {
+    bottom: calc(var(--pad) + 152px + env(safe-area-inset-bottom));
+  }
+
+  /* Con la leyenda desplegada la ayuda se oculta: ocuparía el mismo sitio. */
+  .app:has(.lines:not([hidden]):not(.lines--collapsed)) .help {
+    display: none;
+  }
+
   .toolbar {
     top: calc(var(--pad) - 4px + env(safe-area-inset-top));
     left: var(--pad);
@@ -1222,6 +1333,28 @@ a {
 
   .filters__head {
     padding: 0 var(--pad);
+  }
+
+  .lines {
+    padding: 0 var(--pad);
+    margin-bottom: 8px;
+  }
+
+  .lines__title {
+    display: none;
+  }
+
+  .lines__toggle {
+    display: inline-block;
+  }
+
+  .lines--collapsed .lines__list {
+    display: none;
+  }
+
+  .lines__list {
+    flex-basis: 100%;
+    gap: 2px 12px;
   }
 
   .filters__chips {
@@ -1292,6 +1425,7 @@ a {
   .hud__tagline,
   .hud__contact,
   .filters__head,
+  .lines,
   .help {
     display: none;
   }

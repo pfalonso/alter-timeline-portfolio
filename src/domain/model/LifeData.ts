@@ -49,6 +49,32 @@ export interface LifeMetaData {
   tagline?: string;
   locale: string;
   contact?: LinkData[];
+  /** Línea vital central (carril y = 0, la más brillante hoy). Por defecto "main". */
+  mainBranch?: string;
+}
+
+/** Periodo en el que una línea vital está en foco (brilla más). */
+export interface FocusPeriodData {
+  start: string;
+  /** Fecha de fin o "present"; si falta, el foco sigue hasta hoy. */
+  end?: string;
+  /** Intensidad del foco: 1 suave … 3 pleno (por defecto). */
+  level?: 1 | 2 | 3;
+}
+
+/** Descripción de una línea vital (rama) con nombre, color, nacimiento, fusión y foco. */
+export interface BranchInfoData {
+  id: string;
+  label: string;
+  color?: string;
+  description?: string;
+  /** Evento donde nace la línea; prevalece sobre `event.branchFrom`. */
+  origin?: string;
+  /** La línea converge en `branch` a la altura de `event` (un evento de `branch`) y termina ahí. */
+  mergeInto?: { branch: string; event: string };
+  /** La línea sigue viva hasta hoy aunque su último evento haya terminado. */
+  until?: 'present';
+  focus?: FocusPeriodData[];
 }
 
 export interface LifeData {
@@ -56,4 +82,5 @@ export interface LifeData {
   meta: LifeMetaData;
   categories: CategoryData[];
   events: LifeEventData[];
+  branches?: BranchInfoData[];
 }

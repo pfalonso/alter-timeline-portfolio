@@ -27,7 +27,14 @@ describe('public/data/life.example.json', () => {
 
   it('ejercita las funciones del producto: ramas, privados, eventos en curso y varias categorías', () => {
     expect(data.categories.length).toBeGreaterThanOrEqual(3);
-    expect(data.events.some((event) => event.branchFrom !== undefined)).toBe(true);
+    // Modelo de líneas vitales: todas nacen en el nacimiento, una se fusiona, otra sigue latente.
+    const lines = data.branches ?? [];
+    expect(data.meta.mainBranch).toBe('oficio');
+    expect(lines.length).toBeGreaterThanOrEqual(4);
+    expect(lines.filter((line) => line.id !== data.meta.mainBranch).every((line) => line.origin === 'nacimiento')).toBe(true);
+    expect(lines.some((line) => line.mergeInto !== undefined)).toBe(true);
+    expect(lines.some((line) => line.until === 'present')).toBe(true);
+    expect(lines.every((line) => (line.focus ?? []).length > 0)).toBe(true);
     expect(data.events.some((event) => event.visibility === 'private')).toBe(true);
     expect(data.events.some((event) => event.date.end === 'present')).toBe(true);
     expect(data.events.some((event) => event.categories.length > 1)).toBe(true);

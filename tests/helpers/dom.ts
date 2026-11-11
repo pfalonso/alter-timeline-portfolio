@@ -39,7 +39,13 @@ export function unsafeModel(
   changes: { meta?: Partial<LifeMetaData>; categories?: readonly Category[]; events?: Record<string, Partial<LifeEventProps>> },
 ): TimelineViewModel {
   const events = base.timeline.events.map((event) => new LifeEvent({ ...event, ...(changes.events?.[event.id] ?? {}) }));
-  const timeline = new Timeline({ ...base.timeline.meta, ...changes.meta }, changes.categories ?? base.timeline.categories, events, base.timeline.now);
+  const timeline = new Timeline(
+    { ...base.timeline.meta, ...changes.meta },
+    changes.categories ?? base.timeline.categories,
+    events,
+    base.timeline.now,
+    base.timeline.lines,
+  );
   return { ...base, timeline };
 }
 

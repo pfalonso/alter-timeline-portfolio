@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://alter-timeline-portfolio.invalid/schema/life.schema.json",
   "title": "LifeData",
-  "description": "Datos de la línea temporal (schemaVersion 1). Las reglas que un JSON Schema no puede expresar (ids únicos, referencias a categorías y a branchFrom existentes, end >= start, ramas sin ciclos) las comprueba además `npm run validate:data`.",
+  "description": "Datos de la línea temporal (schemaVersion 1). Las reglas que un JSON Schema no puede expresar (ids únicos, referencias a categorías, eventos y líneas existentes, end >= start, ramas y fusiones sin ciclos, que cada línea declarada tenga eventos, until incompatible con mergeInto) las comprueba además `npm run validate:data`.",
   "type": "object",
   "required": ["schemaVersion", "meta", "categories", "events"],
   "properties": {
@@ -16,7 +16,12 @@
         "title": { "$ref": "#/$defs/nonEmptyString", "description": "Titular del sitio" },
         "tagline": { "type": "string" },
         "locale": { "$ref": "#/$defs/nonEmptyString", "description": "Idioma BCP 47: \"es\", \"en\"…" },
-        "contact": { "type": "array", "items": { "$ref": "#/$defs/link" } }
+        "contact": { "type": "array", "items": { "$ref": "#/$defs/link" } },
+        "mainBranch": {
+          "$ref": "#/$defs/kebabId",
+          "default": "main",
+          "description": "Línea vital central (carril y = 0, la más brillante hoy). Los eventos sin branch pertenecen a ella."
+        }
       }
     },
     "categories": {
@@ -27,6 +32,11 @@
     "events": {
       "type": "array",
       "items": { "$ref": "#/$defs/event" }
+    },
+    "branches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/branch" },
+      "description": "Líneas vitales con nombre: origen, fusión, until y periodos de foco. Opcional."
     }
   },
   "$defs": {
@@ -55,6 +65,36 @@
         "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
         "icon": { "type": "string" },
         "description": { "type": "string" }
+      }
+    },
+    "focusPeriod": {
+      "type": "object",
+      "required": ["start"],
+      "properties": {
+        "start": { "$ref": "#/$defs/partialDate" },
+        "end": { "anyOf": [{ "$ref": "#/$defs/partialDate" }, { "const": "present" }], "description": "Si falta, el foco sigue hasta hoy" },
+        "level": { "enum": [1, 2, 3], "default": 3 }
+      }
+    },
+    "branch": {
+      "type": "object",
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/kebabId", "description": "Debe usarlo algún event.branch (o ser meta.mainBranch)" },
+        "label": { "$ref": "#/$defs/nonEmptyString" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Si falta, el de la categoría principal de su primer evento" },
+        "description": { "type": "string" },
+        "origin": { "$ref": "#/$defs/kebabId", "description": "Evento donde nace la línea; prevalece sobre event.branchFrom" },
+        "mergeInto": {
+          "type": "object",
+          "required": ["branch", "event"],
+          "properties": {
+            "branch": { "$ref": "#/$defs/kebabId", "description": "Línea en la que converge (distinta de esta)" },
+            "event": { "$ref": "#/$defs/kebabId", "description": "Evento de esa línea donde se produce la fusión" }
+          }
+        },
+        "until": { "const": "present", "description": "La línea sigue viva hasta hoy; incompatible con mergeInto" },
+        "focus": { "type": "array", "items": { "$ref": "#/$defs/focusPeriod" } }
       }
     },
     "event": {
@@ -99,7 +139,7 @@
           }
         },
         "importance": { "enum": [1, 2, 3], "default": 2 },
-        "branch": { "$ref": "#/$defs/kebabId", "default": "main" },
+        "branch": { "$ref": "#/$defs/kebabId", "default": "main", "description": "Línea vital; por defecto la central (meta.mainBranch, \"main\" si no se indica)" },
         "branchFrom": { "$ref": "#/$defs/kebabId", "description": "Id del evento (de otra rama) del que nace esta rama" },
         "visibility": { "enum": ["public", "private"], "default": "public" }
       }

@@ -78,6 +78,46 @@ export function makeData(): LifeData {
   };
 }
 
+/**
+ * Modelo de «líneas vitales»: todas nacen en el nacimiento y discurren en paralelo; cambia el foco.
+ * Central `core`; `art` converge en `core` en el máster; `food` sigue latente hasta hoy; `teach`
+ * se cierra.
+ */
+export function makeLifeLinesData(mutate: (data: LifeData) => void = () => undefined): LifeData {
+  const data: LifeData = {
+    schemaVersion: 1,
+    meta: { owner: 'Ada', title: 'Líneas', locale: 'es', mainBranch: 'core' },
+    categories: [
+      { id: 'work', label: 'Trabajo', color: '#FFB454' },
+      { id: 'art', label: 'Arte', color: '#FF7EB6' },
+    ],
+    events: [
+      makeEvent({ id: 'birth', date: { start: '2000-01' } }),
+      makeEvent({ id: 'degree', date: { start: '2010', end: '2014' } }),
+      makeEvent({ id: 'master', date: { start: '2016', end: '2017' } }),
+      makeEvent({ id: 'job', date: { start: '2017-06', end: 'present' } }),
+      makeEvent({ id: 'drawing', date: { start: '2006' }, categories: ['art'], branch: 'art' }),
+      makeEvent({ id: 'show', date: { start: '2013' }, categories: ['art'], branch: 'art' }),
+      makeEvent({ id: 'bread', date: { start: '2011', end: '2012' }, branch: 'food' }),
+      makeEvent({ id: 'class', date: { start: '2015', end: '2016' }, branch: 'teach' }),
+    ],
+    branches: [
+      { id: 'core', label: 'Oficio', focus: [{ start: '2016', end: 'present', level: 3 }] },
+      {
+        id: 'art',
+        label: 'Arte',
+        origin: 'birth',
+        mergeInto: { branch: 'core', event: 'master' },
+        focus: [{ start: '2005', end: '2007', level: 2 }],
+      },
+      { id: 'food', label: 'Cocina', color: '#7BE0A4', origin: 'birth', until: 'present', focus: [{ start: '2011', end: '2012' }] },
+      { id: 'teach', label: 'Enseñar', origin: 'birth' },
+    ],
+  };
+  mutate(data);
+  return data;
+}
+
 export function makeEvent(overrides: Partial<LifeEventData> & { id: string }): LifeEventData {
   return {
     title: `Evento ${overrides.id}`,

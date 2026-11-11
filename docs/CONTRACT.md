@@ -2,7 +2,11 @@
 
 Proyecto: **alter-timeline-portfolio** — portfolio/CV interactivo de Pablo Fernández Alonso
 (desarrollador multidisciplinar y tech artist, Donostia). La vida se muestra como una
-**línea temporal ramificada** con nodos; cada bifurcación vital abre una rama ("otro yo").
+línea temporal 3D con nodos. Concepto (desde el 11/11/2026): **«mis flores nacieron conmigo, solo he
+cambiado el foco»**: las ramas son **líneas vitales** que nacen todas en el nacimiento y discurren en
+paralelo; lo que cambia con el tiempo es el **foco** (qué línea brilla), y dos líneas pueden
+**fusionarse**. El modelo antiguo (cada bifurcación abre una rama, `branch` + `branchFrom`) sigue
+siendo válido.
 Diseño visual ORIGINAL (no copiar arte, logos, nombres ni UI de ningún videojuego):
 estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las ramas.
 
@@ -44,9 +48,21 @@ interface LifeData {
     tagline?: string;
     locale: string;           // "es" | "en" ...
     contact?: { label: string; url: string }[];
+    mainBranch?: string;      // línea central (carril y = 0); por defecto "main"
   };
   categories: Category[];     // N categorías, definidas en datos, no en código
   events: LifeEvent[];
+  branches?: BranchInfo[];    // líneas vitales (opcional)
+}
+interface BranchInfo {
+  id: string;                 // kebab-case único; debe usarse en algún event.branch (o ser mainBranch)
+  label: string;              // nombre visible de la línea (leyenda, pop-up, índice)
+  color?: string;             // #RRGGBB; si falta, color de la categoría principal del primer evento
+  description?: string;
+  origin?: string;            // id de evento donde nace la línea; prevalece sobre event.branchFrom
+  mergeInto?: { branch: string; event: string }; // converge en `branch` en la posición de `event` (de `branch`) y termina
+  until?: "present";          // sigue viva hasta hoy aunque su último evento haya terminado
+  focus?: { start: string; end?: string | "present"; level?: 1 | 2 | 3 }[]; // sin end = hasta hoy; level por defecto 3
 }
 interface Category {
   id: string;                 // kebab-case, único
@@ -71,15 +87,27 @@ interface LifeEvent {
   links?: { label: string; url: string }[];   // solo http(s)
   media?: { type: "image"; url: string; alt: string }[];
   importance?: 1 | 2 | 3;     // tamaño/brillo del nodo; por defecto 2
-  branch?: string;            // id de rama; por defecto "main"
+  branch?: string;            // id de rama; por defecto la central (meta.mainBranch, "main")
   branchFrom?: string;        // id del evento del que nace esta rama (bifurcación)
   visibility?: "public" | "private"; // "private" se oculta salvo ?private=1
 }
 ```
 
 Reglas de validación (dominio): ids únicos; categorías referenciadas existen; `branchFrom` existe;
-fechas con formato válido y `end >= start`; color hex válido; URLs http(s). Errores acumulados con ruta
-(`events[3].date.start: ...`), no solo el primero.
+fechas con formato válido y `end >= start`; color hex válido; URLs http(s). Líneas: ids únicos y usados
+por algún evento (o `mainBranch`); `origin` y `mergeInto.event` existen; `mergeInto.branch` existe, es
+distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `focus` con fechas válidas,
+`end >= start` y `level` 1–3; `mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
+`"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `origin` ni `mergeInto`.
+Errores acumulados con ruta (`events[3].date.start: ...`, `branches[1].mergeInto.event: ...`), no solo el primero.
+
+Comportamiento visual de las líneas: la central siempre en y = 0, la más brillante y algo más gruesa
+hoy; las que comparten `origin` salen del mismo punto como un haz; la intensidad (brillo/bloom, densidad
+y velocidad de partículas, opacidad) de cada tramo sale de `focusIntensityAt(line, fecha)` (dominio,
+pura: ≈ 0,3 fuera de foco, 0,55/0,78/1 según `level`, rampas suaves); `mergeInto` curva la línea hasta
+la destino y pone una costura de partículas; `until: "present"` llega a hoy atenuada; el resto se
+disuelve como las ramas cerradas. Leyenda DOM accesible encima de los filtros (plegable en móvil) que
+resalta la línea en la escena al pasar el ratón.
 
 ## Arquitectura hexagonal
 
@@ -103,7 +131,7 @@ src/
 
 - Dependencias solo hacia dentro: infrastructure → application → domain. Dominio y aplicación no importan `three` ni tocan `document`/`window`/`fetch`.
 - SOLID: una responsabilidad por clase, puertos pequeños, inyección por constructor, extensible sin modificar (nuevas categorías = datos; nuevos efectos = nuevas clases que implementan una interfaz `SceneEffect`).
-- `TimelineLayout` es puro y determinista: de `Timeline` → `{ nodes: {eventId, position{x,y,z}, branch}, branches: {id, points[]} }`. El eje X es el tiempo; cada rama se desvía en Y/Z desde su `branchFrom`.
+- `TimelineLayout` es puro y determinista: de `Timeline` → `{ nodes: {eventId, position{x,y,z}, branch}, branches: {id, points[], focus[], main, merge} }`. El eje X es el tiempo; cada rama se desvía en Y/Z desde su origen (`origin` o `branchFrom`).
 
 ## UX obligatoria
 

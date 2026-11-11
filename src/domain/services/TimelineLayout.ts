@@ -1,5 +1,6 @@
-import { MAIN_BRANCH, type LifeEvent } from '../model/LifeEvent';
+import type { LifeEvent } from '../model/LifeEvent';
 import type { Timeline } from '../model/Timeline';
+import { focusIntensityAt } from './LineFocus';
 
 export interface Vec3 {
   readonly x: number;
@@ -25,6 +26,18 @@ export interface LayoutBranch {
   readonly lane: number;
   /** `true` si la rama sigue viva hoy (no se desvanece al final). */
   readonly open: boolean;
+  /** `true` para la línea central (`meta.mainBranch`). */
+  readonly main: boolean;
+  /** Intensidad de foco (0..1) en cada punto de `points` (todo 1 si la línea no declara foco). */
+  readonly focus: readonly number[];
+  /** Si la línea converge en otra: con cuál, en qué evento y dónde (último punto de la curva). */
+  readonly merge: LayoutMerge | null;
+}
+
+export interface LayoutMerge {
+  readonly into: string;
+  readonly eventId: string;
+  readonly position: Vec3;
 }
 
 export interface YearMark {
@@ -63,6 +76,10 @@ export interface LayoutOptions {
   readonly laneDepth: number;
   /** Años que tarda una rama en alcanzar su carril tras bifurcarse. */
   readonly blendYears: number;
+  /** Años que tarda en abrirse una línea con `origin` declarado (haz desde el nacimiento). */
+  readonly bundleBlendYears: number;
+  /** Años que dura la curva de convergencia de una línea que se fusiona. */
+  readonly mergeBlendYears: number;
   /** Distancia en X entre muestras de la polilínea. */
   readonly sampleStep: number;
   /** Años de margen antes del primer evento y después de "hoy". */
@@ -82,6 +99,8 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   maxLaneSpread: 10,
   laneDepth: 2.4,
   blendYears: 1.1,
+  bundleBlendYears: 2.6,
+  mergeBlendYears: 2.2,
   sampleStep: 0.5,
   padYears: 1.2,
   tailYears: 0.9,
@@ -91,8 +110,13 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
 
 interface BranchPlan {
   readonly id: string;
+  readonly main: boolean;
+  readonly order: number;
   readonly events: LifeEvent[];
   readonly origin: LifeEvent | null;
+  /** Unidades de X que tarda en alcanzar su carril. */
+  readonly blendX: number;
+  merge: { readonly target: BranchPlan; readonly event: LifeEvent; readonly x: number; readonly blendX: number } | null;
   startX: number;
   endX: number;
   open: boolean;
@@ -133,14 +157,16 @@ export class TimelineLayout {
 
     const nodeX = this.assignNodeX(timeline, toX);
     const plans = this.planBranches(timeline, nodeX, toX, toX(range.start), lastX);
+    const planById = new Map(plans.map((plan) => [plan.id, plan]));
+    this.planMerges(timeline, plans, planById, nodeX);
     const laneSpacing = this.assignLanes(plans);
 
-    const planById = new Map(plans.map((plan) => [plan.id, plan]));
     const resolved = new Set<string>();
     const positionOn = (plan: BranchPlan, x: number): Vec3 => this.pointOnBranch(plan, x);
     const resolveOrigin = (plan: BranchPlan): void => {
       if (resolved.has(plan.id)) return;
       resolved.add(plan.id);
+      if (plan.merge) resolveOrigin(plan.merge.target);
       if (!plan.origin) return;
       const parent = planById.get(plan.origin.branch);
       if (!parent || parent === plan) return;
@@ -162,13 +188,20 @@ export class TimelineLayout {
       return { ...node, span: this.sample(plan, x, Math.min(endX, plan.endX)) };
     });
 
-    const branches: LayoutBranch[] = plans.map((plan) => ({
-      id: plan.id,
-      points: this.sample(plan, plan.startX, plan.endX),
-      originEventId: plan.origin?.id ?? null,
-      lane: plan.lane,
-      open: plan.open,
-    }));
+    const branches: LayoutBranch[] = plans.map((plan) => {
+      const points = this.sample(plan, plan.startX, plan.endX);
+      const line = timeline.getLine(plan.id);
+      return {
+        id: plan.id,
+        points,
+        originEventId: plan.origin?.id ?? null,
+        lane: plan.lane,
+        open: plan.open,
+        main: plan.main,
+        focus: points.map((point) => focusIntensityAt(line, originYear + point.x / o.unitsPerYear)),
+        merge: plan.merge ? { into: plan.merge.target.id, eventId: plan.merge.event.id, position: points[points.length - 1] } : null,
+      };
+    });
 
     const years: YearMark[] = [];
     const firstYear = Math.ceil(originYear + plans[0].startX / o.unitsPerYear);
@@ -215,52 +248,72 @@ export class TimelineLayout {
     const o = this.options;
     const pad = o.padYears * o.unitsPerYear;
     const plans: BranchPlan[] = [];
-    for (const id of timeline.branchIds) {
+    timeline.branchIds.forEach((id, order) => {
       const events = timeline.eventsOfBranch(id);
-      if (id === MAIN_BRANCH) {
+      const base = { id, order, events, merge: null, lane: 0, laneY: 0, laneZ: 0 };
+      if (id === timeline.mainBranch) {
         plans.push({
-          id,
-          events,
+          ...base,
+          main: true,
           origin: null,
+          blendX: o.blendYears * o.unitsPerYear,
           startX: firstX - pad,
           endX: lastX + pad * 0.5,
           open: true,
-          lane: 0,
-          laneY: 0,
-          laneZ: 0,
           originPosition: { x: firstX - pad, y: 0, z: 0 },
         });
-        continue;
+        return;
       }
-      const originId = events.find((event) => event.branchFrom !== undefined)?.branchFrom;
-      const originEvent = originId === undefined ? undefined : timeline.getEvent(originId);
+      const line = timeline.getLine(id);
       // Si el origen no existe (p. ej. es privado y está oculto) la rama nace del tronco.
-      const origin = originEvent && originEvent.branch !== id ? originEvent : null;
+      const origin = timeline.originOf(id) ?? null;
+      // Las líneas con `origin` declarado se abren despacio, como un haz desde su nacimiento.
+      const bundle = origin !== null && line?.originEventId === origin.id;
       const xs = events.map((event) => nodeX.get(event.id) as number);
       const firstNodeX = Math.min(...xs);
       const startX = origin
         ? Math.min(nodeX.get(origin.id) as number, firstNodeX - 0.5 * o.unitsPerYear)
         : firstNodeX - o.blendYears * o.unitsPerYear;
-      const open = events.some((event) => event.ongoing);
+      const open = events.some((event) => event.ongoing) || line?.untilPresent === true;
       const lastNodeX = Math.max(...xs);
       const lastEndX = Math.max(
         lastNodeX,
         ...events.map((event) => (event.end ? toX(event.end.toDecimalYear()) : -Infinity)),
       );
       plans.push({
-        id,
-        events,
+        ...base,
+        main: false,
         origin,
+        blendX: (bundle ? o.bundleBlendYears : o.blendYears) * o.unitsPerYear,
         startX,
         endX: open ? lastX + pad * 0.5 : lastEndX + o.tailYears * o.unitsPerYear,
         open,
-        lane: 0,
-        laneY: 0,
-        laneZ: 0,
         originPosition: { x: startX, y: 0, z: 0 },
       });
-    }
+    });
     return plans;
+  }
+
+  /** Líneas que convergen en otra: terminan en la X del evento de fusión, sin cola ni «hoy». */
+  private planMerges(
+    timeline: Timeline,
+    plans: readonly BranchPlan[],
+    planById: ReadonlyMap<string, BranchPlan>,
+    nodeX: ReadonlyMap<string, number>,
+  ): void {
+    for (const plan of plans) {
+      if (plan.main) continue;
+      const merge = timeline.mergeOf(plan.id);
+      const target = merge ? planById.get(merge.branch) : undefined;
+      if (!merge || !target) continue;
+      const x = nodeX.get(merge.event.id) as number;
+      // Una fusión anterior al nacimiento de la línea no tiene sentido geométrico: se ignora.
+      if (x <= plan.startX + this.options.sampleStep) continue;
+      const blendX = Math.min(this.options.mergeBlendYears * this.options.unitsPerYear, (x - plan.startX) * 0.6);
+      plan.merge = { target, event: merge.event, x, blendX };
+      plan.endX = x;
+      plan.open = false;
+    }
   }
 
   /**
@@ -274,10 +327,8 @@ export class TimelineLayout {
     const o = this.options;
     const gap = o.unitsPerYear * 0.8;
     const occupiedUntil = new Map<number, number>();
-    const laneOf = new Map<string, number>([[MAIN_BRANCH, 0]]);
-    const side = plans
-      .filter((plan) => plan.id !== MAIN_BRANCH)
-      .sort((a, b) => a.startX - b.startX || a.id.localeCompare(b.id));
+    const laneOf = new Map<string, number>(plans.filter((plan) => plan.main).map((plan) => [plan.id, 0]));
+    const side = plans.filter((plan) => !plan.main).sort((a, b) => a.startX - b.startX || a.order - b.order);
     const isFree = (lane: number, x: number): boolean => (occupiedUntil.get(lane) ?? -Infinity) + gap <= x;
     for (const plan of side) {
       const parent = plan.origin ? (laneOf.get(plan.origin.branch) ?? 0) : 0;
@@ -290,8 +341,14 @@ export class TimelineLayout {
         else down += 1;
       }
       const preferUp = up <= down;
+      // Si converge en una línea que ya tiene carril, conviene quedar cerca de ella (y de su lado).
+      const mergeLane = plan.merge ? laneOf.get(plan.merge.target.id) : undefined;
       const cost = (lane: number): number =>
-        Math.abs(lane - parent) + (parent !== 0 && Math.sign(lane) !== Math.sign(parent) ? TRUNK_CROSSING_COST : 0);
+        Math.abs(lane - parent) +
+        (parent !== 0 && Math.sign(lane) !== Math.sign(parent) ? TRUNK_CROSSING_COST : 0) +
+        (mergeLane === undefined || mergeLane === 0
+          ? 0
+          : Math.abs(lane - mergeLane) + (Math.sign(lane) !== Math.sign(mergeLane) ? TRUNK_CROSSING_COST : 0));
       let best = 0;
       for (let n = 1; n <= MAX_LANE; n += 1) {
         for (const lane of preferUp ? [n, -n] : [-n, n]) {
@@ -305,7 +362,7 @@ export class TimelineLayout {
           if (better) best = lane;
         }
         // Ningún carril más lejano puede mejorar al encontrado.
-        if (best !== 0 && n - Math.abs(parent) > cost(best)) break;
+        if (best !== 0 && n - Math.abs(parent) > cost(best) && (mergeLane === undefined || n - Math.abs(mergeLane) > cost(best))) break;
       }
       plan.lane = best;
       laneOf.set(plan.id, best);
@@ -327,14 +384,21 @@ export class TimelineLayout {
     const { laneY, laneZ } = plan;
     const waveY = o.waveAmplitude * Math.sin(x * 0.13 + plan.lane * 1.7);
     const waveZ = o.waveAmplitude * 0.8 * Math.cos(x * 0.09 + plan.lane * 0.9);
-    if (plan.id === MAIN_BRANCH) return { x: round(x), y: round(waveY), z: round(waveZ) };
-    const blend = smoothstep((x - plan.startX) / (o.blendYears * o.unitsPerYear));
+    if (plan.main) return { x: round(x), y: round(waveY), z: round(waveZ) };
+    const blend = smoothstep((x - plan.startX) / plan.blendX);
     const from = plan.originPosition;
-    return {
-      x: round(x),
-      y: round(from.y + (laneY + waveY - from.y) * blend),
-      z: round(from.z + (laneZ + waveZ - from.z) * blend),
-    };
+    let y = from.y + (laneY + waveY - from.y) * blend;
+    let z = from.z + (laneZ + waveZ - from.z) * blend;
+    if (plan.merge) {
+      // Convergencia: en los últimos `blendX` la línea se curva hasta coincidir con la de destino.
+      const k = smoothstep((x - (plan.merge.x - plan.merge.blendX)) / plan.merge.blendX);
+      if (k > 0) {
+        const to = this.pointOnBranch(plan.merge.target, x);
+        y += (to.y - y) * k;
+        z += (to.z - z) * k;
+      }
+    }
+    return { x: round(x), y: round(y), z: round(z) };
   }
 
   private sample(plan: BranchPlan, fromX: number, toX: number): Vec3[] {

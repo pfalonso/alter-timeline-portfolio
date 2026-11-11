@@ -60,9 +60,10 @@ describe('Timeline + layout + filtro', () => {
     const layout = new TimelineLayout().compute(timeline);
     expect(new TimelineLayout().compute(timeline)).toEqual(layout);
     expect(layout.nodes).toHaveLength(timeline.events.length);
-    expect(layout.branches.map((branch) => branch.id).sort()).toEqual(['docencia', 'main', 'obrador', 'penumbra']);
+    expect(layout.branches.map((branch) => branch.id).sort()).toEqual(['artes-visuales', 'cocina', 'creacion', 'ensenar', 'oficio']);
+    expect(layout.branches.find((branch) => branch.main)?.id).toBe('oficio');
 
-    const main = layout.nodes.filter((node) => node.branch === 'main');
+    const main = layout.nodes.filter((node) => node.branch === 'oficio');
     for (let i = 1; i < main.length; i += 1) expect(main[i].position.x).toBeGreaterThan(main[i - 1].position.x);
     const side = layout.nodes.find((node) => node.eventId === 'faro-interior');
     expect(Math.abs(side?.position.y ?? 0)).toBeGreaterThan(2);

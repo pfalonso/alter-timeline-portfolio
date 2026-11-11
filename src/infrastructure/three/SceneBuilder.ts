@@ -1,6 +1,7 @@
 import type { TimelineViewModel } from '../../application/ports';
-import { MAIN_BRANCH } from '../../domain/model';
 import { BranchCurve, type BranchStyle } from './BranchCurve';
+import { sampleAlongPath, smoothstep, valueAtX } from './math';
+import { MergeSeam } from './MergeSeam';
 import { Nebula } from './Nebula';
 import { NodeAssets, NodeMesh } from './NodeMesh';
 import { ParticleFlow, type FlowPath } from './ParticleFlow';
@@ -44,6 +45,10 @@ export const DEFAULT_BUILD_OPTIONS: SceneBuildOptions = {
 export interface BuiltScene {
   readonly nodes: readonly NodeMesh[];
   readonly branches: readonly BranchCurve[];
+  /** Costuras de las líneas que se fusionan. */
+  readonly seams: readonly MergeSeam[];
+  /** Resalta una línea (y atenúa las demás); `null` vuelve al estado normal. */
+  highlightBranch(id: string | null): void;
   /** Todo lo que se actualiza por fotograma (ramas incluidas). */
   readonly effects: readonly SceneEffect[];
   readonly pulse: SelectionPulse;
@@ -68,23 +73,48 @@ export class SceneBuilder {
       return (event && timeline.primaryCategoryOf(event)?.color) ?? palette.fallbackNode;
     };
 
-    // Ramas: el tronco es pálido; cada bifurcación hereda el color de su primer evento.
+    // Líneas: la central es pálida salvo que declare color; las demás usan el suyo o el de la
+    // categoría principal de su primer evento. El foco modula brillo, grosor y partículas.
+    const colorOfLine = (id: string, main: boolean): string =>
+      (main ? timeline.getLine(id)?.color : timeline.lineColorOf(id)) ?? palette.trunk;
     const branches = layout.branches.map((branch) => {
-      const isTrunk = branch.id === MAIN_BRANCH;
-      const first = timeline.eventsOfBranch(branch.id)[0];
+      const isTrunk = branch.main;
+      const merges = branch.merge !== null;
+      const hasFocus = (timeline.getLine(branch.id)?.focus.length ?? 0) > 0;
+      // La central engorda un poco al acercarse a hoy: es la línea en foco actual.
+      const widths = branch.points.map((point, i) => {
+        const focusWidth = hasFocus ? 0.75 + 0.35 * branch.focus[i] : 1;
+        return focusWidth * (isTrunk ? 1 + 0.5 * smoothstep(layout.nowX - 22, layout.nowX, point.x) : 1);
+      });
       const style: BranchStyle = {
-        color: isTrunk || !first ? palette.trunk : colorOfEvent(first.id),
+        color: colorOfLine(branch.id, isTrunk),
         radius: isTrunk ? 0.075 : 0.055,
         intensity: isTrunk ? 1 : 0.85,
         fadeIn: isTrunk ? 0.06 : 0.02,
-        fadeOut: isTrunk ? 0.05 : branch.open ? 0.04 : 0.3,
+        fadeOut: isTrunk ? 0.05 : branch.open ? 0.04 : merges ? 0.015 : 0.3,
         flowSpeed: 0.11,
         fogDensity,
+        focus: branch.focus,
+        widths,
       };
-      // Una rama que no llega al presente se deshace en polvo al final (ver ParticleFlow).
-      const dissolve = !isTrunk && !branch.open ? style.fadeOut : 0;
-      return { curve: new BranchCurve(branch.id, branch.points, style), color: style.color, dissolve };
+      // Una rama que no llega al presente (ni converge en otra) se deshace en polvo al final.
+      const dissolve = !isTrunk && !branch.open && !merges ? style.fadeOut : 0;
+      return { branch, curve: new BranchCurve(branch.id, branch.points, style), color: style.color, dissolve };
     });
+    const branchById = new Map(layout.branches.map((branch) => [branch.id, branch]));
+    const focusAtNode = (branchId: string, x: number): number => {
+      const branch = branchById.get(branchId);
+      return branch ? valueAtX(branch.points, branch.focus, x) : 1;
+    };
+
+    // Costuras: donde una línea converge en otra.
+    const seams = branches
+      .filter(({ branch }) => branch.merge !== null)
+      .map(({ branch, color }) => {
+        const merge = branch.merge as NonNullable<typeof branch.merge>;
+        const target = branchById.get(merge.into);
+        return new MergeSeam(branch.id, merge.position, color, colorOfLine(merge.into, target?.main ?? false));
+      });
 
     // Tramos de duración: un filamento más grueso y tenue del color de la categoría.
     const spans = layout.nodes
@@ -94,7 +124,7 @@ export class SceneBuilder {
           new BranchCurve(`span:${node.eventId}`, node.span ?? [], {
             color: colorOfEvent(node.eventId),
             radius: 0.15,
-            intensity: 0.34,
+            intensity: 0.34 * focusAtNode(node.branch, node.position.x),
             fadeIn: 0.03,
             fadeOut: 0.12,
             flowSpeed: 0.05,
@@ -118,7 +148,13 @@ export class SceneBuilder {
       );
     });
 
-    const flowPaths: FlowPath[] = branches.map(({ curve, color, dissolve }) => ({ path: curve.path, color, dissolve }));
+    const flowPaths: FlowPath[] = branches.map(({ branch, curve, color, dissolve }) => ({
+      id: branch.id,
+      path: curve.path,
+      color,
+      dissolve,
+      focus: sampleAlongPath(curve.path, branch.points, branch.focus),
+    }));
     const { minX, maxX, minY, maxY } = layout.bounds;
     const wide: [number, number] = [minX - 260, maxX + 260];
     const starLayers: StarLayer[] = [
@@ -137,19 +173,26 @@ export class SceneBuilder {
     ];
 
     const pulse = new SelectionPulse(assets.ring);
+    const flow = new ParticleFlow(flowPaths, { density: 2.6 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
     const effects: SceneEffect[] = [
       new Nebula(palette.nebula),
       new Starfield(starLayers),
       new YearMarkers(layout.years, layout.bounds),
       ...branches.map(({ curve }) => curve),
       ...spans,
-      new ParticleFlow(flowPaths, { density: 2.6 * particleBudget, maxParticles: Math.round(2400 * particleBudget) }),
+      flow,
+      ...seams,
       pulse,
     ];
 
     return {
       nodes,
       branches: branches.map(({ curve }) => curve),
+      seams,
+      highlightBranch: (id) => {
+        for (const { curve } of branches) curve.setEmphasis(id === null ? 'none' : curve.id === id ? 'on' : 'off');
+        flow.highlight(id);
+      },
       effects,
       pulse,
       dispose: () => {

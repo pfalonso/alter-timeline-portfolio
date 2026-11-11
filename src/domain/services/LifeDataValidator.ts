@@ -106,9 +106,12 @@ export class LifeDataValidator {
     }
     if (input.schemaVersion !== 1) collector.add('schemaVersion', 'debe ser 1');
 
-    this.validateMeta(input.meta, collector);
+    const mainBranch = this.validateMeta(input.meta, collector);
     const categoryIds = this.validateCategories(input.categories, collector);
-    this.validateEvents(input.events, categoryIds, collector);
+    const graph = this.validateEvents(input.events, categoryIds, mainBranch, collector);
+    this.validateLines(input.branches, graph, mainBranch, collector);
+    this.checkMainBranch(input, graph, mainBranch, collector);
+    this.checkOriginCycles(graph, mainBranch, collector);
 
     const ok = collector.issues.length === 0;
     return ok ? { ok, issues: [], data: input as unknown as LifeData } : { ok, issues: collector.issues };
@@ -121,16 +124,23 @@ export class LifeDataValidator {
     return result.data;
   }
 
-  private validateMeta(meta: unknown, c: IssueCollector): void {
+  /** Devuelve la línea central (`meta.mainBranch` o "main"). */
+  private validateMeta(meta: unknown, c: IssueCollector): string {
     if (!isRecord(meta)) {
       c.add('meta', 'es obligatorio y debe ser un objeto');
-      return;
+      return MAIN_BRANCH;
     }
     c.requiredString(meta, 'owner', 'meta');
     c.requiredString(meta, 'title', 'meta');
     c.requiredString(meta, 'locale', 'meta');
     c.optionalString(meta, 'tagline', 'meta');
     c.links(meta.contact, 'meta.contact');
+    if (meta.mainBranch === undefined) return MAIN_BRANCH;
+    if (typeof meta.mainBranch !== 'string' || !KEBAB.test(meta.mainBranch)) {
+      c.add('meta.mainBranch', 'debe ser un id de rama en kebab-case');
+      return MAIN_BRANCH;
+    }
+    return meta.mainBranch;
   }
 
   private validateCategories(categories: unknown, c: IssueCollector): Set<string> {
@@ -157,10 +167,16 @@ export class LifeDataValidator {
     return ids;
   }
 
-  private validateEvents(events: unknown, categoryIds: ReadonlySet<string>, c: IssueCollector): void {
+  private validateEvents(
+    events: unknown,
+    categoryIds: ReadonlySet<string>,
+    mainBranch: string,
+    c: IssueCollector,
+  ): BranchGraph {
+    const empty: BranchGraph = { eventIds: new Set(), branchOfEvent: new Map(), parentBranch: new Map(), usedBranches: new Set() };
     if (!Array.isArray(events)) {
       c.add('events', 'debe ser una lista de eventos');
-      return;
+      return empty;
     }
     const ids = new Set<string>();
     const valid: { index: number; event: Rec }[] = [];
@@ -205,7 +221,7 @@ export class LifeDataValidator {
         c.add(`${path}.branchFrom`, 'debe ser el id de un evento');
       }
     });
-    this.validateBranches(valid, ids, c);
+    return this.validateBranches(valid, ids, mainBranch, c);
   }
 
   private validateDate(date: unknown, path: string, c: IssueCollector): void {
@@ -260,12 +276,20 @@ export class LifeDataValidator {
     });
   }
 
-  /** `branchFrom` existe, no apunta a la propia rama, es único por rama y no forma ciclos. */
-  private validateBranches(events: { index: number; event: Rec }[], ids: ReadonlySet<string>, c: IssueCollector): void {
+  /**
+   * `branchFrom` existe, no apunta a la propia rama, es único por rama. Devuelve el grafo de ramas
+   * (la comprobación de ciclos se hace después, cuando `branches[].origin` puede haberlo cambiado).
+   */
+  private validateBranches(
+    events: { index: number; event: Rec }[],
+    ids: ReadonlySet<string>,
+    mainBranch: string,
+    c: IssueCollector,
+  ): BranchGraph {
     const branchOfEvent = new Map<string, string>();
     for (const { event } of events) {
       if (typeof event.id === 'string') {
-        branchOfEvent.set(event.id, typeof event.branch === 'string' ? event.branch : MAIN_BRANCH);
+        branchOfEvent.set(event.id, typeof event.branch === 'string' ? event.branch : mainBranch);
       }
     }
     const parentBranch = new Map<string, string>();
@@ -274,7 +298,7 @@ export class LifeDataValidator {
       const from = event.branchFrom;
       if (typeof from !== 'string') continue;
       const path = `events[${index}].branchFrom`;
-      const branch = typeof event.branch === 'string' ? event.branch : MAIN_BRANCH;
+      const branch = typeof event.branch === 'string' ? event.branch : mainBranch;
       if (!ids.has(from)) {
         c.add(path, `el evento "${from}" no existe`);
         continue;
@@ -283,8 +307,8 @@ export class LifeDataValidator {
         c.add(path, 'un evento no puede bifurcarse de sí mismo');
         continue;
       }
-      if (branch === MAIN_BRANCH) {
-        c.add(path, `la rama "${MAIN_BRANCH}" es el tronco y no puede tener branchFrom`);
+      if (branch === mainBranch) {
+        c.add(path, `la rama "${mainBranch}" es el tronco y no puede tener branchFrom`);
         continue;
       }
       if (branchOfEvent.get(from) === branch) {
@@ -297,19 +321,166 @@ export class LifeDataValidator {
         continue;
       }
       originOfBranch.set(branch, from);
-      parentBranch.set(branch, branchOfEvent.get(from) ?? MAIN_BRANCH);
+      parentBranch.set(branch, branchOfEvent.get(from) ?? mainBranch);
     }
-    for (const branch of parentBranch.keys()) {
+    return { eventIds: ids, branchOfEvent, parentBranch, usedBranches: new Set(branchOfEvent.values()) };
+  }
+
+  /** `branches[]`: líneas vitales con nombre, origen, fusión, `until` y periodos de foco. */
+  private validateLines(lines: unknown, graph: BranchGraph, mainBranch: string, c: IssueCollector): void {
+    if (lines === undefined) return;
+    if (!Array.isArray(lines)) {
+      c.add('branches', 'debe ser una lista de líneas { id, label, … }');
+      return;
+    }
+    const known = new Set([...graph.usedBranches, mainBranch]);
+    const seen = new Set<string>();
+    const mergeTarget = new Map<string, string>();
+    lines.forEach((line, index) => {
+      const path = `branches[${index}]`;
+      if (!isRecord(line)) {
+        c.add(path, 'debe ser un objeto { id, label, … }');
+        return;
+      }
+      const id = c.kebabId(line, path, seen);
+      c.requiredString(line, 'label', path);
+      c.optionalString(line, 'description', path);
+      if (line.color !== undefined && (typeof line.color !== 'string' || !HEX_COLOR.test(line.color))) {
+        c.add(`${path}.color`, `"${String(line.color)}" debe ser un color hex #RRGGBB`);
+      }
+      if (id !== null && !known.has(id)) {
+        c.add(`${path}.id`, `ningún evento usa la rama "${id}" (y no es meta.mainBranch "${mainBranch}")`);
+      }
+      const isMain = id === mainBranch;
+      if (line.origin !== undefined) {
+        if (typeof line.origin !== 'string' || !graph.eventIds.has(line.origin)) {
+          c.add(`${path}.origin`, `el evento "${String(line.origin)}" no existe`);
+        } else if (isMain) {
+          c.add(`${path}.origin`, `"${mainBranch}" es la línea central y no nace de otra`);
+        } else if (graph.branchOfEvent.get(line.origin) === id) {
+          c.add(`${path}.origin`, `"${line.origin}" pertenece a la propia línea "${id}"; debe ser un evento de otra`);
+        } else if (id !== null) {
+          graph.parentBranch.set(id, graph.branchOfEvent.get(line.origin) ?? mainBranch);
+        }
+      }
+      if (line.mergeInto !== undefined) {
+        const target = this.validateMerge(line.mergeInto, `${path}.mergeInto`, id, isMain, known, graph, c);
+        if (target !== null && id !== null) mergeTarget.set(id, target);
+      }
+      if (line.until !== undefined) {
+        if (line.until !== PRESENT) c.add(`${path}.until`, 'solo admite "present"');
+        else if (line.mergeInto !== undefined) {
+          c.add(`${path}.until`, 'una línea que se fusiona (mergeInto) termina en la fusión: no admite until');
+        }
+      }
+      this.validateFocus(line.focus, `${path}.focus`, c);
+    });
+    this.checkMergeCycles(mergeTarget, c);
+  }
+
+  private validateMerge(
+    merge: unknown,
+    path: string,
+    id: string | null,
+    isMain: boolean,
+    known: ReadonlySet<string>,
+    graph: BranchGraph,
+    c: IssueCollector,
+  ): string | null {
+    if (!isRecord(merge)) {
+      c.add(path, 'debe ser un objeto { branch, event }');
+      return null;
+    }
+    if (isMain) {
+      c.add(path, 'la línea central no puede fusionarse en otra');
+      return null;
+    }
+    const branch = c.requiredString(merge, 'branch', path);
+    const event = c.requiredString(merge, 'event', path);
+    let ok = true;
+    if (branch !== null && !known.has(branch)) {
+      c.add(`${path}.branch`, `la línea "${branch}" no existe`);
+      ok = false;
+    } else if (branch !== null && branch === id) {
+      c.add(`${path}.branch`, 'una línea no puede fusionarse consigo misma');
+      ok = false;
+    }
+    if (event !== null && !graph.eventIds.has(event)) {
+      c.add(`${path}.event`, `el evento "${event}" no existe`);
+      ok = false;
+    } else if (event !== null && branch !== null && graph.branchOfEvent.get(event) !== branch) {
+      c.add(`${path}.event`, `"${event}" no pertenece a la línea "${branch}"`);
+      ok = false;
+    }
+    return ok ? branch : null;
+  }
+
+  private validateFocus(focus: unknown, path: string, c: IssueCollector): void {
+    if (focus === undefined) return;
+    if (!Array.isArray(focus)) {
+      c.add(path, 'debe ser una lista de periodos { start, end?, level? }');
+      return;
+    }
+    focus.forEach((period, index) => {
+      const itemPath = `${path}[${index}]`;
+      if (!isRecord(period)) {
+        c.add(itemPath, 'debe ser un objeto { start, end?, level? }');
+        return;
+      }
+      this.validateDate(period, itemPath, c);
+      if (period.level !== undefined && ![1, 2, 3].includes(period.level as number)) {
+        c.add(`${itemPath}.level`, 'debe ser 1, 2 o 3');
+      }
+    });
+  }
+
+  private checkMergeCycles(mergeTarget: ReadonlyMap<string, string>, c: IssueCollector): void {
+    for (const start of mergeTarget.keys()) {
+      const visited = [start];
+      let current = mergeTarget.get(start);
+      while (current !== undefined) {
+        if (current === start) {
+          c.add('branches', `las fusiones forman un ciclo (${[...visited, current].join(' → ')})`);
+          return;
+        }
+        if (visited.includes(current)) break;
+        visited.push(current);
+        current = mergeTarget.get(current);
+      }
+    }
+  }
+
+  /** Con `meta.mainBranch` explícito, o con líneas declaradas, la línea central debe tener eventos. */
+  private checkMainBranch(input: Rec, graph: BranchGraph, mainBranch: string, c: IssueCollector): void {
+    if (graph.usedBranches.size === 0 || graph.usedBranches.has(mainBranch)) return;
+    const explicit = isRecord(input.meta) && input.meta.mainBranch !== undefined;
+    if (explicit) c.add('meta.mainBranch', `ningún evento pertenece a la línea central "${mainBranch}"`);
+    else if (Array.isArray(input.branches)) {
+      c.add('meta.mainBranch', `falta: ningún evento pertenece a "${MAIN_BRANCH}"; indica cuál es la línea central`);
+    }
+  }
+
+  private checkOriginCycles(graph: BranchGraph, mainBranch: string, c: IssueCollector): void {
+    for (const branch of graph.parentBranch.keys()) {
       const visited = new Set<string>([branch]);
-      let current = parentBranch.get(branch);
-      while (current !== undefined && current !== MAIN_BRANCH) {
+      let current = graph.parentBranch.get(branch);
+      while (current !== undefined && current !== mainBranch) {
         if (visited.has(current)) {
           c.add('events', `las ramas forman un ciclo de bifurcaciones (${[...visited].join(' → ')} → ${current})`);
           return;
         }
         visited.add(current);
-        current = parentBranch.get(current);
+        current = graph.parentBranch.get(current);
       }
     }
   }
+}
+
+interface BranchGraph {
+  readonly eventIds: ReadonlySet<string>;
+  /** Rama de cada evento (la central si no declara `branch`). */
+  readonly branchOfEvent: ReadonlyMap<string, string>;
+  /** Rama madre de cada rama (por `branchFrom` y, después, por `branches[].origin`). */
+  readonly parentBranch: Map<string, string>;
+  readonly usedBranches: ReadonlySet<string>;
 }
