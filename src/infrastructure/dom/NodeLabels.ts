@@ -2,7 +2,7 @@ import type { SelectionViewState, TimelineViewModel } from '../../application/po
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
-import { clampLabelX, labelDistanceLimit, labelPriority, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
+import { clampLabelX, labelDistanceLimit, labelPriority, labelSlots, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
 
 interface Label {
   readonly element: HTMLElement;
@@ -10,6 +10,8 @@ interface Label {
   width: number;
   height: number;
   shown: boolean;
+  /** Lado preferido respecto a la banda: alterna por orden cronológico. */
+  readonly above: boolean;
 }
 
 /** Alto estimado por nivel (título + año); se sustituye por el medido. */
@@ -60,7 +62,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
   render(model: TimelineViewModel): void {
     clear(this.root);
     this.labels.clear();
-    for (const event of model.timeline.events) {
+    model.timeline.events.forEach((event, order) => {
       const element = el('div', { class: `node-label node-label--i${event.importance}` }, [
         el('span', { class: 'node-label__title', text: event.labelTitle }),
         el('span', { class: 'node-label__date', text: String(event.start.year) }),
@@ -74,8 +76,9 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         width: Math.min(event.importance === 3 ? 280 : 230, event.labelTitle.length * perChar + 18),
         height: LABEL_HEIGHT[event.importance] ?? 32,
         shown: false,
+        above: order % 2 === 0,
       });
-    }
+    });
   }
 
   applySelection(state: SelectionViewState): void {
@@ -108,8 +111,8 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       candidates.push({
         id: node.eventId,
         x: clampLabelX(node.x, label.width, frame.viewport.width),
-        // Debajo, encima y, si no, un poco más abajo (sigue leyéndose como suyo).
-        ys: [node.y + gap, node.y - gap - label.height, node.y + gap + label.height * 0.75],
+        // Alternando arriba/abajo de la banda (por orden cronológico); si no cabe, el otro lado.
+        ys: labelSlots(node.y, gap, label.height, label.above),
         width: label.width,
         height: label.height,
         priority: labelPriority(node.importance, pinned, label.shown, node.radius),

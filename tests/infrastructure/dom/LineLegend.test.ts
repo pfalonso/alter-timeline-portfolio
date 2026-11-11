@@ -40,6 +40,14 @@ describe('LineLegend', () => {
     expect(buttons[2].style.getPropertyValue('--line-color')).toBe('#7BE0A4');
   });
 
+  it('cada línea muestra su lenguaje de forma (style o el de por defecto)', () => {
+    const { root } = setup();
+    for (const branch of model.layout.branches) {
+      const mark = item(root, branch.id).querySelector('.line__mark');
+      expect(mark?.classList.contains(`line__mark--${model.timeline.lineStyleOf(branch.id)}`)).toBe(true);
+    }
+  });
+
   it('no aparece con datos sin branches (modelo antiguo)', () => {
     const { root, highlight } = setup(buildModel());
     expect(root.hidden).toBe(true);

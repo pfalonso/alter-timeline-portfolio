@@ -16,6 +16,8 @@ import type { FrameContext } from './types';
 
 export interface BranchStyle {
   readonly color: string;
+  /** Color al final de la curva (degradado a lo largo); sin él, color uniforme. */
+  readonly colorEnd?: string;
   readonly radius: number;
   readonly intensity: number;
   /** Fracción inicial en la que el filamento aparece. */
@@ -58,6 +60,7 @@ const VERTEX = /* glsl */ `
 
 const FRAGMENT = /* glsl */ `
   uniform vec3 uColor;
+  uniform vec3 uColorEnd;
   uniform float uTime;
   uniform float uLength;
   uniform float uIntensity;
@@ -81,7 +84,8 @@ const FRAGMENT = /* glsl */ `
     if (uFadeOut > 0.0) edge *= 1.0 - smoothstep(1.0 - uFadeOut, 1.0, vUv.x);
     float fog = exp(-uFogDensity * uFogDensity * vDepth * vDepth);
     float core = 0.45 + 0.55 * vRim;
-    vec3 color = uColor * (0.3 + 0.85 * pulse + 0.2 * ripple) + vec3(0.25) * pulse * pulse;
+    vec3 base = mix(uColor, uColorEnd, smoothstep(0.15, 0.85, vUv.x));
+    vec3 color = base * (0.3 + 0.85 * pulse + 0.2 * ripple) + vec3(0.25) * pulse * pulse;
     // De cerca el filamento se suaviza para no quemar la imagen.
     float near = mix(0.5, 1.0, smoothstep(14.0, 46.0, vDepth));
     // Foco: fuera de foco la línea sigue ahí, pero tenue (brillo y opacidad bajan juntos).
@@ -117,6 +121,7 @@ export class BranchCurve implements SceneEffect {
       blending: AdditiveBlending,
       uniforms: {
         uColor: { value: new Color(style.color) },
+        uColorEnd: { value: new Color(style.colorEnd ?? style.color) },
         uTime: { value: 0 },
         uLength: { value: this.path.length },
         uIntensity: { value: style.intensity },

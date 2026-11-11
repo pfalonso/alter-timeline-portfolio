@@ -46,22 +46,24 @@ describe('NodeLabels', () => {
     expect(root.querySelector('.node-label--shown')).toBeNull();
   });
 
-  it('muestra los rótulos bajo su nodo, centrados en su X', () => {
+  it('rotula alternando arriba/abajo de la banda (orden cronológico), centrado en su X', () => {
     const { labels, label } = setup();
     labels.onProjected(frame([node('a-school', 200, 100), node('b-job', 600, 300)]));
     expect(shown(label('Escuela'))).toBe(true);
     expect(shown(label('Primer trabajo'))).toBe(true);
     expect(shown(label('Proyecto paralelo'))).toBe(false);
-    // y = 100 + (radio 10 × 2,1 + 10) = 131
-    expect(translation(label('Escuela'))).toEqual([200, 131]);
+    // El primero va encima: y = 100 − (radio 10 × 2,1 + 10) − alto de un rótulo medio (32) = 37.
+    expect(translation(label('Escuela'))).toEqual([200, 37]);
+    // El segundo, debajo: y = 300 + 31.
+    expect(translation(label('Primer trabajo'))).toEqual([600, 331]);
     expect(label('Escuela').style.transform).toContain('translateX(-50%)');
   });
 
-  it('si no cabe debajo, lo coloca encima del nodo', () => {
+  it('si no cabe en su lado, lo coloca en el otro', () => {
     const { labels, label } = setup();
-    labels.onProjected(frame([node('a-school', 200, 590)]));
-    // y = 590 − 31 − alto estimado de un rótulo medio (32) = 527
-    expect(translation(label('Escuela'))).toEqual([200, 527]);
+    labels.onProjected(frame([node('a-school', 200, 20)]));
+    // Encima no cabe (borde superior): debajo, y = 20 + 31.
+    expect(translation(label('Escuela'))).toEqual([200, 51]);
   });
 
   it('jerarquía: mayor siempre, medio al acercarse, menor nunca salvo hover/foco', () => {
@@ -105,10 +107,10 @@ describe('NodeLabels', () => {
     const { labels, label } = setup();
     labels.applySelection(selection('a-school'));
     labels.onProjected(frame([node('a-school', 300, 200), node('b-job', 310, 200)]));
-    expect(translation(label('Escuela'))).toEqual([300, 231]);
+    // El enfocado ocupa su lado (encima: 200 − 31 − 32 = 137); el otro, el suyo (debajo).
+    expect(translation(label('Escuela'))).toEqual([300, 137]);
     expect(shown(label('Primer trabajo'))).toBe(true);
-    // Encima: 200 − 31 − alto estimado de un rótulo mayor (40) = 129.
-    expect(translation(label('Primer trabajo'))).toEqual([310, 129]);
+    expect(translation(label('Primer trabajo'))).toEqual([310, 231]);
   });
 
   it('un rótulo no tapa el disco de otro nodo', () => {
@@ -124,12 +126,12 @@ describe('NodeLabels', () => {
     expect(shown(label('Escuela'))).toBe(true);
   });
 
-  it('si debajo y encima están ocupados, prueba un poco más abajo', () => {
+  it('si encima y debajo están ocupados, prueba un escalón más lejos', () => {
     const { labels, label } = setup();
     // El disco de e-side-two (medio) tapa la posición de debajo; arriba no cabe (borde superior).
     labels.onProjected(frame([node('a-school', 300, 10), node('e-side-two', 300, 45)], 20));
     expect(shown(label('Escuela'))).toBe(true);
-    expect(translation(label('Escuela'))[1]).toBeCloseTo(10 + 31 + 32 * 0.75, 5);
+    expect(translation(label('Escuela'))[1]).toBeCloseTo(10 + 31 + 32 * 0.85, 5);
   });
 
   it('evita las zonas de interfaz reservadas (cabecera, filtros), medidas respecto a su contenedor', () => {

@@ -4,6 +4,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { damp } from './math';
+import { WatercolorPass, type WatercolorWash } from './Watercolor';
 
 export interface PostFxOptions {
   readonly strength: number;
@@ -11,7 +12,8 @@ export interface PostFxOptions {
   readonly threshold: number;
 }
 
-export const DEFAULT_POSTFX: PostFxOptions = { strength: 0.56, radius: 0.6, threshold: 0.18 };
+/** Bloom contenido: tinta luminosa más que neón (el umbral deja fuera el papel y los lavados). */
+export const DEFAULT_POSTFX: PostFxOptions = { strength: 0.42, radius: 0.48, threshold: 0.3 };
 
 /** Lo que la vista necesita del postprocesado (permite sustituirlo en tests). */
 export interface PostProcessing {
@@ -19,13 +21,16 @@ export interface PostProcessing {
   render(delta: number): void;
   /** Sube el bloom un instante (pulso de selección). */
   kick(amount: number): void;
+  /** Fondo de acuarela que se dibuja antes que la escena (`null` = papel liso). */
+  setBackdrop?(wash: WatercolorWash | null): void;
   dispose(): void;
 }
 
-/** EffectComposer + UnrealBloomPass + salida con tone mapping. */
+/** Fondo de acuarela + EffectComposer + UnrealBloomPass + salida con tone mapping. */
 export class PostFX implements PostProcessing {
   private readonly composer: EffectComposer;
   private readonly bloom: UnrealBloomPass;
+  private readonly backdrop = new WatercolorPass(0.5);
   private boost = 0;
 
   constructor(
@@ -35,7 +40,12 @@ export class PostFX implements PostProcessing {
     private readonly options: PostFxOptions = DEFAULT_POSTFX,
   ) {
     this.composer = new EffectComposer(renderer);
-    this.composer.addPass(new RenderPass(scene, camera));
+    this.composer.addPass(this.backdrop);
+    // La escena se pinta encima del papel: no borra el color, solo la profundidad.
+    const scenePass = new RenderPass(scene, camera);
+    scenePass.clear = false;
+    scenePass.clearDepth = true;
+    this.composer.addPass(scenePass);
     this.bloom = new UnrealBloomPass(new Vector2(1, 1), options.strength, options.radius, options.threshold);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -44,6 +54,10 @@ export class PostFX implements PostProcessing {
   setSize(width: number, height: number, pixelRatio: number): void {
     this.composer.setPixelRatio(pixelRatio);
     this.composer.setSize(width, height);
+  }
+
+  setBackdrop(wash: WatercolorWash | null): void {
+    this.backdrop.setWash(wash);
   }
 
   kick(amount: number): void {

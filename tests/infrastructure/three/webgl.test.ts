@@ -64,6 +64,7 @@ vi.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({ OutputPass: 
 import { ACESFilmicToneMapping, PerspectiveCamera, Scene, type WebGLRenderer } from 'three';
 import { DEFAULT_POSTFX, PostFX } from '../../../src/infrastructure/three/PostFX';
 import { createWebGLBackend, isWebGLAvailable } from '../../../src/infrastructure/three/webgl';
+import { WatercolorPass } from '../../../src/infrastructure/three/Watercolor';
 
 type FakeComposer = InstanceType<typeof mocks.FakeComposer>;
 type FakeBloom = InstanceType<typeof mocks.FakeBloomPass>;
@@ -144,8 +145,8 @@ describe('createWebGLBackend', () => {
     expect(post).toBeInstanceOf(PostFX);
     const composer = mocks.state.composers[0] as unknown as FakeComposer;
     expect(composer.renderer).toBe(mocks.state.renderers[0]);
-    expect((composer.passes[0] as { scene: unknown }).scene).toBe(scene);
-    expect((composer.passes[0] as { camera: unknown }).camera).toBe(camera);
+    expect((composer.passes[1] as { scene: unknown }).scene).toBe(scene);
+    expect((composer.passes[1] as { camera: unknown }).camera).toBe(camera);
   });
 });
 
@@ -153,13 +154,28 @@ describe('PostFX', () => {
   function setup(options = DEFAULT_POSTFX): { post: PostFX; composer: FakeComposer; bloom: FakeBloom } {
     const post = new PostFX({} as WebGLRenderer, new Scene(), new PerspectiveCamera(), options);
     const composer = mocks.state.composers.at(-1) as unknown as FakeComposer;
-    return { post, composer, bloom: composer.passes[1] as FakeBloom };
+    return { post, composer, bloom: composer.passes[2] as FakeBloom };
   }
 
-  it('encadena render → bloom → salida, con los parámetros de bloom configurados', () => {
+  it('encadena acuarela → escena (sin borrar el papel) → bloom → salida', () => {
     const { composer, bloom } = setup({ strength: 0.7, radius: 0.4, threshold: 0.2 });
-    expect(composer.passes.map((pass) => (pass as { kind: string }).kind)).toEqual(['render', 'bloom', 'output']);
+    expect(composer.passes[0]).toBeInstanceOf(WatercolorPass);
+    expect(composer.passes.slice(1).map((pass) => (pass as { kind: string }).kind)).toEqual(['render', 'bloom', 'output']);
+    expect(composer.passes[1]).toMatchObject({ clear: false, clearDepth: true });
     expect(bloom).toMatchObject({ strength: 0.7, radius: 0.4, threshold: 0.2 });
+  });
+
+  it('setBackdrop entrega el lavado al pase de acuarela', () => {
+    const { post, composer } = setup();
+    const pass = composer.passes[0] as WatercolorPass;
+    const spy = vi.spyOn(pass, 'setWash');
+    post.setBackdrop(null);
+    expect(spy).toHaveBeenCalledWith(null);
+  });
+
+  it('el bloom por defecto es contenido (tinta luminosa, no neón)', () => {
+    expect(DEFAULT_POSTFX.threshold).toBeGreaterThanOrEqual(0.3);
+    expect(DEFAULT_POSTFX.strength).toBeLessThan(0.5);
   });
 
   it('setSize propaga tamaño y pixelRatio al compositor', () => {

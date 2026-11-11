@@ -48,6 +48,7 @@ export class TimelineFactory {
       originEventId: raw.origin,
       mergeInto: raw.mergeInto ? { branch: raw.mergeInto.branch, eventId: raw.mergeInto.event } : undefined,
       untilPresent: raw.until === PRESENT,
+      style: raw.style,
       focus: (raw.focus ?? []).map((period) => ({
         start: PartialDate.parse(period.start),
         end: period.end === undefined || period.end === PRESENT ? null : PartialDate.parse(period.end),
@@ -81,6 +82,7 @@ export class TimelineFactory {
       branchFrom: raw.branchFrom,
       isPrivate: raw.visibility === 'private',
       bridge: raw.bridge?.trim() || undefined,
+      ledTo: [...new Set(raw.ledTo ?? [])],
     });
   }
 }

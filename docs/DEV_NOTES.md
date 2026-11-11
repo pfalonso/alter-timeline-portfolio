@@ -185,6 +185,52 @@ real es `webgl.ts` y `PostFX.ts`.
     siguiente visible con importancia ≥ 2 y, si no queda ninguno, cae al vecino; `all` (Mayús, y los
     botones del pop-up fuera de la historia) va nodo a nodo como antes.
 
+23. **Banda narrativa** (11/11/2026, feedback: «difícil de seguir la historia saltando entre tantas
+    líneas»). `TimelineLayout.assignBand`: cada nodo va a `y = clamp(carril × 0,42, ±1,5)` y, si otro
+    nodo ya colocado está a menos de `stackDx` (1,4) en X y `stackGap` (1,25) en Y, se apila en el
+    hueco libre más cercano alternando lado (empezando por el de su carril). Z = 0. La línea
+    (`pointOnBranch`) es la curva de su carril (`pointOnLane`, el algoritmo de siempre) mezclada
+    con la «recta de la banda» entre sus dos nodos vecinos: `out = smoothstep((x−a)/pinch) ×
+    smoothstep((b−x)/pinch)` con `pinchX` 3,2. Así pasa exactamente por cada nodo y, cuanto más
+    separados estén, más se aleja hacia su carril. Antes del primer nodo parte del origen; tras el
+    último sale de la banda (o, si se fusiona, vuelve a ella en el nodo destino). Se compactaron los
+    carriles (`laneSpacing` 3,6, `minLaneSpacing` 1,7, `maxLaneSpread` 6,5) y la ondulación sube a
+    0,7. `round` normaliza −0 a 0. `SceneBuilder.bandFade` atenúa hasta un 45 % las líneas lejos de
+    la banda. La apertura de cámara encuadra la banda ± 4,5 (las hebras pueden perderse por arriba o
+    abajo). Rótulos: `labelSlots` alterna arriba/abajo por orden cronológico.
+24. **`ledTo` (enlaces causales).** Dominio: `LifeEvent.ledTo` (sin duplicados) y
+    `Timeline.consequencesOf / causesOf / causalLinks`, solo con eventos visibles (un destino
+    privado oculto desaparece sin error). Validador: lista de ids existentes, no a sí mismo, sin
+    repetir, destino con `start` ≥ el del origen (misma fecha permitida). `build:public-data` quita
+    los destinos privados y borra la lista si queda vacía. Layout: `links[]` con una hebra que arquea
+    (±0,7…2,4 en Y alternando signo, +0,8 en Z para ir por delante de las líneas) del nodo origen al
+    destino. Escena: `BranchCurve` con `colorEnd` (degradado) y, si cambian de línea, un
+    `MergeSeam` sin destello central (`core: 0`) como remolino. Pop-up: «Viene de…» y «Esto llevó
+    a…» como botones (`onEventActivated`). Historia: si el paso siguiente es destino de un `ledTo`
+    del actual, `CameraRig.flyAlong(routeAlong(link.points))`; si no, ruta recta por la banda
+    (`storyRoute` sin líneas: seguir líneas que salen de la banda mareaba).
+25. **Glifos por peso y forma** (`glyphShader.ts`, `NodeMesh`). Un cuadro por nodo que mira a la
+    cámara con un fragment shader SDF (`fwidth` para el antialias: nítido a cualquier zoom); sustituye
+    núcleo, jaula, halo, anillo y satélites. `uTier` (1/2/3) y `uStyle` (0 geometric, 1 organic, 2
+    neutral). Peso 3 lleva aura de pigmento (ruido, se apaga antes del borde del cuadro); hover y
+    foco suben `uAttention`, que la expande en todos. Se renderizan después de las líneas
+    (`renderOrder` 5) con mezcla normal para que el relleno las tape. `BranchInfo.style` opcional;
+    por defecto `defaultLineStyle(id)`. Los chips usan el estilo dominante de la categoría
+    (`dominantStyles`: la línea con más eventos de esa categoría). Las categorías secundarias ya no
+    se dibujan como satélites (el campo `secondaryColors` queda opcional y sin uso visual).
+26. **Fondo de acuarela** (`Watercolor.ts`). Sustituye `Starfield`, `Nebula` y la textura de
+    resplandor. `WatercolorPass` es el primer pase del compositor: dibuja `WatercolorWash` (domain
+    warping con fbm en 3 niveles, borde acumulado como banda estrecha alrededor del umbral del
+    lavado, segundo sangrado, paleta = colores de las líneas interpolados por un campo de ruido) en
+    un render target a 1/2 de resolución y lo compone a pantalla completa añadiendo granulación
+    (solo donde hay pigmento, densidad en alfa) y fibras de papel. El `RenderPass` va con
+    `clear = false` y `clearDepth = true`; `scene.background = null`. Tinte: la línea con más foco en
+    la X de la cámara (`focusAt`, la central gana empates), con transición lenta. Parallax 0,0035 por
+    unidad de mundo. Movimiento reducido: tiempo congelado y tinte inmediato. Papel `#140e26`, que
+    es también el color de la niebla. Bloom `strength` 0,42 / `radius` 0,48 / `threshold` 0,3 y golpe
+    de selección 0,45 / 0,25: tinta luminosa, no neón. Las motas de `ParticleFlow` son gotas de
+    pigmento del color de su línea (menos densidad, menos blanco).
+
 ## Comprobación visual automatizada
 
 `scripts/ui-check.mjs` abre la web en Chrome headless (WebGL por software) y recorre: escena,
@@ -228,7 +274,7 @@ Bloques del encargo (para reanudar si se corta la sesión):
 | --- | --- |
 | 1. Dominio + aplicación + carga de datos + escena three | Hecho. Compila y se ve. |
 | 2. Pop-up y filtros | Hecho (foco, Esc, clic fuera, chips, URL). Pop-up no modal desde el 11/11. |
-| 3. VFX y pulido | Hecho (bloom, partículas, estrellas, nebulosa, halos, niebla, pulso, rótulos, ramas cerradas que se disuelven en partículas). |
+| 3. VFX y pulido | Hecho (bloom, partículas, halos, niebla, pulso, rótulos, ramas cerradas que se disuelven en partículas). Desde el 11/11 el fondo es acuarela (decisión 26). |
 | 4. Docker | Hecho: `docker build` + prueba de humo en la CI (`.github/workflows/ci.yml`). En este entorno no se puede construir (registros bloqueados). |
 | 5. ui-check y capturas | Hecho: `scripts/ui-check.mjs` en verde con datos de ejemplo y con datos reales. |
 | 6. Tests (agente 3) | Hecho: ver `docs/QA_REPORT.md`. |
@@ -244,6 +290,10 @@ Bloques del encargo (para reanudar si se corta la sesión):
   `Ctrl`+`+` no hace zoom en la escena; el pop-up recibe el foco al abrir y no lo roba al cerrar si
   el usuario ya lo movió a un chip.
 - CI de GitHub en verde (jobs `quality` y `docker`); `main` solo recibe cambios por PR desde `develop`.
+
+Pasada de acuarela (11/11/2026, rama `feature/acuarela`): banda narrativa, `ledTo`, glifos por peso y
+forma y fondo de acuarela (decisiones 23–26). Cadena de calidad en verde; `ui-check` «Todo correcto»
+con datos reales y de ejemplo.
 
 Pasada de layout (11/11/2026, rama `feature/layout-carriles`): carriles compactos y encuadre con
 franjas reservadas (decisiones 13 y 14). Cadena de calidad en verde; capturas revisadas con datos

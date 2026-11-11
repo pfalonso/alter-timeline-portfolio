@@ -2,6 +2,7 @@ import type { ValidationIssue } from '../errors/ValidationError';
 import { ValidationError } from '../errors/ValidationError';
 import type { LifeData } from '../model/LifeData';
 import { MAIN_BRANCH } from '../model/LifeEvent';
+import { LINE_STYLES } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
 import { isHttpUrl } from './safeUrl';
 
@@ -116,6 +117,7 @@ export class LifeDataValidator {
     this.checkOriginCycles(graph, mainBranch, collector);
     this.validateArcs(input.arcs, collector);
     this.validateStory(input.story, input.events, collector);
+    this.validateLedTo(input.events, collector);
 
     const ok = collector.issues.length === 0;
     return ok ? { ok, issues: [], data: input as unknown as LifeData } : { ok, issues: collector.issues };
@@ -386,6 +388,9 @@ export class LifeDataValidator {
         }
       }
       this.validateFocus(line.focus, `${path}.focus`, c);
+      if (line.style !== undefined && !LINE_STYLES.includes(line.style as never)) {
+        c.add(`${path}.style`, `debe ser ${LINE_STYLES.map((style) => `"${style}"`).join(', ')}`);
+      }
     });
     this.checkMergeCycles(mergeTarget, c);
   }
@@ -532,6 +537,42 @@ export class LifeDataValidator {
         c.add(path, `"${id}" (${start.toString()}) es anterior a "${previous.id}" (${previous.start.toString()}): el recorrido debe ir en orden cronológico`);
       }
       previous = { id, start };
+    });
+  }
+
+  /**
+   * `ledTo` (enlaces causales): lista de ids existentes, sin el propio evento, sin duplicados y con
+   * el destino en la misma fecha o después que el origen.
+   */
+  private validateLedTo(events: unknown, c: IssueCollector): void {
+    if (!Array.isArray(events)) return;
+    const starts = new Map<string, PartialDate | null>();
+    for (const event of events) {
+      if (isRecord(event) && typeof event.id === 'string') {
+        starts.set(event.id, isRecord(event.date) ? PartialDate.tryParse(event.date.start) : null);
+      }
+    }
+    events.forEach((event, index) => {
+      if (!isRecord(event) || event.ledTo === undefined) return;
+      const path = `events[${index}].ledTo`;
+      if (!Array.isArray(event.ledTo)) {
+        c.add(path, 'debe ser una lista de ids de eventos');
+        return;
+      }
+      const seen = new Set<string>();
+      const own = typeof event.id === 'string' ? starts.get(event.id) : null;
+      event.ledTo.forEach((id, j) => {
+        const at = `${path}[${j}]`;
+        if (typeof id !== 'string') return c.add(at, 'debe ser el id de un evento');
+        if (id === event.id) return c.add(at, 'un evento no puede llevar a sí mismo');
+        if (!starts.has(id)) return c.add(at, `el evento "${id}" no existe`);
+        if (seen.has(id)) return c.add(at, `"${id}" está repetido`);
+        seen.add(id);
+        const target = starts.get(id);
+        if (own && target && target.compareTo(own) < 0) {
+          c.add(at, `"${id}" (${target.toString()}) es anterior al origen (${own.toString()}): ledTo solo apunta hacia delante`);
+        }
+      });
     });
   }
 

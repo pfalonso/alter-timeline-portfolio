@@ -60,13 +60,17 @@ export const POINTS_VERTEX = /* glsl */ `
   }
 `;
 
+/** Motas de pigmento: disco irregular con el borde algo más cargado (como una gota que se seca). */
 export const POINTS_FRAGMENT = /* glsl */ `
   varying float vAlpha;
   varying vec3 vColor;
   void main() {
-    float d = length(gl_PointCoord - 0.5) * 2.0;
-    float a = pow(max(0.0, 1.0 - d), 2.0);
-    gl_FragColor = vec4(vColor, a * vAlpha);
+    vec2 c = gl_PointCoord - 0.5;
+    float wobble = 0.08 * sin(atan(c.y, c.x) * 3.0 + vColor.r * 17.0);
+    float d = length(c) * 2.0 + wobble;
+    float body = 1.0 - smoothstep(0.7, 1.0, d);
+    float rim = smoothstep(0.35, 0.85, d) * body;
+    gl_FragColor = vec4(vColor, (0.3 * body + 0.3 * rim) * vAlpha);
   }
 `;
 
@@ -122,9 +126,10 @@ export class ParticleFlow implements SceneEffect {
           spin: (random() - 0.5) * 1.4,
           orbit: bright ? 0.05 + random() * 0.12 : 0.12 + Math.pow(random(), 2) * 0.75,
         });
-        const color = base.clone().lerp(white, bright ? 0.7 : 0.25 + random() * 0.3);
+        // Pigmento, no chispa: las motas conservan el color de su línea (apenas se aclaran).
+        const color = base.clone().lerp(white, bright ? 0.3 : 0.08 + random() * 0.15);
         colors.push(color.r, color.g, color.b);
-        sizes.push(bright ? 0.34 + random() * 0.24 : 0.12 + random() * 0.2);
+        sizes.push(bright ? 0.26 + random() * 0.18 : 0.1 + random() * 0.16);
       }
     });
     this.count = this.particles.length;

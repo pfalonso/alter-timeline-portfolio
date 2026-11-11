@@ -2,10 +2,8 @@ import { Scene, type BufferAttribute } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { BranchCurve, type BranchStyle } from '../../../src/infrastructure/three/BranchCurve';
 import { PathTable } from '../../../src/infrastructure/three/math';
-import { Nebula } from '../../../src/infrastructure/three/Nebula';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
-import { Starfield, type StarLayer } from '../../../src/infrastructure/three/Starfield';
 import { createRingTexture } from '../../../src/infrastructure/three/textures';
 import { YearMarkers } from '../../../src/infrastructure/three/YearMarkers';
 import { frameContext } from '../../helpers/three';
@@ -297,124 +295,6 @@ describe('BranchCurve', () => {
 
   it('con menos de dos puntos falla de forma explícita', () => {
     expect(() => new BranchCurve('x', [points[0]], style)).toThrow(/dos puntos/);
-  });
-});
-
-describe('Nebula', () => {
-  it('se dibuja al fondo, detrás de todo', () => {
-    const nebula = new Nebula();
-    expect(nebula.mesh.name).toBe('nebula');
-    expect(nebula.mesh.position.z).toBe(-320);
-    expect(nebula.mesh.renderOrder).toBeLessThan(0);
-    expect(nebula.mesh.material.depthTest).toBe(false);
-  });
-
-  it('usa los tres colores de la paleta', () => {
-    const { uniforms } = new Nebula(['#ff0000', '#00ff00', '#0000ff']).mesh.material;
-    expect([uniforms.uColorA, uniforms.uColorB, uniforms.uColorC].map((uniform) => uniform.value.getHexString())).toEqual([
-      'ff0000', '00ff00', '0000ff',
-    ]);
-  });
-
-  it('sigue a la cámara con retardo (parallax) y compensa el dibujo para que no patine', () => {
-    const nebula = new Nebula(undefined, -100, 0.5);
-    const context = frameContext({ time: 7 });
-    context.camera.position.set(300, -62, 40);
-    nebula.update(context);
-    expect(nebula.mesh.position.toArray()).toEqual([150, -31, -100]);
-    const { uniforms } = nebula.mesh.material;
-    expect(uniforms.uOffset.value.x).toBeCloseTo((150 / 1500) * 9, 10);
-    expect(uniforms.uOffset.value.y).toBeCloseTo((-31 / 620) * 4, 10);
-    expect(uniforms.uTime.value).toBe(7);
-  });
-
-  it('con movimiento reducido la nube no se anima', () => {
-    const nebula = new Nebula();
-    nebula.update(frameContext({ time: 7, reducedMotion: true }));
-    expect(nebula.mesh.material.uniforms.uTime.value).toBe(0);
-  });
-
-  it('attach / dispose', () => {
-    const nebula = new Nebula();
-    const scene = new Scene();
-    nebula.attach(scene);
-    expect(scene.children).toEqual([nebula.mesh]);
-    const material = vi.spyOn(nebula.mesh.material, 'dispose');
-    nebula.dispose();
-    expect(scene.children).toHaveLength(0);
-    expect(material).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('Starfield', () => {
-  const layer = (overrides: Partial<StarLayer> = {}): StarLayer => ({
-    count: 200,
-    x: [-10, 10],
-    y: [0, 5],
-    z: [-50, -40],
-    size: [1, 3],
-    alpha: [0.2, 0.8],
-    palette: ['#ff0000', '#0000ff'],
-    drift: 0,
-    ...overrides,
-  });
-
-  it('crea una nube de puntos por capa con el nº de estrellas pedido', () => {
-    const field = new Starfield([layer(), layer({ count: 50, drift: 0.7 })]);
-    expect(field.layers.map((points) => points.name)).toEqual(['starfield:0', 'starfield:1']);
-    expect(field.layers.map((points) => points.geometry.attributes.position.count)).toEqual([200, 50]);
-    expect(field.layers.map((points) => points.material.uniforms.uDrift.value)).toEqual([0, 0.7]);
-  });
-
-  it('reparte las estrellas dentro de la caja, con tamaños, alfas y colores de la paleta', () => {
-    const [points] = new Starfield([layer()]).layers;
-    const { position, aSize, aAlpha, aColor } = points.geometry.attributes;
-    for (let i = 0; i < 200; i += 1) {
-      expect(position.getX(i)).toBeGreaterThanOrEqual(-10);
-      expect(position.getX(i)).toBeLessThanOrEqual(10);
-      expect(position.getY(i)).toBeGreaterThanOrEqual(0);
-      expect(position.getY(i)).toBeLessThanOrEqual(5);
-      expect(position.getZ(i)).toBeGreaterThanOrEqual(-50);
-      expect(position.getZ(i)).toBeLessThanOrEqual(-40);
-      expect(aSize.getX(i)).toBeGreaterThanOrEqual(1);
-      expect(aSize.getX(i)).toBeLessThanOrEqual(3);
-      expect(aAlpha.getX(i)).toBeGreaterThanOrEqual(0.2 - 1e-6);
-      expect(aAlpha.getX(i)).toBeLessThanOrEqual(0.8 + 1e-6);
-      expect([aColor.getX(i), aColor.getY(i), aColor.getZ(i)].filter((channel) => channel === 1)).toHaveLength(1);
-      expect(aColor.getY(i)).toBe(0);
-    }
-    // Muchas pequeñas, pocas grandes.
-    const sizes = Array.from({ length: 200 }, (_, i) => aSize.getX(i));
-    expect(sizes.filter((size) => size < 2).length).toBeGreaterThan(130);
-  });
-
-  it('es determinista por semilla', () => {
-    const positions = (seed?: number): number[] => [...new Starfield([layer()], seed).layers[0].geometry.attributes.position.array];
-    expect(positions()).toEqual(positions());
-    expect(positions(1)).toEqual(positions(1));
-    expect(positions(1)).not.toEqual(positions(2));
-  });
-
-  it('update ajusta tamaño de punto y tiempo (congelado con movimiento reducido)', () => {
-    const field = new Starfield([layer(), layer()]);
-    field.update(frameContext({ time: 4, viewport: { width: 100, height: 500 } }));
-    for (const points of field.layers) {
-      expect(points.material.uniforms.uScale.value).toBe(450);
-      expect(points.material.uniforms.uTime.value).toBe(4);
-    }
-    field.update(frameContext({ time: 4, reducedMotion: true }));
-    expect(field.layers[0].material.uniforms.uTime.value).toBe(0);
-  });
-
-  it('attach / dispose', () => {
-    const field = new Starfield([layer(), layer()]);
-    const scene = new Scene();
-    field.attach(scene);
-    expect(scene.children).toHaveLength(2);
-    const geometry = vi.spyOn(field.layers[1].geometry, 'dispose');
-    field.dispose();
-    expect(scene.children).toHaveLength(0);
-    expect(geometry).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -21,11 +21,6 @@ function build(size: number, alphaAt: (radius: number) => number): DataTexture {
   return texture;
 }
 
-/** Resplandor radial suave (procedural: no necesita canvas, así que funciona también en tests). */
-export function createGlowTexture(size = 128): DataTexture {
-  return build(size, (r) => (r >= 1 ? 0 : Math.pow(1 - r, 2.6) + 0.35 * Math.exp(-r * r * 40)));
-}
-
 /** Anillo fino con un halo interior tenue. */
 export function createRingTexture(size = 256): DataTexture {
   return build(size, (r) => {

@@ -8,7 +8,10 @@ paralelo; lo que cambia con el tiempo es el **foco** (qué línea brilla), y dos
 **fusionarse**. El modelo antiguo (cada bifurcación abre una rama, `branch` + `branchFrom`) sigue
 siendo válido.
 Diseño visual ORIGINAL (no copiar arte, logos, nombres ni UI de ningún videojuego):
-estética sci-fi etérea, partículas, bloom, niebla, energía fluyendo por las ramas.
+desde el 11/11/2026, **acuarela en movimiento** (nada espacial): papel índigo/ciruela muy oscuro con
+lavados de pigmento de los colores de las líneas, líneas como tinta luminosa, motas de pigmento,
+bloom contenido. Los nodos se leen como una sola historia en una **banda central**; las líneas entran
+y salen de ella como hebras, y las hebras causales (`ledTo`) unen lo que llevó a qué.
 
 ## Stack
 
@@ -73,6 +76,7 @@ interface BranchInfo {
   mergeInto?: { branch: string; event: string }; // converge en `branch` en la posición de `event` (de `branch`) y termina
   until?: "present";          // sigue viva hasta hoy aunque su último evento haya terminado
   focus?: { start: string; end?: string | "present"; level?: 1 | 2 | 3 }[]; // sin end = hasta hoy; level por defecto 3
+  style?: "geometric" | "organic" | "neutral"; // forma de sus nodos; por defecto según id (ver abajo)
 }
 interface Category {
   id: string;                 // kebab-case, único
@@ -101,6 +105,7 @@ interface LifeEvent {
   branchFrom?: string;        // id del evento del que nace esta rama (bifurcación)
   visibility?: "public" | "private"; // "private" se oculta salvo ?private=1
   bridge?: string;            // ≤ 160: frase que conecta con el evento anterior del recorrido
+  ledTo?: string[];           // enlaces causales: ids de eventos posteriores o de la misma fecha (cualquier línea)
 }
 ```
 
@@ -110,12 +115,26 @@ por algún evento (o `mainBranch`); `origin` y `mergeInto.event` existen; `merge
 distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `focus` con fechas válidas,
 `end >= start` y `level` 1–3; `arcs` con ids únicos, fechas válidas, `end >= start` y sin solapes;
 `story.path` con ids existentes, sin repetir y en orden cronológico; `bridge` no vacío y ≤ 160;
+`ledTo` con ids existentes, sin el propio evento, sin duplicados y con destino no anterior al origen;
+`branches[].style` ∈ geometric | organic | neutral;
 `mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
 `"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `origin` ni `mergeInto`.
 Errores acumulados con ruta (`events[3].date.start: ...`, `branches[1].mergeInto.event: ...`), no solo el primero.
 
-Jerarquía, arcos e historia: `importance` 3 = nodo grande con halo, anillo y rótulo siempre; 2 =
-mediano, rótulo al acercarse si cabe; 1 = punto sin halo ni rótulo salvo hover/foco/selección. Los
+Jerarquía, arcos e historia: `importance` 3 = glifo compuesto grande (forma + anillo/marco exterior +
+marca interior + aura de pigmento) y rótulo siempre; 2 = forma sola con contorno y relleno suave,
+rótulo al acercarse si cabe; 1 = marca pequeña sin aura ni rótulo salvo hover/foco/selección (se
+distinguen también en escala de grises). Forma por línea (`style`, por defecto `tecnologia`/`gestion` →
+geometric; `arte`/`gastronomia`/`rol` → organic; resto → neutral): geometric = rombo, hexágono, marco
+con esquinas y trazos de circuito; organic = mancha de acuarela, pétalo/gota, pincel, espiral; neutral =
+círculo y anillos. Glifos SDF en shader; hover/selección expanden el pigmento. Chips y leyenda usan
+el mismo lenguaje.
+Banda narrativa: todos los nodos en una banda central (|y| pequeño, desfase por carril, apilado si
+coinciden en fecha); las líneas salen de la banda entre nodos hacia su carril y vuelven a cada uno de
+sus eventos. Rótulos alternando arriba/abajo de la banda. `ledTo` = hebra de tinta del nodo origen al
+destino (degradado de color entre las dos líneas; remolino de pigmento si cambian de línea); pop-up con
+«Viene de…» y «Esto llevó a…»; en la historia, si el paso siguiente es consecuencia del actual, la
+cámara sigue la hebra. Los
 rótulos se colocan por prioridad (fijado > mayor > medio > menor) y nunca se solapan. Los arcos son
 separadores verticales etéreos + velo del arco activo en la escena, franja de capítulos sobre la regla
 (se ilumina el de la cámara) y grupos en el índice. Modo historia («Ver la historia», tecla H): recorre
@@ -123,9 +142,9 @@ separadores verticales etéreos + velo del arco activo en la escena, franja de c
 pop-up con progreso «3 / 22», arco y `bridge`, Anterior/Siguiente y ←/→ por el recorrido, tarjeta de
 capítulo al entrar en un arco nuevo; sale con Esc o botón. Sin `story.path` no hay botón. En modo
 libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. `build:public-data` quita del recorrido
-los ids privados y conserva los arcos.
+los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados.
 
-Comportamiento visual de las líneas: la central siempre en y = 0, la más brillante y algo más gruesa
+Comportamiento visual de las líneas: la central siempre en el carril y = 0, la más brillante y algo más gruesa
 hoy; las que comparten `origin` salen del mismo punto como un haz; la intensidad (brillo/bloom, densidad
 y velocidad de partículas, opacidad) de cada tramo sale de `focusIntensityAt(line, fecha)` (dominio,
 pura: ≈ 0,3 fuera de foco, 0,55/0,78/1 según `level`, rampas suaves); `mergeInto` curva la línea hasta
@@ -147,7 +166,7 @@ src/
     TimelineController.ts   # orquesta casos de uso ↔ vista
   infrastructure/
     http/            # HttpJsonTimelineRepository (fetch + fallback)
-    three/           # ThreeTimelineView + SceneBuilder, NodeMesh, BranchCurve, ParticleFlow, Starfield, PostFX, CameraRig
+    three/           # ThreeTimelineView + SceneBuilder, NodeMesh (glifos), BranchCurve, ParticleFlow, Watercolor, PostFX, CameraRig
     dom/             # FilterBar, EventPopup, Hud, Tooltip
     storage/         # UrlFilterStateStore (filtros en query string)
   main.ts            # composition root (única pieza que conoce todo)
@@ -155,7 +174,7 @@ src/
 
 - Dependencias solo hacia dentro: infrastructure → application → domain. Dominio y aplicación no importan `three` ni tocan `document`/`window`/`fetch`.
 - SOLID: una responsabilidad por clase, puertos pequeños, inyección por constructor, extensible sin modificar (nuevas categorías = datos; nuevos efectos = nuevas clases que implementan una interfaz `SceneEffect`).
-- `TimelineLayout` es puro y determinista: de `Timeline` → `{ nodes: {eventId, position{x,y,z}, branch}, branches: {id, points[], focus[], main, merge} }`. El eje X es el tiempo; cada rama se desvía en Y/Z desde su origen (`origin` o `branchFrom`).
+- `TimelineLayout` es puro y determinista: de `Timeline` → `{ nodes: {eventId, position{x,y,z}, branch}, branches: {id, points[], focus[], main, merge}, links: {from, to, fromBranch, toBranch, points[]}, band: {minY, maxY} }`. El eje X es el tiempo; los nodos van a la banda central y cada rama se desvía en Y/Z hacia su carril entre ellos (nace en `origin` o `branchFrom`).
 
 ## UX obligatoria
 
@@ -164,7 +183,7 @@ src/
 - Nodo: hover → tooltip (título + fechas); clic/Enter → **pop-up** con todo el detalle del evento; Esc o clic fuera lo cierra; la cámara vuela al nodo.
 - **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados se atenúan/desvanecen con transición, no desaparecen en seco. Estado reflejado en la URL.
 - Marcas de año sobre el eje. HUD con nombre, tagline y contador de eventos visibles.
-- VFX: bloom, partículas fluyendo por las ramas, campo de polvo/estrellas con parallax, halo pulsante en nodos, niebla de profundidad, pulso al seleccionar.
+- VFX: fondo de acuarela en movimiento con parallax leve (estático con movimiento reducido), bloom contenido, motas de pigmento fluyendo por las ramas, aura de pigmento en los nodos mayores, niebla del color del papel, pulso al seleccionar.
 - Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog" no modal: es un panel lateral y el resto sigue operable, así que no lleva `aria-modal` ni atrapa el foco; ver DOC_DISCREPANCIES A6).
 - Responsive (móvil: pop-up a pantalla completa, gestos táctiles). Fallback legible si no hay WebGL.
 - Rendimiento: partículas con `Points`/instancing, pixelRatio limitado a 2, pausar render con la pestaña oculta.

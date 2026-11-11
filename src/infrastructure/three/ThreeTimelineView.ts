@@ -1,4 +1,4 @@
-import { Color, FogExp2, PerspectiveCamera, Scene, Vector3 } from 'three';
+import { FogExp2, PerspectiveCamera, Scene, Vector3 } from 'three';
 import type {
   FilterViewState,
   SelectionViewState,
@@ -10,7 +10,7 @@ import type { TimelineViewPart } from '../dom/CompositeTimelineView';
 import type { NodeHoverListener } from '../dom/Tooltip';
 import { CameraRig } from './CameraRig';
 import { activeArcAt } from './ArcBands';
-import { bandFraction, bandOffset, clamp, pickNode, storyRoute, verticalExtent, type SafeInsets } from './math';
+import { bandFraction, bandOffset, clamp, pickNode, routeAlong, storyRoute, verticalExtent, type SafeInsets } from './math';
 import type { NodeMesh } from './NodeMesh';
 import { PointerInput } from './PointerInput';
 import type { PostProcessing } from './PostFX';
@@ -52,6 +52,8 @@ const OPENING_MAX_DISTANCE = 80;
 /** Margen vertical (mundo) alrededor de las ramas al encuadrar: radio de los nodos y halos. */
 const FRAME_MARGIN = 2.2;
 const DETAIL_DISTANCE = 21;
+/** Margen vertical (mundo) que se encuadra alrededor de la banda de nodos al abrir. */
+const BAND_FRAME = 4.5;
 /** Por encima de este ancho el pop-up es un panel lateral y el encuadre se desplaza. */
 const SIDE_PANEL_MIN_WIDTH = 900;
 
@@ -81,7 +83,8 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const canvas = deps.backend.renderer.domElement;
     canvas.classList.add('stage__canvas');
     deps.container.prepend(canvas);
-    this.scene.background = new Color(DEFAULT_PALETTE.background);
+    // Sin fondo de escena: el papel de acuarela lo pinta el postprocesado antes que ella.
+    this.scene.background = null;
     this.post = deps.backend.createPostProcessing(this.scene, this.camera);
 
     new PointerInput(canvas, {
@@ -114,6 +117,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.built = built;
     this.scene.fog = new FogExp2(DEFAULT_PALETTE.background, FOG_DENSITY);
     for (const effect of built.effects) effect.attach(this.scene);
+    this.post.setBackdrop?.(built.backdrop);
     if (this.highlightedBranch !== null) built.highlightBranch(this.highlightedBranch);
     for (const node of built.nodes) {
       this.scene.add(node.group);
@@ -181,18 +185,18 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance);
     else this.rig.flyTo(node.group.position, distance);
     this.built?.pulse.trigger(node.group.position, node.color, node.radius);
-    if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.9 : 0.45);
+    if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.45 : 0.25);
   }
 
-  /** Vuelo del modo historia: avanza por el tiempo siguiendo la línea de salida y la de llegada. */
+  /**
+   * Vuelo del modo historia. Los nodos viven en la banda, así que el vuelo la recorre en línea recta;
+   * si el paso siguiente es consecuencia del actual (`ledTo`), la cámara sigue la hebra causal.
+   */
   private flyAlongLines(from: NodeMesh, to: NodeMesh, distance: number): void {
-    const lineOf = (id: string) => {
-      const branch = this.layout?.nodes.find((item) => item.eventId === id)?.branch;
-      return this.layout?.branches.find((item) => item.id === branch)?.points;
-    };
     const a = from.group.position;
     const b = to.group.position;
-    const route = storyRoute(a, b, lineOf(from.eventId), lineOf(to.eventId));
+    const link = this.layout?.links?.find((item) => item.from === from.eventId && item.to === to.eventId);
+    const route = link ? routeAlong(link.points) : storyRoute(a, b);
     const span = Math.abs(b.x - a.x);
     this.rig.flyAlong(route, distance, clamp(1.3 + span / 30, 1.5, 3.4), Math.min(26, 4 + span * 0.35));
   }
@@ -251,6 +255,13 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
       const x = nowX - halfWidth * 0.7;
       extent = verticalExtent(layout.branches, x - halfWidth, x + halfWidth) ?? extent;
+      // Lo que importa es la banda de los nodos: las hebras que se alejan pueden perderse por arriba/abajo.
+      if (layout.band) {
+        extent = {
+          minY: Math.max(extent.minY, layout.band.minY - BAND_FRAME),
+          maxY: Math.min(extent.maxY, layout.band.maxY + BAND_FRAME),
+        };
+      }
       distance = Math.min(
         OPENING_MAX_DISTANCE,
         Math.max(this.defaultDistance(), this.rig.distanceToFitHeight(extent.maxY - extent.minY + 2 * FRAME_MARGIN, band)),

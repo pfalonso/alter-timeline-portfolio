@@ -102,6 +102,16 @@ describe('ParticleFlow con foco y resalte', () => {
 });
 
 describe('MergeSeam', () => {
+  it('con core 0 (remolino de una hebra causal) no hay destello central blanco', () => {
+    const swirl = new MergeSeam('s', { x: 0, y: 0, z: 0 }, '#ff0000', '#0000ff', { count: 10, radius: 0.8, core: 0 });
+    const sizes = swirl.points.geometry.getAttribute('aSize').array as Float32Array;
+    const colors = swirl.points.geometry.getAttribute('aColor').array as Float32Array;
+    expect(sizes[0]).toBe(0);
+    expect(colors[0]).toBeLessThan(1);
+    const flash = new MergeSeam('f', { x: 0, y: 0, z: 0 }, '#ff0000', '#0000ff', { count: 10 });
+    expect((flash.points.geometry.getAttribute('aSize').array as Float32Array)[0]).toBeCloseTo(2.6, 5);
+  });
+
   it('es un destello y un remolino de motas alrededor del punto de fusión que late con el tiempo', () => {
     const seam = new MergeSeam('art', { x: 5, y: 2, z: -1 }, '#ff0000', '#0000ff', { count: 20, radius: 1.5 });
     const scene = new Scene();

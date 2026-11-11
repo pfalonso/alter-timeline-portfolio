@@ -161,19 +161,20 @@ describe('TimelineLayout: ramas y branchFrom', () => {
     expect(side.points[0]).toEqual(nodeOf(layout, 'b-job').position);
   });
 
-  it('se desvía en Y y Z hasta su carril', () => {
+  it('sus nodos viven en la banda y, entre ellos, la línea sale hasta su carril (Y y Z)', () => {
     const layout = layoutOf(makeData());
     const side = branchOf(layout, 'side');
     expect(side.lane).toBe(1);
+    const first = nodeOf(layout, 'c-side').position;
     const second = nodeOf(layout, 'e-side-two').position;
-    expect(second.y).toBeGreaterThan(O.laneSpacing - O.waveAmplitude - 1e-9);
-    expect(second.y).toBeLessThan(O.laneSpacing + O.waveAmplitude + 1e-9);
-    expect(second.z).toBeLessThan(-O.laneDepth + O.waveAmplitude);
-    // La desviación es progresiva: la Y crece de forma monótona durante la transición.
-    const blendEnd = side.points[0].x + O.blendYears * O.unitsPerYear;
-    const blending = side.points.filter((point) => point.x <= blendEnd);
-    expect(blending.length).toBeGreaterThan(3);
-    for (let i = 1; i < blending.length; i += 1) expect(blending[i].y).toBeGreaterThanOrEqual(blending[i - 1].y - 1e-9);
+    for (const node of [first, second]) {
+      expect(Math.abs(node.y)).toBeLessThanOrEqual(O.bandHalfHeight + O.stackGap);
+      expect(node.z).toBeCloseTo(0, 6);
+    }
+    // Entre los dos nodos la línea se curva fuera de la banda, hacia su carril y hacia el fondo.
+    const between = side.points.filter((point) => point.x > first.x && point.x < second.x);
+    expect(Math.max(...between.map((point) => point.y))).toBeGreaterThan(O.laneSpacing - O.waveAmplitude - 1e-9);
+    expect(Math.min(...between.map((point) => point.z))).toBeLessThan(-O.laneDepth + O.waveAmplitude);
   });
 
   it('el nodo de una rama está sobre la polilínea de su rama', () => {
@@ -278,9 +279,10 @@ describe('TimelineLayout: carriles', () => {
       ]),
     );
     expect(['ba', 'bb', 'bc', 'bd'].map((id) => branchOf(layout, id).lane)).toEqual([1, -1, 2, -2]);
-    expect(nodeOf(layout, 'b').position.y).toBeLessThan(-O.laneSpacing + O.waveAmplitude + 1e-9);
-    // Cuanto más lejos del tronco, más al fondo.
-    expect(nodeOf(layout, 'c').position.z).toBeLessThan(nodeOf(layout, 'a').position.z);
+    // En la banda, cada nodo lleva un ligero desfase hacia el lado de su carril.
+    expect(nodeOf(layout, 'a').position.y).toBeGreaterThan(0);
+    expect(nodeOf(layout, 'b').position.y).toBeLessThan(0);
+    expect(Math.abs(nodeOf(layout, 'c').position.y)).toBeGreaterThan(Math.abs(nodeOf(layout, 'a').position.y));
   });
 
   it('reutiliza un carril cuando la rama anterior ya ha terminado', () => {
@@ -382,7 +384,9 @@ describe('TimelineLayout: carriles compactos', () => {
     const flat = { waveAmplitude: 0 };
     const two = layoutOf(dataWith(concurrent(2)), flat);
     const eight = layoutOf(dataWith(concurrent(8)), flat);
-    const zOf = (layout: TimelineLayoutResult, id: string): number => nodeOf(layout, id).position.z;
+    // Z del carril (lejos de los nodos): la mínima de la rama del evento e0.
+    const zOf = (layout: TimelineLayoutResult, id: string): number =>
+      Math.min(...branchOf(layout, nodeOf(layout, id).branch).points.map((point) => point.z));
     expect(zOf(two, 'e0')).toBeCloseTo(-O.laneDepth, 3);
     expect(zOf(eight, 'e0')).toBeCloseTo(-O.laneDepth * (eight.laneSpacing / O.laneSpacing), 3);
   });
@@ -429,8 +433,74 @@ describe('TimelineLayout: tramos de duración y límites', () => {
   });
 
   it('las opciones se combinan con las de por defecto', () => {
-    const flat = layoutOf(makeData(), { waveAmplitude: 0, laneSpacing: 10 });
+    const flat = layoutOf(makeData(), { waveAmplitude: 0, laneSpacing: 10, maxLaneSpread: 10 });
     for (const point of branchOf(flat, 'main').points) expect(Math.abs(point.y) + Math.abs(point.z)).toBe(0);
-    expect(nodeOf(flat, 'e-side-two').position.y).toBe(10);
+    expect(Math.max(...branchOf(flat, 'side').points.map((point) => point.y))).toBeCloseTo(10, 1);
+    expect(layoutOf(makeData(), { bandLaneStep: 0.9 }).nodes.find((node) => node.eventId === 'e-side-two')?.position.y).toBe(0.9);
+  });
+});
+
+describe('TimelineLayout: banda narrativa', () => {
+  const sameDay = (): LifeData['events'] => [
+    makeEvent({ id: 'm1', date: { start: '2010' } }),
+    makeEvent({ id: 'm2', date: { start: '2014-05' } }),
+    makeEvent({ id: 'u', date: { start: '2014-05' }, branch: 'up', branchFrom: 'm1' }),
+    makeEvent({ id: 'd', date: { start: '2014-05' }, branch: 'down', branchFrom: 'm1' }),
+    makeEvent({ id: 'u2', date: { start: '2018' }, branch: 'up' }),
+  ];
+
+  it('todos los nodos quedan en una banda central estrecha, aunque las líneas se alejen', () => {
+    const layout = layoutOf(dataWith(sameDay()));
+    for (const node of layout.nodes) expect(Math.abs(node.position.y)).toBeLessThanOrEqual(O.bandHalfHeight + 2 * O.stackGap);
+    expect(layout.band.maxY - layout.band.minY).toBeLessThan(layout.bounds.maxY - layout.bounds.minY);
+  });
+
+  it('nodos de la misma fecha se apilan con la separación mínima', () => {
+    const layout = layoutOf(dataWith(sameDay()));
+    const ys = ['m2', 'u', 'd'].map((id) => nodeOf(layout, id).position.y).sort((a, b) => a - b);
+    expect(ys[1] - ys[0]).toBeGreaterThanOrEqual(O.stackGap - 1e-9);
+    expect(ys[2] - ys[1]).toBeGreaterThanOrEqual(O.stackGap - 1e-9);
+  });
+
+  it('cada línea pasa exactamente por sus nodos', () => {
+    const layout = layoutOf(dataWith(sameDay()));
+    for (const node of layout.nodes) {
+      const branch = branchOf(layout, node.branch);
+      const closest = branch.points.reduce((best, point) => (Math.abs(point.x - node.position.x) < Math.abs(best.x - node.position.x) ? point : best));
+      expect(Math.abs(closest.y - node.position.y)).toBeLessThan(0.15);
+    }
+  });
+
+  it('es determinista', () => {
+    expect(layoutOf(dataWith(sameDay()))).toEqual(layoutOf(dataWith([...sameDay()].reverse())));
+  });
+});
+
+describe('TimelineLayout: enlaces causales (ledTo)', () => {
+  const events = (): LifeData['events'] => [
+    makeEvent({ id: 'tfg', date: { start: '2017' }, ledTo: ['culinary', 'coop'] }),
+    makeEvent({ id: 'culinary', date: { start: '2018' }, branch: 'side', branchFrom: 'tfg' }),
+    makeEvent({ id: 'coop', date: { start: '2020' } }),
+  ];
+
+  it('una hebra por enlace, del nodo origen al destino, con las líneas de ambos', () => {
+    const layout = layoutOf(dataWith(events()));
+    expect(layout.links.map((link) => [link.from, link.to, link.fromBranch, link.toBranch])).toEqual([
+      ['tfg', 'culinary', 'main', 'side'],
+      ['tfg', 'coop', 'main', 'main'],
+    ]);
+    for (const link of layout.links) {
+      const points = link.points;
+      expect(points[0]).toEqual(nodeOf(layout, link.from).position);
+      expect(points[points.length - 1]).toEqual(nodeOf(layout, link.to).position);
+      // Arquea un poco hacia delante para leerse por encima de las líneas.
+      expect(Math.max(...points.map((point) => point.z))).toBeGreaterThan(0.5);
+    }
+  });
+
+  it('sin ledTo no hay hebras; los destinos ocultos se ignoran', () => {
+    expect(layoutOf(makeData()).links).toEqual([]);
+    const hidden = events().map((event) => (event.id === 'coop' ? { ...event, visibility: 'private' as const } : event));
+    expect(layoutOf(dataWith(hidden)).links.map((link) => link.to)).toEqual(['culinary']);
   });
 });

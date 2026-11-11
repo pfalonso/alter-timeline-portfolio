@@ -25,7 +25,7 @@ Este README es la wiki completa del proyecto: cómo arrancarlo, cómo meter tus 
 
 Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: el eje horizontal es el tiempo y cada evento es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
 
-No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela siguiendo las líneas y cada paso trae una frase que lo enlaza con el anterior.
+No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela por la banda (o sigue la hebra causal cuando un paso llevó al siguiente) y cada paso trae una frase que lo enlaza con el anterior. Todo sobre un fondo de acuarela en movimiento, no un cielo estrellado.
 
 **Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: qué línea brilla en cada momento. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
 
@@ -215,11 +215,12 @@ Raíz del documento:
 | `highlights` | lista de textos no vacíos | No | Sección «Hitos» |
 | `links` | lista de `{ label, url }` | No | Sección «Enlaces». Solo http(s) |
 | `media` | lista de `{ type: "image", url, alt }` | No | Imágenes del pop-up. `url` http(s); `alt` obligatorio (puede ser vacío) |
-| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Jerarquía del nodo (ver 4.1): `3` mayor (grande, halo, anillo y rótulo siempre), `2` medio (rótulo al acercarse), `1` menor (punto sin halo, rótulo solo al señalarlo). ←/→ saltan entre los de importancia ≥ 2 |
+| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Jerarquía del nodo (ver 4.1): `3` mayor (glifo compuesto con aura y rótulo siempre), `2` medio (forma con contorno; rótulo al acercarse), `1` menor (marca pequeña; rótulo solo al señalarlo). ←/→ saltan entre los de importancia ≥ 2 |
 | `branch` | texto kebab-case | No (por defecto la línea central: `meta.mainBranch`, o `"main"`) | Línea (rama) a la que pertenece el evento |
 | `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama (modelo clásico; `branches[].origin` prevalece) |
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
 | `bridge` | texto no vacío, máx. 160 caracteres | No | Frase puente que enlaza con el evento **anterior del recorrido** (`story.path`). Se muestra arriba del pop-up en el modo historia |
+| `ledTo` | lista de ids de evento | No | Enlaces causales «esto llevó a esto»: eventos **posteriores o de la misma fecha**, de cualquier línea. Se dibujan como una hebra de tinta del nodo origen al destino y aparecen en el pop-up («Esto llevó a…» / «Viene de…») |
 
 #### `branches[]` (opcional)
 
@@ -234,6 +235,7 @@ Describe las líneas vitales. Una línea existe porque algún evento la usa en `
 | `origin` | id de evento | No | Evento donde nace la línea (p. ej. `"nacimiento"`). Prevalece sobre `event.branchFrom`. Las líneas con el mismo `origin` salen del mismo punto y se abren como un haz |
 | `mergeInto` | `{ branch, event }` | No | La línea converge en la línea `branch` a la altura de `event` (que debe pertenecer a `branch`) y termina ahí, con una «costura» de partículas |
 | `until` | `"present"` | No | La línea llega hasta hoy aunque sus eventos hayan terminado (afición latente). Incompatible con `mergeInto` |
+| `style` | `"geometric"`, `"organic"` o `"neutral"` | No | Lenguaje de forma de los nodos de la línea (y de su marca en leyenda y chips): rectilíneo para lo racional, orgánico/abstracto para lo creativo, círculo neutro. Si falta: `tecnologia`/`gestion` → `geometric`; `arte`/`gastronomia`/`rol` → `organic`; el resto → `neutral` |
 | `focus` | lista de `{ start, end?, level? }` | No | Periodos de foco. `start`/`end` con el formato de fechas; `end` admite `"present"` y, si falta, el foco sigue hasta hoy. `level` `1`, `2` o `3` (por defecto `3`) |
 
 #### `arcs[]` (opcional)
@@ -303,6 +305,8 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `arcs[]` | Ids kebab-case únicos; `title` no vacío; `start` y `end` (fecha o `"present"`) obligatorios y válidos; `end >= start`; sin solapes (cada arco empieza cuando o después de que empiece el periodo `end` del anterior; nada después de un arco con `"present"`) |
 | `story.path` | Lista de ids de eventos existentes, sin repetir y en orden cronológico (por `date.start`) |
 | `bridge` | Opcional; si está, texto no vacío de 160 caracteres como máximo |
+| `ledTo` | Lista de ids existentes, sin el propio evento, sin repetir y con el destino en la misma fecha o después que el origen. `build:public-data` quita los destinos privados (y la lista si se queda vacía) |
+| `branches[].style` | `"geometric"`, `"organic"` o `"neutral"` |
 
 > [!NOTE]
 > `schema/life.schema.json` describe la **forma** del documento y sirve para el autocompletado del editor. Las reglas cruzadas (unicidad, referencias, `end ≥ start`, ciclos, días reales del mes) no son expresables en JSON Schema: la referencia es `npm run validate:data`. El proyecto no incluye ninguna librería que valide contra el schema.
@@ -320,7 +324,10 @@ La forma recomendada de contar una vida: varias líneas que nacen juntas y cambi
 
 Cómo se ve:
 
-- **Carriles.** La central va siempre en el carril del centro (y = 0). Las demás se reparten alrededor con el algoritmo de carriles de siempre (carril libre más cercano, sin cruzar el tronco si se puede evitar).
+- **Banda narrativa.** Todos los **nodos** viven en una banda central estrecha (ligero desfase por carril; si dos coinciden en fecha se apilan con una separación mínima), así que se leen de izquierda a derecha como una sola historia. Los rótulos alternan arriba y abajo de la banda.
+- **Carriles.** Cada línea conserva su carril (la central en y = 0; las demás alrededor, con el algoritmo de siempre), pero solo **entre** sus nodos: sale de la banda, se curva hacia su carril (tejiéndose y cruzándose con otras, más tenue cuanto más lejos) y vuelve a la banda para pasar exactamente por cada uno de sus eventos.
+- **Enlaces causales.** Cada `ledTo` es una hebra de tinta que arquea del nodo origen al destino con un degradado del color de una línea al de la otra; si cambian de línea, un remolino de pigmento marca dónde se unen.
+- **Forma de los nodos.** El peso (`importance`) decide la complejidad del glifo y la línea (`style`) su lenguaje de forma (ver 4.1).
 - **Foco.** El brillo y el bloom del filamento, la densidad, velocidad y brillo de sus partículas y su opacidad dependen de si ese momento cae dentro de un periodo de `focus`: fuera de foco la línea queda a ≈ 0,3; `level` 1, 2 y 3 suben a ≈ 0,55, 0,78 y 1. Las transiciones son suaves a lo largo de la curva (rampas de ~0,8 años centradas en cada borde), no saltos. Una línea sin `focus` brilla a pleno, como antes. La central además engorda un poco al acercarse a hoy.
 - **Fusión.** Con `mergeInto`, la línea se curva en sus últimos ~2 años hasta unirse a la línea destino en la posición del evento indicado y termina ahí, con una «costura»: un destello que late y un remolino de motas con los colores de las dos líneas.
 - **Final.** Una línea con `until: "present"` llega hasta hoy (atenuada según su foco). Sin `until` ni `mergeInto`, una línea cuyos eventos han terminado se disuelve en polvo como las ramas clásicas.
@@ -462,11 +469,13 @@ La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cá
 
 | Nivel | Nodo | Rótulo |
 | --- | --- | --- |
-| `3` mayor | Grande, con halo amplio, jaula y anillo siempre visibles | Siempre, en tipografía display |
-| `2` medio | Mediano, halo suave, sin anillo en reposo | Al acercarse (cámara a ≤ 72 unidades) y si cabe |
-| `1` menor | Punto pequeño sin halo, jaula ni satélites | Solo al pasar el ratón, al enfocarlo con el teclado o al seleccionarlo (y entonces crece y se enciende) |
+| `3` mayor | Glifo compuesto grande: forma + anillo/marco exterior + marca interior + aura de pigmento | Siempre, en tipografía display |
+| `2` medio | La forma sola, con contorno y relleno suave, sin aura | Al acercarse (cámara a ≤ 72 unidades) y si cabe |
+| `1` menor | Marca pequeña (punto, rombo o gota), sin aura | Solo al pasar el ratón, al enfocarlo con el teclado o al seleccionarlo (y entonces crece y su pigmento se expande) |
 
-Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: si no caben debajo, encima o un poco más abajo, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
+Los tres niveles se distinguen a primera vista incluso en escala de grises (tamaño y estructura). La **forma** depende de la línea (`branches[].style`): las líneas racionales usan geometría rectilínea (rombo, hexágono, marco con esquinas y trazos de circuito en el glifo mayor); las creativas, formas orgánicas (manchas de acuarela con borde acumulado, pétalo/gota, trazo de pincel abierto y espiral); las neutras, círculo y anillos. Los glifos son SDF en el shader: nítidos a cualquier zoom. Chips y leyenda repiten el mismo lenguaje (rombo / mancha / círculo).
+
+Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: alternan arriba y abajo de la banda de nodos (por orden cronológico); si no caben en su lado se prueba el otro y después un escalón más lejos; si no, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
 
 **Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo alineados con la escena; el actual se ilumina (en tramos estrechos se omiten los años o el título).
 
@@ -474,7 +483,7 @@ Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a iguald
 
 El botón **Ver la historia** (o la tecla `H`) recorre `story.path` de nodo en nodo:
 
-- La cámara **vuela siguiendo las líneas**: avanza por el tiempo pegada a la línea del evento de salida y pasa con suavidad a la del de llegada, alejándose un poco a mitad de camino. Con `prefers-reduced-motion` (o `?reduced-motion=1`) son cortes.
+- La cámara **vuela por la banda de nodos** de un paso al siguiente, alejándose un poco a mitad de camino; si el paso siguiente es consecuencia del actual (`ledTo`), **sigue la hebra causal** que los une. Con `prefers-reduced-motion` (o `?reduced-motion=1`) son cortes.
 - El pop-up se abre en cada paso con, arriba, el progreso (`3 / 22`), el capítulo actual y la **frase puente** (`bridge`) del evento.
 - `←` / `→`, y los botones **Anterior** / **Siguiente** del pop-up, siguen el recorrido, no la cronología.
 - Al entrar en un capítulo nuevo aparece una **tarjeta de capítulo** (número, título, años, subtítulo y resumen) que se pasa con **Continuar** o con el siguiente paso.
@@ -500,7 +509,7 @@ Fuera del modo historia, el pop-up de un evento que forma parte del recorrido of
 
 ### 4.3 Pop-up de detalle
 
-Muestra, en este orden y solo si hay dato: (en modo historia) progreso, capítulo y frase puente; etiquetas de categoría, título, subtítulo, insignias («Capítulo: …» si hay `arcs`, «En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
+Muestra, en este orden y solo si hay dato: (en modo historia) progreso, capítulo y frase puente; etiquetas de categoría, título, subtítulo, insignias («Capítulo: …» si hay `arcs`, «En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, **«Viene de…»** (eventos cuyo `ledTo` apunta a este) y **«Esto llevó a…»** (sus `ledTo` visibles), como botones que abren ese evento, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
 
 - En pantallas de 900 px o más de ancho es un panel lateral y la cámara desplaza el encuadre para que el nodo no quede tapado.
 - En pantallas de 720 px o menos ocupa toda la pantalla.
@@ -570,7 +579,7 @@ src/
                                YearRuler, ArcStrip, StoryControls, KeyboardShortcuts, LiveAnnouncer, ViewControls,
                                labelLayout, dom, strings
     three/                     ThreeTimelineView, SceneBuilder, SceneEffect, NodeMesh, BranchCurve, ParticleFlow,
-                               MergeSeam, ArcBands, Starfield, Nebula, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
+                               MergeSeam, ArcBands, WatercolorWash/WatercolorPass, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
                                PostFX, webgl, math, textures, types
   styles/main.css
 build/personalDataPlugin.ts    plugin de Vite que sirve data/life.json en dev y preview
@@ -992,8 +1001,7 @@ classDiagram
         +reducedMotion boolean
     }
 
-    class Nebula
-    class Starfield
+    class WatercolorWash
     class YearMarkers
     class BranchCurve
     class ParticleFlow
@@ -1001,8 +1009,7 @@ classDiagram
         +trigger(position, color, radius) void
     }
 
-    SceneEffect <|.. Nebula
-    SceneEffect <|.. Starfield
+    SceneEffect <|.. WatercolorWash
     SceneEffect <|.. YearMarkers
     SceneEffect <|.. BranchCurve
     SceneEffect <|.. ParticleFlow
@@ -1114,11 +1121,10 @@ Qué hace cada efecto:
 
 | Efecto | Qué dibuja |
 | --- | --- |
-| `Nebula` | Fondo procedural de nebulosa |
-| `Starfield` | Tres capas de puntos: estrellas lejanas, estrellas medias y polvo cercano con deriva |
+| `WatercolorWash` | Fondo de acuarela en movimiento: lavados de pigmento (domain warping con fbm) con borde acumulado, sangrados, granulación y papel. Lo dibuja `WatercolorPass` (postprocesado) a media resolución antes de la escena; se tiñe hacia la línea en foco y se desplaza un poco con la cámara |
 | `YearMarkers` | Meridianos verticales de cada año |
-| `BranchCurve` | El tronco, cada rama y los tramos de duración de los eventos con fecha de fin |
-| `ParticleFlow` | Motas de energía que recorren las ramas hacia el futuro, en un único `Points` |
+| `BranchCurve` | El tronco, cada rama, los tramos de duración y las hebras causales (`ledTo`, con degradado de color) |
+| `ParticleFlow` | Motas de pigmento que recorren las ramas hacia el futuro, en un único `Points` |
 | `SelectionPulse` | Anillo que se expande al seleccionar un nodo |
 
 Cada fotograma, `ThreeTimelineView.frame` hace siempre lo mismo: actualiza la cámara, llama a `update(frame)` en todos los efectos y nodos, proyecta nodos y años a coordenadas de pantalla, resuelve el hover, avisa a los `ProjectionListener` y renderiza con el postprocesado (bloom). `NodeMesh` no es un `SceneEffect` porque además recibe estado de la aplicación (visible, enfocado, bajo el puntero), pero se actualiza con el mismo `FrameContext`.
@@ -1637,7 +1643,8 @@ window.__timelineDebug.story()      // { active, step }: modo historia y progres
 | --- | --- |
 | `pixelRatio` limitado | Máximo 2, aunque la pantalla tenga más densidad |
 | Pausa con la pestaña oculta | `RenderLoop` cancela el fotograma pendiente al ocultarse y acota el salto de tiempo al volver (0,1 s) |
-| Partículas en un solo objeto | `ParticleFlow` es un único `Points`; el campo de estrellas, tres |
+| Partículas en un solo objeto | `ParticleFlow` es un único `Points` |
+| Fondo a media resolución | El lavado de acuarela se calcula a 1/2 de resolución y se escala; la granulación y el papel se añaden a resolución completa con ruido barato |
 | Presupuesto de partículas | 100 % en escritorio, 60 % en pantallas de 720 px o menos, 30 % con movimiento reducido. Se decide al cargar la página |
 | Texturas procedurales | Sin descargas de imágenes para la escena |
 | Sin antialias del renderer | El bloom ya suaviza; se ahorra el coste del multisampling |
@@ -1645,7 +1652,7 @@ window.__timelineDebug.story()      // { active, step }: modo historia y progres
 | Red | Assets con hash y caché inmutable de un año, gzip, fuentes autoalojadas, una o dos peticiones de datos |
 | Liberación de recursos | Cada efecto y nodo tiene `dispose()`; al volver a pintar se libera la escena anterior |
 
-El coste principal por fotograma son el bloom y la nebulosa procedural a pantalla completa. No hay mediciones en GPU real (ver la sección siguiente).
+El coste principal por fotograma son el bloom y el lavado de acuarela (a media resolución). No hay mediciones en GPU real (ver la sección siguiente).
 
 ---
 
@@ -1674,7 +1681,7 @@ Tomadas de `docs/DEV_NOTES.md` y del propio código. Para el estado de las compr
 - [x] Workflow de CI (`lint`, `typecheck`, `validate:data`, `test:coverage`, `build`, `docker build` + prueba de humo).
 - [ ] Enlace profundo a eventos (`?event=id`), reutilizando el patrón de `UrlFilterStateStore`.
 - [ ] Internacionalización de la interfaz (ver [6.5](#65-internacionalización-futura)).
-- [ ] Medir el rendimiento en GPU real y, si hace falta, ofrecer un nivel de calidad reducido (bloom, nebulosa).
+- [ ] Medir el rendimiento en GPU real y, si hace falta, ofrecer un nivel de calidad reducido (bloom, acuarela).
 - [ ] Pruebas en Firefox, Safari y móviles reales.
 - [ ] Revisar el encuadre por defecto con muchas ramas simultáneas.
 - [ ] Medir la anchura real de los rótulos.
