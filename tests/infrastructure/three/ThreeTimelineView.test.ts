@@ -148,7 +148,8 @@ describe('ThreeTimelineView: montaje y tamaño', () => {
     expect(h.canvas.classList.contains('stage__canvas')).toBe(true);
     expect(h.createPostProcessing).toHaveBeenCalledTimes(1);
     expect(h.scene().isScene).toBe(true);
-    expect(h.scene().background).not.toBeNull();
+    // Sin fondo de escena: el papel de acuarela lo pinta el postprocesado.
+    expect(h.scene().background).toBeNull();
   });
 
   it('ajusta renderer y postprocesado al tamaño del contenedor', () => {
@@ -202,7 +203,7 @@ describe('ThreeTimelineView: render y bucle', () => {
     const h = harness();
     const scene = h.scene();
     for (const id of ['a-school', 'b-job', 'c-side', 'e-side-two']) expect(scene.getObjectByName(`node:${id}`)).toBeDefined();
-    for (const name of ['branch:main', 'branch:side', 'nebula', 'particle-flow', 'year-markers', 'starfield:0']) {
+    for (const name of ['branch:main', 'branch:side', 'particle-flow', 'year-markers']) {
       expect(scene.getObjectByName(name)).toBeDefined();
     }
     expect(scene.fog).not.toBeNull();

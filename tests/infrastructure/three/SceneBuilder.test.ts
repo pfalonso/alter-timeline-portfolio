@@ -1,11 +1,10 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
 import { BranchCurve } from '../../../src/infrastructure/three/BranchCurve';
-import { Nebula } from '../../../src/infrastructure/three/Nebula';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
-import { DEFAULT_PALETTE, SceneBuilder } from '../../../src/infrastructure/three/SceneBuilder';
+import { bandFade, DEFAULT_PALETTE, SceneBuilder } from '../../../src/infrastructure/three/SceneBuilder';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
-import { Starfield } from '../../../src/infrastructure/three/Starfield';
+import { WatercolorWash } from '../../../src/infrastructure/three/Watercolor';
 import { YearMarkers } from '../../../src/infrastructure/three/YearMarkers';
 import { unsafeModel } from '../../helpers/dom';
 import { buildModel, makeData } from '../../helpers/fixtures';
@@ -63,10 +62,10 @@ describe('SceneBuilder', () => {
     expect(spans.map((span) => `#${span.mesh.material.uniforms.uColor.value.getHexString()}`)).toEqual(['#6ea8ff', '#ffb454', '#b48cff']);
   });
 
-  it('registra todos los efectos: nebulosa, estrellas, años, ramas, partículas y pulso', () => {
+  it('registra todos los efectos: acuarela, años, ramas, partículas y pulso (nada espacial)', () => {
     const built = new SceneBuilder().build(model);
-    expect(count(built.effects, Nebula)).toBe(1);
-    expect(count(built.effects, Starfield)).toBe(1);
+    expect(count(built.effects, WatercolorWash)).toBe(1);
+    expect(built.effects).toContain(built.backdrop);
     expect(count(built.effects, YearMarkers)).toBe(1);
     expect(count(built.effects, BranchCurve)).toBe(2 + 3);
     expect(count(built.effects, ParticleFlow)).toBe(1);
@@ -82,19 +81,18 @@ describe('SceneBuilder', () => {
     expect(flow?.count).toBe(Math.round(total * 2.6));
   });
 
-  it('particleBudget reduce partículas y polvo (movimiento reducido / móvil), no las estrellas de fondo', () => {
-    const stars = (budget: number): number[] => {
-      const built = new SceneBuilder({ particleBudget: budget }).build(model);
-      const field = built.effects.find((effect): effect is Starfield => effect instanceof Starfield);
-      const flow = built.effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow);
-      return [...(field?.layers.map((layer) => layer.geometry.attributes.position.count) ?? []), flow?.count ?? -1];
-    };
-    const full = stars(1);
-    const low = stars(0.3);
-    expect(full.slice(0, 3)).toEqual([2600, 700, 520]);
-    expect(low.slice(0, 3)).toEqual([2600, 700, 156]);
-    expect(low[3]).toBeLessThan(full[3] * 0.35);
-    expect(low[3]).toBeGreaterThan(0);
+  it('particleBudget reduce las motas de pigmento (movimiento reducido / móvil)', () => {
+    const motes = (budget: number): number =>
+      new SceneBuilder({ particleBudget: budget }).build(model).effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow)?.count ?? -1;
+    expect(motes(0.3)).toBeLessThan(motes(1) * 0.35);
+    expect(motes(0.3)).toBeGreaterThan(0);
+  });
+
+  it('las líneas se desvanecen un poco fuera de la banda de nodos', () => {
+    expect(bandFade(0)).toBe(1);
+    expect(bandFade(1)).toBe(1);
+    expect(bandFade(10)).toBeCloseTo(0.55, 5);
+    expect(bandFade(-4)).toBeLessThan(1);
   });
 
   it('la paleta y la niebla son configurables', () => {

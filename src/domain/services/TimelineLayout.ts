@@ -131,7 +131,7 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   unitsPerYear: 5,
   laneSpacing: 3.6,
   minLaneSpacing: 1.7,
-  maxLaneSpread: 7.5,
+  maxLaneSpread: 6.5,
   laneDepth: 2.4,
   blendYears: 1.1,
   bundleBlendYears: 2.6,

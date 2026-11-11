@@ -3,32 +3,31 @@ import { ArcBands } from './ArcBands';
 import { BranchCurve, type BranchStyle } from './BranchCurve';
 import { sampleAlongPath, smoothstep, valueAtX } from './math';
 import { MergeSeam } from './MergeSeam';
-import { Nebula } from './Nebula';
 import { NodeAssets, NodeMesh } from './NodeMesh';
 import { ParticleFlow, type FlowPath } from './ParticleFlow';
 import type { SceneEffect } from './SceneEffect';
 import { SelectionPulse } from './SelectionPulse';
-import { Starfield, type StarLayer } from './Starfield';
 import { createRingTexture } from './textures';
+import { DEFAULT_WATERCOLOR, WatercolorWash } from './Watercolor';
 import { YearMarkers } from './YearMarkers';
 
 export interface ScenePalette {
+  /** Papel: índigo/ciruela muy oscuro (no negro), también color de la niebla. */
   readonly background: string;
   readonly trunk: string;
   readonly fallbackNode: string;
-  readonly nebula: readonly [string, string, string];
-  readonly stars: readonly string[];
-  readonly dust: readonly string[];
 }
 
 export const DEFAULT_PALETTE: ScenePalette = {
-  background: '#04050d',
+  background: DEFAULT_WATERCOLOR.paper,
   trunk: '#a9d4ff',
   fallbackNode: '#cfe4ff',
-  nebula: ['#0a1640', '#0a3d52', '#3b1a63'],
-  stars: ['#ffffff', '#cfe0ff', '#ffe9d2', '#a8c8ff'],
-  dust: ['#7fd6ff', '#b79cff', '#ffd6a8', '#8affd9'],
 };
+
+/** Fuera de la banda las líneas se desvanecen un poco: el ojo sigue los nodos, no las hebras. */
+export function bandFade(y: number, bandHalf = 1.6, far = 6.5): number {
+  return 1 - 0.45 * smoothstep(bandHalf, far, Math.abs(y));
+}
 
 export interface SceneBuildOptions {
   readonly palette: ScenePalette;
@@ -55,6 +54,8 @@ export interface BuiltScene {
   readonly pulse: SelectionPulse;
   /** Velos y separadores de los arcos temporales. */
   readonly arcs: ArcBands;
+  /** Fondo de acuarela (lo dibuja el postprocesado antes que la escena). */
+  readonly backdrop: WatercolorWash;
   dispose(): void;
 }
 
@@ -92,12 +93,12 @@ export class SceneBuilder {
       const style: BranchStyle = {
         color: colorOfLine(branch.id, isTrunk),
         radius: isTrunk ? 0.075 : 0.055,
-        intensity: isTrunk ? 1 : 0.85,
+        intensity: isTrunk ? 0.95 : 0.72,
         fadeIn: isTrunk ? 0.06 : 0.02,
         fadeOut: isTrunk ? 0.05 : branch.open ? 0.04 : merges ? 0.015 : 0.3,
         flowSpeed: 0.11,
         fogDensity,
-        focus: branch.focus,
+        focus: branch.focus.map((value, i) => value * bandFade(branch.points[i].y)),
         widths,
       };
       // Una rama que no llega al presente (ni converge en otra) se deshace en polvo al final.
@@ -157,29 +158,16 @@ export class SceneBuilder {
       dissolve,
       focus: sampleAlongPath(curve.path, branch.points, branch.focus),
     }));
-    const { minX, maxX, minY, maxY } = layout.bounds;
-    const wide: [number, number] = [minX - 260, maxX + 260];
-    const starLayers: StarLayer[] = [
-      { count: 2600, x: wide, y: [-190, 190], z: [-300, -120], size: [0.5, 2.6], alpha: [0.25, 0.95], palette: palette.stars, drift: 0 },
-      { count: 700, x: [minX - 120, maxX + 120], y: [minY - 60, maxY + 60], z: [-110, -30], size: [0.35, 1.3], alpha: [0.2, 0.7], palette: palette.stars, drift: 0 },
-      {
-        count: Math.round(520 * particleBudget),
-        x: [minX - 40, maxX + 40],
-        y: [minY - 16, maxY + 16],
-        z: [-24, 14],
-        size: [0.1, 0.42],
-        alpha: [0.12, 0.5],
-        palette: palette.dust,
-        drift: 0.7,
-      },
-    ];
+    const backdrop = new WatercolorWash(
+      branches.map(({ branch, color }) => ({ color, points: branch.points, focus: branch.focus, main: branch.main })),
+      { ...DEFAULT_WATERCOLOR, paper: palette.background },
+    );
 
     const pulse = new SelectionPulse(assets.ring);
     const arcs = new ArcBands(layout.arcs, layout.bounds);
     const flow = new ParticleFlow(flowPaths, { density: 2.6 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
     const effects: SceneEffect[] = [
-      new Nebula(palette.nebula),
-      new Starfield(starLayers),
+      backdrop,
       new YearMarkers(layout.years, layout.bounds),
       arcs,
       ...branches.map(({ curve }) => curve),
@@ -200,6 +188,7 @@ export class SceneBuilder {
       effects,
       pulse,
       arcs,
+      backdrop,
       dispose: () => {
         for (const effect of effects) effect.dispose();
         for (const node of nodes) node.dispose();

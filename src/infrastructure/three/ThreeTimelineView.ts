@@ -1,4 +1,4 @@
-import { Color, FogExp2, PerspectiveCamera, Scene, Vector3 } from 'three';
+import { FogExp2, PerspectiveCamera, Scene, Vector3 } from 'three';
 import type {
   FilterViewState,
   SelectionViewState,
@@ -83,7 +83,8 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const canvas = deps.backend.renderer.domElement;
     canvas.classList.add('stage__canvas');
     deps.container.prepend(canvas);
-    this.scene.background = new Color(DEFAULT_PALETTE.background);
+    // Sin fondo de escena: el papel de acuarela lo pinta el postprocesado antes que ella.
+    this.scene.background = null;
     this.post = deps.backend.createPostProcessing(this.scene, this.camera);
 
     new PointerInput(canvas, {
@@ -116,6 +117,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.built = built;
     this.scene.fog = new FogExp2(DEFAULT_PALETTE.background, FOG_DENSITY);
     for (const effect of built.effects) effect.attach(this.scene);
+    this.post.setBackdrop?.(built.backdrop);
     if (this.highlightedBranch !== null) built.highlightBranch(this.highlightedBranch);
     for (const node of built.nodes) {
       this.scene.add(node.group);
