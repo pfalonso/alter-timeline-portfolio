@@ -13,7 +13,9 @@ export interface PostFxOptions {
 }
 
 /** Bloom contenido: tinta luminosa más que neón (el umbral deja fuera el papel y los lavados). */
-export const DEFAULT_POSTFX: PostFxOptions = { strength: 0.42, radius: 0.48, threshold: 0.3 };
+export const DEFAULT_POSTFX: PostFxOptions = { strength: 0.36, radius: 0.42, threshold: 0.38 };
+/** Golpe máximo de bloom al seleccionar. */
+export const MAX_KICK = 0.14;
 
 /** Lo que la vista necesita del postprocesado (permite sustituirlo en tests). */
 export interface PostProcessing {
@@ -61,7 +63,8 @@ export class PostFX implements PostProcessing {
   }
 
   kick(amount: number): void {
-    this.boost = Math.max(this.boost, amount);
+    // Tope del golpe de selección: sumado a remolinos o costuras cercanas, más quemaba la imagen.
+    this.boost = Math.min(MAX_KICK, Math.max(this.boost, amount));
   }
 
   render(delta: number): void {

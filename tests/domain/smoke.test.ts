@@ -68,7 +68,7 @@ describe('Timeline + layout + filtro', () => {
     // Los nodos viven en la banda central; las líneas laterales se alejan entre ellos.
     for (const node of layout.nodes) expect(Math.abs(node.position.y)).toBeLessThan(4);
     const side = layout.branches.find((branch) => branch.id === 'creacion');
-    expect(Math.max(...(side?.points ?? []).map((point) => Math.abs(point.y)))).toBeGreaterThan(2);
+    expect(Math.max(...(side?.points ?? []).map((point) => Math.abs(point.y)))).toBeGreaterThan(1);
   });
 
   it('filtra por categoría (basta con que una coincida)', () => {

@@ -42,6 +42,9 @@ export interface ParticleFlowOptions {
   readonly seed: number;
 }
 
+/** Opacidad mínima de las motas dentro de la banda de nodos. */
+export const BAND_CLEAR_MIN = 0.12;
+
 export const DEFAULT_FLOW_OPTIONS: ParticleFlowOptions = { density: 2.6, maxParticles: 2400, speed: 2.4, seed: 7 };
 
 export const POINTS_VERTEX = /* glsl */ `
@@ -212,7 +215,10 @@ export class ParticleFlow implements SceneEffect {
       const fadeOut = dissolve > 0 ? 1 - smoothstep(0.45, 1, k) : 1 - smoothstep(0.9, 1, particle.t);
       const density = 0.15 + 0.95 * f;
       const shown = 1 - smoothstep(density - 0.08, density + 0.08, particle.rank);
-      alphas[i] = smoothstep(0, 0.04, particle.t) * fadeOut * shown * (0.45 + 0.55 * f) * this.emphasis[particle.pathIndex];
+      // En la banda de los nodos (y ≈ 0) las motas se apagan: no ensucian los símbolos.
+      const clearBand = BAND_CLEAR_MIN + (1 - BAND_CLEAR_MIN) * smoothstep(0.5, 1.8, Math.abs(positions[i * 3 + 1]));
+      alphas[i] =
+        smoothstep(0, 0.04, particle.t) * fadeOut * shown * (0.45 + 0.55 * f) * clearBand * this.emphasis[particle.pathIndex];
     }
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.aAlpha.needsUpdate = true;

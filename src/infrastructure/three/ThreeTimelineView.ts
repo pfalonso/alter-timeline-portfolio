@@ -10,7 +10,7 @@ import type { TimelineViewPart } from '../dom/CompositeTimelineView';
 import type { NodeHoverListener } from '../dom/Tooltip';
 import { CameraRig } from './CameraRig';
 import { activeArcAt } from './ArcBands';
-import { bandFraction, bandOffset, clamp, pickNode, routeAlong, storyRoute, verticalExtent, type SafeInsets } from './math';
+import { bandFraction, bandOffset, clamp, pickNode, routeAlong, storyRoute, type SafeInsets } from './math';
 import type { NodeMesh } from './NodeMesh';
 import { PointerInput } from './PointerInput';
 import type { PostProcessing } from './PostFX';
@@ -42,8 +42,10 @@ export interface ThreeTimelineViewDeps {
 }
 
 const DEFAULT_DISTANCE = 44;
-/** Tope de la vista general: vidas largas (desde el nacimiento) necesitan alejarse más. */
-const OVERVIEW_MAX_DISTANCE = 160;
+/** Tope de la vista general: con el eje ordinal la escena mide (nº de nodos × paso). */
+const OVERVIEW_MAX_DISTANCE = 250;
+/** Nodos que caben a lo ancho en la vista inicial (tramo legible alrededor del presente). */
+const OPENING_NODES = 14;
 const FOG_DENSITY = 0.0068;
 /** Más allá de esta distancia la niebla se aclara en proporción, para que lo lejano no se apague. */
 const FOG_REFERENCE_DISTANCE = 90;
@@ -52,10 +54,14 @@ const OPENING_MAX_DISTANCE = 80;
 /** Margen vertical (mundo) alrededor de las ramas al encuadrar: radio de los nodos y halos. */
 const FRAME_MARGIN = 2.2;
 const DETAIL_DISTANCE = 21;
-/** Margen vertical (mundo) que se encuadra alrededor de la banda de nodos al abrir. */
-const BAND_FRAME = 4.5;
 /** Por encima de este ancho el pop-up es un panel lateral y el encuadre se desplaza. */
 const SIDE_PANEL_MIN_WIDTH = 900;
+
+/** Mismo conjunto de nodos en las mismas posiciones: no hace falta re-layout. */
+function sameNodes(a: TimelineLayoutResult, b: TimelineLayoutResult | null): boolean {
+  if (!b || a.nodes.length !== b.nodes.length) return false;
+  return a.nodes.every((node, i) => node.eventId === b.nodes[i].eventId && node.position.x === b.nodes[i].position.x);
+}
 
 /** Vista 3D: compone escena, cámara, entrada y postprocesado. La lógica vive en piezas pequeñas. */
 export class ThreeTimelineView implements TimelineViewPart, CameraControls {
@@ -69,6 +75,9 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   private handlers: TimelineViewHandlers | null = null;
   private built: BuiltScene | null = null;
   private layout: TimelineLayoutResult | null = null;
+  private model: TimelineViewModel | null = null;
+  /** `true` hasta el primer filtro tras `render`: el filtro guardado no se anima, se encuadra. */
+  private fresh = false;
   private readonly nodesById = new Map<string, NodeMesh>();
   private projected: ProjectedFrame | null = null;
   private hoveredId: string | null = null;
@@ -109,11 +118,21 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   }
 
   render(model: TimelineViewModel): void {
+    this.model = model;
+    this.fresh = true;
+    this.mount(model.layout);
+    this.frameOpening();
+    this.deps.loop.start((delta, time) => this.frame(delta, time));
+  }
+
+  /** Construye la escena de un layout (sustituye la anterior) y ajusta límites y vista general. */
+  private mount(layout: TimelineLayoutResult): void {
+    const model = this.model as TimelineViewModel;
     this.built?.dispose();
     this.nodesById.clear();
-    this.layout = model.layout;
+    this.layout = layout;
 
-    const built = this.deps.sceneBuilder.build(model);
+    const built = this.deps.sceneBuilder.build({ ...model, layout });
     this.built = built;
     this.scene.fog = new FogExp2(DEFAULT_PALETTE.background, FOG_DENSITY);
     for (const effect of built.effects) effect.attach(this.scene);
@@ -124,29 +143,65 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       this.nodesById.set(node.eventId, node);
     }
 
-    const { bounds, nowX } = model.layout;
+    const { bounds } = layout;
     const insets = this.insets();
     const band = bandFraction(this.viewport.height, insets);
     // Vista general: cabe todo el ancho y todo el alto (más margen) dentro de la franja libre.
     this.overviewDistance = Math.min(
       OVERVIEW_MAX_DISTANCE,
       Math.max(
-        this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.1,
+        // Aunque haya pocos nodos, la vista general queda más lejos que la de trabajo.
+        this.defaultDistance() * 1.25,
+        this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.06,
         this.rig.distanceToFitHeight(bounds.maxY - bounds.minY + 2 * FRAME_MARGIN, band),
       ),
     );
     // El encuadre desplaza la cámara para centrar en la franja libre: los límites admiten ese margen.
     const shift = Math.abs(bandOffset(this.viewport.height, insets)) * 2 * this.rig.halfHeightAt(this.overviewDistance);
     this.rig.setBounds({ minX: bounds.minX, maxX: bounds.maxX, minY: bounds.minY - 2 - shift, maxY: bounds.maxY + 2 + shift });
+    this.refreshLinks();
+  }
 
-    // Apertura: de la vista general al presente.
+  /** Apertura: de la vista general al presente. */
+  private frameOpening(): void {
+    const layout = this.layout as TimelineLayoutResult;
     this.rig.flyTo(this.overviewTarget(), this.overviewDistance);
     this.rig.snap();
-    const opening = this.openingView(model.layout, nowX);
+    const opening = this.openingView(layout);
     this.rig.flyTo(opening, opening.distance);
     if (this.deps.reducedMotion()) this.rig.snap();
+  }
 
-    this.deps.loop.start((delta, time) => this.frame(delta, time));
+  /**
+   * Re-layout tras un cambio de filtros: los nodos que siguen visibles se deslizan desde donde
+   * estaban; las líneas aparecen de nuevo. La cámara se traslada con el nodo más cercano a su
+   * centro para que el usuario no pierda el sitio.
+   */
+  private relayout(layout: TimelineLayoutResult): void {
+    const previous = new Map([...this.nodesById].map(([id, node]) => [id, { ...node.group.position }]));
+    const lookX = this.rig.lookX;
+    let anchor: { id: string; x: number } | null = null;
+    for (const node of layout.nodes) {
+      const old = previous.get(node.eventId);
+      if (old && (anchor === null || Math.abs(old.x - lookX) < Math.abs(anchor.x - lookX))) anchor = { id: node.eventId, x: old.x };
+    }
+    this.mount(layout);
+    if (this.deps.reducedMotion()) {
+      this.rig.shiftX(anchor ? (this.nodesById.get(anchor.id)?.group.position.x ?? anchor.x) - anchor.x : 0);
+      return;
+    }
+    this.built?.fadeIn();
+    for (const node of this.nodesById.values()) {
+      const old = previous.get(node.eventId);
+      if (old) node.slideFrom(old);
+      else node.fadeIn();
+    }
+    if (anchor) this.rig.shiftX((this.nodesById.get(anchor.id) as NodeMesh).group.position.x - anchor.x);
+  }
+
+  /** Hebras causales: se encienden las del nodo señalado y las del seleccionado. */
+  private refreshLinks(): void {
+    this.built?.highlightLinks([this.hoveredId, this.focusedId].filter((id): id is string => id !== null));
   }
 
   /** Resalta una línea vital en la escena (p. ej. al pasar por la leyenda); `null` la suelta. */
@@ -156,6 +211,19 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   }
 
   applyFilter(state: FilterViewState): void {
+    const fresh = this.fresh;
+    this.fresh = false;
+    if (state.layout && this.model && !sameNodes(state.layout, this.layout)) {
+      if (fresh) {
+        this.mount(state.layout);
+        this.frameOpening();
+      } else {
+        this.relayout(state.layout);
+      }
+      // La selección se reaplica sobre los nodos nuevos.
+      this.nodesById.get(this.focusedId ?? '')?.setFocused(true);
+      this.hoveredId = null;
+    }
     for (const node of this.nodesById.values()) node.setVisible(state.visibleEventIds.has(node.eventId));
   }
 
@@ -174,6 +242,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.focusedId = state.focusedEventId;
     const node = this.nodesById.get(state.focusedEventId ?? '');
     node?.setFocused(true);
+    this.refreshLinks();
 
     const sidePanel = state.detailOpen && this.viewport.width >= SIDE_PANEL_MIN_WIDTH;
     this.rig.setBias(sidePanel ? 0.34 : 0);
@@ -246,29 +315,25 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
    * Encuadre inicial cerca de hoy: «hoy» queda a la derecha y la cámara se aleja lo justo para que
    * las ramas visibles quepan en vertical entre la cabecera y los filtros.
    */
-  private openingView(layout: TimelineLayoutResult, nowX: number): { x: number; y: number; distance: number } {
+  private openingView(layout: TimelineLayoutResult): { x: number; y: number; distance: number } {
     const band = bandFraction(this.viewport.height, this.insets());
-    let distance = this.defaultDistance();
-    let extent = { minY: layout.bounds.minY, maxY: layout.bounds.maxY };
-    // Dos pasadas: la distancia cambia el ancho visible y con él qué ramas entran en cuadro.
-    for (let pass = 0; pass < 2; pass += 1) {
-      const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
-      const x = nowX - halfWidth * 0.7;
-      extent = verticalExtent(layout.branches, x - halfWidth, x + halfWidth) ?? extent;
-      // Lo que importa es la banda de los nodos: las hebras que se alejan pueden perderse por arriba/abajo.
-      if (layout.band) {
-        extent = {
-          minY: Math.max(extent.minY, layout.band.minY - BAND_FRAME),
-          maxY: Math.min(extent.maxY, layout.band.maxY + BAND_FRAME),
-        };
-      }
-      distance = Math.min(
-        OPENING_MAX_DISTANCE,
-        Math.max(this.defaultDistance(), this.rig.distanceToFitHeight(extent.maxY - extent.minY + 2 * FRAME_MARGIN, band)),
-      );
-    }
+    const step = layout.nodeStep;
+    // Ancho: un tramo legible de nodos; alto: los carriles (las hebras causales pueden salirse).
+    const lanes = layout.branches.map((branch) => branch.laneY);
+    const extent = { minY: Math.min(0, ...lanes), maxY: Math.max(0, ...lanes) };
+    // En pantallas estrechas caben menos nodos (mínimo 5).
+    const nodes = clamp((OPENING_NODES * this.camera.aspect) / 1.6, 5, OPENING_NODES);
+    const distance = Math.min(
+      OPENING_MAX_DISTANCE,
+      Math.max(
+        this.defaultDistance(),
+        this.rig.distanceToFitWidth(nodes * step),
+        this.rig.distanceToFitHeight(extent.maxY - extent.minY + 2 * FRAME_MARGIN, band),
+      ),
+    );
     const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
-    return { x: nowX - halfWidth * 0.7, y: this.bandCenterY((extent.minY + extent.maxY) / 2, distance), distance };
+    // «Hoy» queda cerca del borde derecho: se ve el tramo reciente que lleva hasta él.
+    return { x: layout.nowX - halfWidth * 0.72, y: this.bandCenterY((extent.minY + extent.maxY) / 2, distance), distance };
   }
 
   /** En pantallas estrechas la cámara se aleja para que quepan varios años. */
@@ -371,6 +436,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       this.nodesById.get(this.hoveredId ?? '')?.setHovered(false);
       this.nodesById.get(id ?? '')?.setHovered(true);
       this.hoveredId = id;
+      this.refreshLinks();
       canvas.classList.toggle('stage__canvas--pointing', id !== null);
     }
     const rect = canvas.getBoundingClientRect();

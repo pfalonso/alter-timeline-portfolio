@@ -59,6 +59,21 @@ describe('NodeLabels', () => {
     expect(label('Escuela').style.transform).toContain('translateX(-50%)');
   });
 
+  it('alterna entre los nodos que se rotulan solos (medios y mayores), también tras filtrar', () => {
+    const { labels, label } = setup();
+    const model = buildModel();
+    // Sin a-school: e-side-two pasa a ser el segundo rotulable (abajo); b-job, el primero (arriba).
+    const layout = { ...model.layout, nodes: model.layout.nodes.filter((item) => item.eventId !== 'a-school').map((item, index) => ({ ...item, index })) };
+    labels.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(), totalEvents: 4, layout });
+    labels.onProjected(frame([node('b-job', 300, 300), node('e-side-two', 700, 300)]));
+    expect(translation(label('Primer trabajo'))[1]).toBeLessThan(300);
+    expect(translation(label('Segunda parte'))[1]).toBeGreaterThan(300);
+    // Sin layout no cambia nada.
+    labels.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(), totalEvents: 4 });
+    labels.onProjected(frame([node('b-job', 300, 300), node('e-side-two', 700, 300)]));
+    expect(translation(label('Primer trabajo'))[1]).toBeLessThan(300);
+  });
+
   it('si no cabe en su lado, lo coloca en el otro', () => {
     const { labels, label } = setup();
     labels.onProjected(frame([node('a-school', 200, 20)]));

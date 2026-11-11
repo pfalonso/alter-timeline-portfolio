@@ -161,6 +161,16 @@ export class BranchCurve implements SceneEffect {
   }
 
   /** Resalta o atenúa la línea (leyenda). La transición es suave salvo con movimiento reducido. */
+  /** Aparece desde cero hasta su realce actual (líneas nuevas tras un re-layout). */
+  fadeIn(): void {
+    this.emphasis = 0;
+  }
+
+  /** Realce numérico directo (p. ej. hebras causales: tenues salvo al señalar un nodo). */
+  setEmphasisValue(value: number): void {
+    this.emphasisTarget = value;
+  }
+
   setEmphasis(emphasis: BranchEmphasis): void {
     this.emphasisTarget = EMPHASIS_VALUE[emphasis];
   }

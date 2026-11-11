@@ -23,7 +23,7 @@ export interface MergeSeamOptions {
   readonly core: number;
 }
 
-export const DEFAULT_SEAM_OPTIONS: MergeSeamOptions = { count: 90, radius: 1.5, seed: 11, core: 2.6 };
+export const DEFAULT_SEAM_OPTIONS: MergeSeamOptions = { count: 30, radius: 1, seed: 11, core: 1.1 };
 
 interface Mote {
   readonly angle: number;

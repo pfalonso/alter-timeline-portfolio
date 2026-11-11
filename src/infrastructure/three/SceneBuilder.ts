@@ -24,10 +24,13 @@ export const DEFAULT_PALETTE: ScenePalette = {
   fallbackNode: '#cfe4ff',
 };
 
-/** Fuera de la banda las líneas se desvanecen un poco: el ojo sigue los nodos, no las hebras. */
-export function bandFade(y: number, bandHalf = 1.6, far = 6.5): number {
-  return 1 - 0.45 * smoothstep(bandHalf, far, Math.abs(y));
+/** En su carril (fuera de la banda) las líneas van tenues: el ojo sigue los nodos, no las hebras. */
+export function bandFade(y: number, bandHalf = 0.3, far = 2): number {
+  return 1 - 0.5 * smoothstep(bandHalf, far, Math.abs(y));
 }
+
+/** Realce de las hebras causales: discretas por defecto, encendidas al señalar uno de sus nodos. */
+export const STRAND_EMPHASIS = { rest: 0.22, lit: 1.6, other: 0.1 } as const;
 
 export interface SceneBuildOptions {
   readonly palette: ScenePalette;
@@ -51,6 +54,10 @@ export interface BuiltScene {
   readonly strands: readonly BranchCurve[];
   /** Resalta una línea (y atenúa las demás); `null` vuelve al estado normal. */
   highlightBranch(id: string | null): void;
+  /** Ilumina las hebras causales que tocan estos eventos (señalado, seleccionado, paso de la historia). */
+  highlightLinks(eventIds: readonly string[]): void;
+  /** Re-layout: líneas, hebras y tramos aparecen desde cero. */
+  fadeIn(): void;
   /** Todo lo que se actualiza por fotograma (ramas incluidas). */
   readonly effects: readonly SceneEffect[];
   readonly pulse: SelectionPulse;
@@ -130,11 +137,11 @@ export class SceneBuilder {
         new BranchCurve(`link:${link.from}>${link.to}`, link.points, {
           color: lineColorById.get(link.fromBranch) ?? palette.trunk,
           colorEnd: lineColorById.get(link.toBranch) ?? palette.trunk,
-          radius: 0.06,
-          intensity: 0.78,
-          fadeIn: 0.04,
-          fadeOut: 0.04,
-          flowSpeed: 0.18,
+          radius: 0.035,
+          intensity: 0.7,
+          fadeIn: 0.06,
+          fadeOut: 0.06,
+          flowSpeed: 0.12,
           fogDensity,
         }),
     );
@@ -147,7 +154,7 @@ export class SceneBuilder {
           target,
           lineColorById.get(link.fromBranch) ?? palette.trunk,
           lineColorById.get(link.toBranch) ?? palette.trunk,
-          { count: 40, radius: 0.8, core: 0 },
+          { count: 14, radius: 0.55, core: 0 },
         );
       });
 
@@ -158,8 +165,8 @@ export class SceneBuilder {
         (node) =>
           new BranchCurve(`span:${node.eventId}`, node.span ?? [], {
             color: colorOfEvent(node.eventId),
-            radius: 0.15,
-            intensity: 0.34 * focusAtNode(node.branch, node.position.x),
+            radius: 0.1,
+            intensity: 0.18 * focusAtNode(node.branch, node.position.x),
             fadeIn: 0.03,
             fadeOut: 0.12,
             flowSpeed: 0.05,
@@ -196,10 +203,15 @@ export class SceneBuilder {
 
     const pulse = new SelectionPulse(assets.ring);
     const arcs = new ArcBands(layout.arcs, layout.bounds);
-    const flow = new ParticleFlow(flowPaths, { density: 1.9 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
+    const flow = new ParticleFlow(flowPaths, { density: 0.7 * particleBudget, maxParticles: Math.round(900 * particleBudget) });
+    for (const strand of strands) strand.setEmphasisValue(STRAND_EMPHASIS.rest);
     const effects: SceneEffect[] = [
       backdrop,
-      new YearMarkers(layout.years, layout.bounds),
+      // Meridianos entre años: medio paso antes del primer nodo de cada año (no cruzan los símbolos).
+      new YearMarkers(
+        layout.years.map((mark) => ({ ...mark, x: mark.x - layout.nodeStep / 2 })),
+        layout.bounds,
+      ),
       arcs,
       ...branches.map(({ curve }) => curve),
       ...spans,
@@ -218,6 +230,16 @@ export class SceneBuilder {
       highlightBranch: (id) => {
         for (const { curve } of branches) curve.setEmphasis(id === null ? 'none' : curve.id === id ? 'on' : 'off');
         flow.highlight(id);
+      },
+      highlightLinks: (eventIds) => {
+        const lit = new Set(eventIds);
+        layout.links.forEach((link, i) => {
+          const on = lit.has(link.from) || lit.has(link.to);
+          strands[i].setEmphasisValue(on ? STRAND_EMPHASIS.lit : lit.size > 0 ? STRAND_EMPHASIS.other : STRAND_EMPHASIS.rest);
+        });
+      },
+      fadeIn: () => {
+        for (const curve of [...branches.map(({ curve }) => curve), ...strands, ...spans]) curve.fadeIn();
       },
       effects,
       pulse,

@@ -8,6 +8,7 @@ import { routeAlong } from '../../../src/infrastructure/three/math';
 import { RenderLoop } from '../../../src/infrastructure/three/RenderLoop';
 import { SceneBuilder, type BuiltScene } from '../../../src/infrastructure/three/SceneBuilder';
 import { ThreeTimelineView } from '../../../src/infrastructure/three/ThreeTimelineView';
+import { TimelineLayout } from '../../../src/domain/services';
 import type { ProjectedFrame, ProjectedNode } from '../../../src/infrastructure/three/types';
 import { cleanupDom, mount } from '../../helpers/dom';
 import { buildModel, fakeHandlers, makeStoryData, selection, type FakeHandlers } from '../../helpers/fixtures';
@@ -261,7 +262,7 @@ describe('ThreeTimelineView: render y bucle', () => {
     const start = h.last().cameraDistance;
     expect(start).toBeGreaterThan(50);
     h.step(600);
-    expect(h.last().cameraDistance).toBeCloseTo(44, 1);
+    expect(h.last().cameraDistance).toBeGreaterThanOrEqual(44);
     expect(h.last().cameraDistance).toBeLessThan(start);
   });
 
@@ -270,7 +271,9 @@ describe('ThreeTimelineView: render y bucle', () => {
     wide.step();
     const narrow = harness({ width: 400, height: 800 });
     narrow.step();
-    expect(wide.last().cameraDistance).toBeCloseTo(44, 5);
+    // Ancho: un tramo de ~13 nodos (paso constante); estrecho: la distancia mínima para móvil.
+    expect(wide.last().cameraDistance).toBeGreaterThanOrEqual(44);
+    expect(wide.last().cameraDistance).toBeLessThan(50);
     expect(narrow.last().cameraDistance).toBeCloseTo(44 * 1.7, 5);
   });
 
@@ -288,6 +291,50 @@ describe('ThreeTimelineView: render y bucle', () => {
 });
 
 describe('ThreeTimelineView: filtro y selección', () => {
+  const relayoutOf = (h: Harness, visible: string[]) =>
+    new TimelineLayout().compute(h.model.timeline, new Set(visible));
+
+  it('el primer filtro (guardado) recoloca la escena sin animar: solo los nodos visibles', () => {
+    const h = harness();
+    const layout = relayoutOf(h, ['b-job', 'e-side-two']);
+    h.view.applyFilter({ activeCategoryIds: new Set(['work']), visibleEventIds: new Set(['b-job', 'e-side-two']), totalEvents: 4, layout });
+    h.step();
+    expect(h.built).toHaveLength(2);
+    expect(h.last().nodes.map((node) => node.eventId)).toEqual(['b-job', 'e-side-two']);
+    // Mismo layout otra vez: no se reconstruye.
+    h.view.applyFilter({ activeCategoryIds: new Set(['work']), visibleEventIds: new Set(['b-job', 'e-side-two']), totalEvents: 4, layout });
+    expect(h.built).toHaveLength(2);
+  });
+
+  it('después, un cambio de filtro desliza los nodos a su nueva X y la cámara acompaña', () => {
+    const h = harness({ reduced: false });
+    h.view.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(['a-school', 'b-job', 'c-side', 'e-side-two']), totalEvents: 4 });
+    h.step(600);
+    const before = h.view.getNodeScreenPositions().find((node) => node.id === 'e-side-two')?.x ?? 0;
+    const layout = relayoutOf(h, ['b-job', 'e-side-two']);
+    h.view.applyFilter({ activeCategoryIds: new Set(['work']), visibleEventIds: new Set(['b-job', 'e-side-two']), totalEvents: 4, layout });
+    h.step(1);
+    const glyph = h.built[1].nodes.find((node) => node.eventId === 'e-side-two');
+    const target = layout.nodes.find((node) => node.eventId === 'e-side-two')?.position.x ?? 0;
+    // Aún de camino: parte de su X anterior.
+    expect(glyph?.group.position.x).not.toBeCloseTo(target, 3);
+    h.step(120);
+    expect(glyph?.group.position.x).toBeCloseTo(target, 5);
+    // El nodo más cercano al centro sigue más o menos en el mismo sitio de la pantalla.
+    const after = h.view.getNodeScreenPositions().find((node) => node.id === 'e-side-two')?.x ?? 0;
+    expect(Math.abs(after - before)).toBeLessThan(200);
+  });
+
+  it('con movimiento reducido el re-layout es inmediato', () => {
+    const h = harness();
+    h.view.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(['a-school', 'b-job', 'c-side', 'e-side-two']), totalEvents: 4 });
+    const layout = relayoutOf(h, ['a-school', 'e-side-two']);
+    h.view.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(['a-school', 'e-side-two']), totalEvents: 4, layout });
+    h.step();
+    const glyph = h.built[1].nodes.find((node) => node.eventId === 'e-side-two');
+    expect(glyph?.group.position.x).toBe(layout.nodes[1].position.x);
+  });
+
   it('los nodos filtrados se atenúan (no desaparecen) y dejan de ser "visibles"', () => {
     const h = harness();
     h.view.applyFilter({ activeCategoryIds: new Set(['work']), visibleEventIds: new Set(['b-job', 'e-side-two']), totalEvents: 4 });
@@ -354,13 +401,15 @@ describe('ThreeTimelineView: filtro y selección', () => {
 
   it('al cerrar el detalle la cámara recupera la distancia que tenía y vuelve a centrar', () => {
     const h = harness();
-    h.view.zoomBy(1.5); // 66
+    h.step();
+    const zoomed = h.last().cameraDistance * 1.5;
+    h.view.zoomBy(1.5);
     h.view.applySelection(selection('b-job', true));
     h.step();
     expect(h.last().cameraDistance).toBeCloseTo(21, 5);
     h.view.applySelection(selection('b-job', false));
     h.step();
-    expect(h.last().cameraDistance).toBeCloseTo(66, 5);
+    expect(h.last().cameraDistance).toBeCloseTo(zoomed, 5);
     expect(Math.abs(h.node('b-job').x - 600)).toBeLessThan(12);
   });
 
@@ -536,7 +585,7 @@ describe('ThreeTimelineView: controles de cámara', () => {
     const visible = h.view.getNodeScreenPositions();
     expect(visible.map((node) => node.visible)).toEqual([true, true, true, true]);
     expect(h.last().cameraDistance).toBeGreaterThan(44);
-    expect(h.last().cameraDistance).toBeLessThanOrEqual(160);
+    expect(h.last().cameraDistance).toBeLessThanOrEqual(250);
   });
 
   it('getNodeScreenPositions devuelve píxeles de ventana y marca lo que queda fuera de pantalla', () => {

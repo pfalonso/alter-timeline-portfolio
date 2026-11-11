@@ -4,11 +4,12 @@ export type { ValidationResult } from './LifeDataValidator';
 export { isHttpUrl } from './safeUrl';
 export { TimelineFactory } from './TimelineFactory';
 export type { TimelineFactoryOptions } from './TimelineFactory';
-export { DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
+export { compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
 export type {
   LayoutArc,
   LayoutBounds,
   LayoutBranch,
+  LayoutLink,
   LayoutMerge,
   LayoutNode,
   LayoutOptions,

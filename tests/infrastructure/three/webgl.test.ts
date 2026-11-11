@@ -62,7 +62,7 @@ vi.mock('three/examples/jsm/postprocessing/UnrealBloomPass.js', () => ({ UnrealB
 vi.mock('three/examples/jsm/postprocessing/OutputPass.js', () => ({ OutputPass: mocks.FakeOutputPass }));
 
 import { ACESFilmicToneMapping, PerspectiveCamera, Scene, type WebGLRenderer } from 'three';
-import { DEFAULT_POSTFX, PostFX } from '../../../src/infrastructure/three/PostFX';
+import { DEFAULT_POSTFX, MAX_KICK, PostFX } from '../../../src/infrastructure/three/PostFX';
 import { createWebGLBackend, isWebGLAvailable } from '../../../src/infrastructure/three/webgl';
 import { WatercolorPass } from '../../../src/infrastructure/three/Watercolor';
 
@@ -192,11 +192,15 @@ describe('PostFX', () => {
     expect(bloom.strength).toBe(DEFAULT_POSTFX.strength);
   });
 
-  it('kick sube el bloom un instante y decae hasta la intensidad base', () => {
+  it('kick sube el bloom un instante (con tope) y decae hasta la intensidad base', () => {
     const { post, bloom } = setup();
+    post.kick(0.1);
+    post.render(0);
+    expect(bloom.strength).toBeCloseTo(DEFAULT_POSTFX.strength + 0.1, 10);
     post.kick(0.9);
     post.render(0);
-    expect(bloom.strength).toBeCloseTo(DEFAULT_POSTFX.strength + 0.9, 10);
+    // Tope: el golpe de selección no sobreexpone aunque coincida con costuras o remolinos.
+    expect(bloom.strength).toBeCloseTo(DEFAULT_POSTFX.strength + MAX_KICK, 10);
     let previous = bloom.strength;
     for (let i = 0; i < 30; i += 1) {
       post.render(1 / 60);
@@ -210,10 +214,10 @@ describe('PostFX', () => {
 
   it('un golpe menor no rebaja uno mayor en curso', () => {
     const { post, bloom } = setup();
-    post.kick(0.9);
-    post.kick(0.45);
+    post.kick(0.12);
+    post.kick(0.05);
     post.render(0);
-    expect(bloom.strength).toBeCloseTo(DEFAULT_POSTFX.strength + 0.9, 10);
+    expect(bloom.strength).toBeCloseTo(DEFAULT_POSTFX.strength + 0.12, 10);
   });
 
   it('dispose libera el compositor', () => {

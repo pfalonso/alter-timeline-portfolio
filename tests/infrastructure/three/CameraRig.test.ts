@@ -22,6 +22,19 @@ describe('CameraRig: objetivo y límites', () => {
     expect(rig.distance).toBe(40);
   });
 
+  it('shiftX traslada cámara y objetivo a la vez, sin transición (re-layout)', () => {
+    const { rig, camera } = rigWith(FLAT);
+    rig.flyTo({ x: 10, y: 0 }, 40);
+    rig.snap();
+    const before = camera.position.x;
+    rig.shiftX(-4);
+    expect(camera.position.x).toBeCloseTo(before - 4, 6);
+    expect(rig.target.x).toBeCloseTo(6, 6);
+    rig.flyAlong([{ x: 6, y: 0 }, { x: 20, y: 0 }], 40, 2);
+    rig.shiftX(1);
+    expect(rig.flying).toBe(false);
+  });
+
   it('flyTo fija el punto de interés y, opcionalmente, la distancia', () => {
     const { rig } = rigWith();
     rig.flyTo({ x: 12, y: -3 });
@@ -49,7 +62,7 @@ describe('CameraRig: objetivo y límites', () => {
     rig.setDistance(1);
     expect(rig.target.distance).toBe(30);
     rig.setDistance(999);
-    expect(rig.target.distance).toBe(165);
+    expect(rig.target.distance).toBe(DEFAULT_RIG_OPTIONS.maxDistance);
   });
 
   it('setBounds acota el objetivo actual y los movimientos posteriores', () => {

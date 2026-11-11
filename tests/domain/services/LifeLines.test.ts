@@ -177,16 +177,14 @@ describe('TimelineLayout con líneas vitales', () => {
     expect(new Set(layout.branches.map((branch) => branch.lane)).size).toBe(layout.branches.length);
   });
 
-  it('las líneas con origin nacen todas del mismo punto (el nacimiento) y se abren como un haz', () => {
+  it('las líneas con origin nacen todas del mismo punto (el nacimiento) y suben a su carril sin rebasarlo', () => {
     const layout = layoutOf(lifeLines());
     const birth = layout.nodes.find((node) => node.eventId === 'birth')?.position;
     for (const id of ['art', 'food', 'teach']) {
       const branch = layout.branches.find((item) => item.id === id);
       expect(branch?.originEventId).toBe('birth');
       expect(branch?.points[0]).toEqual(birth);
-      // Se separa poco a poco: a un año aún está cerca del nacimiento.
-      const oneYear = branch?.points.find((point) => point.x >= (birth?.x ?? 0) + 5);
-      expect(Math.abs((oneYear?.y ?? 0) - (birth?.y ?? 0))).toBeLessThan(Math.abs(branch?.lane ?? 0) * layout.laneSpacing * 0.6);
+      for (const point of branch?.points ?? []) expect(Math.abs(point.y)).toBeLessThanOrEqual(Math.abs(branch?.laneY ?? 0) + 1e-9);
     }
   });
 
@@ -197,9 +195,9 @@ describe('TimelineLayout con líneas vitales', () => {
     expect(art?.open).toBe(false);
     expect(art?.merge).toEqual({ into: 'core', eventId: 'master', position: master?.position });
     expect(art?.points[art.points.length - 1]).toEqual(master?.position);
-    // Antes de la curva de convergencia va por su carril.
-    const before = art?.points.find((point) => point.x > (master?.position.x ?? 0) - 25);
-    expect(Math.abs(before?.y ?? 0)).toBeGreaterThan(layout.laneSpacing * 0.5);
+    // Antes de bajar al nodo destino va por su carril (si hay nodos por medio).
+    const before = art?.points.find((point) => point.x > (master?.position.x ?? 0) - layout.nodeStep * 1.2);
+    expect(Math.abs(before?.y ?? 0)).toBeGreaterThan(0.5);
   });
 
   it('until: "present" lleva la línea hasta hoy; sin until, una línea cerrada se corta (y se disuelve)', () => {

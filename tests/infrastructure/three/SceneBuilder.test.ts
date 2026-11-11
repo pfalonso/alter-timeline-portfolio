@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BranchCurve } from '../../../src/infrastructure/three/BranchCurve';
 import { MergeSeam } from '../../../src/infrastructure/three/MergeSeam';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
-import { bandFade, DEFAULT_PALETTE, SceneBuilder } from '../../../src/infrastructure/three/SceneBuilder';
+import { bandFade, DEFAULT_PALETTE, SceneBuilder, STRAND_EMPHASIS } from '../../../src/infrastructure/three/SceneBuilder';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
 import { WatercolorWash } from '../../../src/infrastructure/three/Watercolor';
 import { YearMarkers } from '../../../src/infrastructure/three/YearMarkers';
@@ -79,7 +79,7 @@ describe('SceneBuilder', () => {
     const built = new SceneBuilder().build(model);
     const flow = built.effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow);
     const total = built.branches.reduce((sum, branch) => sum + branch.path.length, 0);
-    expect(flow?.count).toBe(Math.round(total * 1.9));
+    expect(flow?.count).toBe(Math.min(900, Math.round(total * 0.7)));
   });
 
   it('particleBudget reduce las motas de pigmento (movimiento reducido / móvil)', () => {
@@ -101,11 +101,29 @@ describe('SceneBuilder', () => {
     expect(swirls).toHaveLength(1);
   });
 
-  it('las líneas se desvanecen un poco fuera de la banda de nodos', () => {
+  it('las hebras causales son discretas y se encienden al señalar uno de sus nodos', () => {
+    const data = makeData();
+    data.events[0].ledTo = ['b-job', 'c-side'];
+    const built = new SceneBuilder().build(buildModel(data));
+    const settle = (): number[] => {
+      for (let i = 0; i < 200; i += 1) for (const strand of built.strands) strand.update(frameContext({ delta: 0.05 }));
+      return built.strands.map((strand) => strand.mesh.material.uniforms.uEmphasis.value as number);
+    };
+    expect(settle()).toEqual([STRAND_EMPHASIS.rest, STRAND_EMPHASIS.rest].map((value) => expect.closeTo(value, 3)));
+    built.highlightLinks(['c-side']);
+    expect(settle()).toEqual([expect.closeTo(STRAND_EMPHASIS.other, 3), expect.closeTo(STRAND_EMPHASIS.lit, 3)]);
+    built.highlightLinks([]);
+    built.fadeIn();
+    built.strands[0].update(frameContext({ delta: 0.001 }));
+    expect(built.strands[0].mesh.material.uniforms.uEmphasis.value).toBeLessThan(0.05);
+  });
+
+  it('en su carril (fuera de la banda) las líneas van tenues', () => {
     expect(bandFade(0)).toBe(1);
-    expect(bandFade(1)).toBe(1);
-    expect(bandFade(10)).toBeCloseTo(0.55, 5);
-    expect(bandFade(-4)).toBeLessThan(1);
+    expect(bandFade(0.2)).toBe(1);
+    expect(bandFade(10)).toBeCloseTo(0.5, 5);
+    expect(bandFade(-2)).toBeCloseTo(0.5, 5);
+    expect(bandFade(1)).toBeLessThan(1);
   });
 
   it('la paleta y la niebla son configurables', () => {

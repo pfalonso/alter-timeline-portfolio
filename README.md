@@ -23,7 +23,7 @@ Este README es la wiki completa del proyecto: cómo arrancarlo, cómo meter tus 
 
 ## 1. Qué es
 
-Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: el eje horizontal es el tiempo y cada evento es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
+Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: los eventos van de izquierda a derecha en orden cronológico, **siempre a la misma distancia entre sí** (eje ordinal, sin escala temporal) y cada uno es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
 
 No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela por la banda (o sigue la hebra causal cuando un paso llevó al siguiente) y cada paso trae una frase que lo enlaza con el anterior. Todo sobre un fondo de acuarela en movimiento, no un cielo estrellado.
 
@@ -324,9 +324,10 @@ La forma recomendada de contar una vida: varias líneas que nacen juntas y cambi
 
 Cómo se ve:
 
-- **Banda narrativa.** Todos los **nodos** viven en una banda central estrecha (ligero desfase por carril; si dos coinciden en fecha se apilan con una separación mínima), así que se leen de izquierda a derecha como una sola historia. Los rótulos alternan arriba y abajo de la banda.
-- **Carriles.** Cada línea conserva su carril (la central en y = 0; las demás alrededor, con el algoritmo de siempre), pero solo **entre** sus nodos: sale de la banda, se curva hacia su carril (tejiéndose y cruzándose con otras, más tenue cuanto más lejos) y vuelve a la banda para pasar exactamente por cada uno de sus eventos.
-- **Enlaces causales.** Cada `ledTo` es una hebra de tinta que arquea del nodo origen al destino con un degradado del color de una línea al de la otra; si cambian de línea, un remolino de pigmento marca dónde se unen.
+- **Eje ordinal.** Los nodos visibles se colocan en orden cronológico con **paso constante**: el mismo espacio entre cada par de nodos consecutivos, sea un mes o diez años. Misma fecha: primero el más importante, después la línea central y por último el id. Al cambiar los filtros los nodos se deslizan a su nuevo sitio.
+- **Banda narrativa.** Todos los **nodos** están en una sola fila (y = 0), así que la historia se lee de izquierda a derecha. Los rótulos alternan arriba y abajo de forma regular.
+- **Carriles.** Cada línea pasa por sus nodos. Entre dos nodos suyos contiguos va recta por la banda; si en medio hay nodos de otras líneas, sube con una curva corta y suave a su carril (cerca y tenue, siempre a la misma altura), lo recorre recto y vuelve a bajar. Nunca tapa ni cruza un símbolo ajeno y no oscila.
+- **Enlaces causales.** Cada `ledTo` es un arco fino por encima de la banda (como en un diagrama de arcos), del color de una línea al de la otra. Por defecto son discretos; se iluminan al señalar o seleccionar uno de sus nodos y en el modo historia.
 - **Forma de los nodos.** El peso (`importance`) decide la complejidad del glifo y la línea (`style`) su lenguaje de forma (ver 4.1).
 - **Foco.** El brillo y el bloom del filamento, la densidad, velocidad y brillo de sus partículas y su opacidad dependen de si ese momento cae dentro de un periodo de `focus`: fuera de foco la línea queda a ≈ 0,3; `level` 1, 2 y 3 suben a ≈ 0,55, 0,78 y 1. Las transiciones son suaves a lo largo de la curva (rampas de ~0,8 años centradas en cada borde), no saltos. Una línea sin `focus` brilla a pleno, como antes. La central además engorda un poco al acercarse a hoy.
 - **Fusión.** Con `mergeInto`, la línea se curva en sus últimos ~2 años hasta unirse a la línea destino en la posición del evento indicado y termina ahí, con una «costura»: un destello que late y un remolino de motas con los colores de las dos líneas.
@@ -444,7 +445,7 @@ docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
 | Dispositivo | Acción | Resultado |
 | --- | --- | --- |
 | Ratón | Arrastrar | Desplaza la vista (horizontal y vertical) |
-| Ratón | Rueda o trackpad | Viaja por el tiempo (desplazamiento horizontal) |
+| Ratón | Rueda o trackpad | Avanza o retrocede por los nodos (desplazamiento horizontal) |
 | Ratón | `Ctrl`/`Cmd` + rueda, o pellizco de trackpad | Zoom |
 | Ratón | Pasar sobre un nodo | Tooltip con categoría, título y fechas |
 | Ratón | Clic en un nodo | Abre el pop-up y la cámara vuela al nodo |
@@ -475,9 +476,9 @@ La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cá
 
 Los tres niveles se distinguen a primera vista incluso en escala de grises (tamaño y estructura). La **forma** depende de la línea (`branches[].style`): las líneas racionales usan geometría rectilínea (rombo, hexágono, marco con esquinas y trazos de circuito en el glifo mayor); las creativas, formas orgánicas (manchas de acuarela con borde acumulado, pétalo/gota, trazo de pincel abierto y espiral); las neutras, círculo y anillos. Los glifos son SDF en el shader: nítidos a cualquier zoom. Chips y leyenda repiten el mismo lenguaje (rombo / mancha / círculo).
 
-Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: alternan arriba y abajo de la banda de nodos (por orden cronológico); si no caben en su lado se prueba el otro y después un escalón más lejos; si no, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
+Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: alternan arriba y abajo de la banda de nodos (de forma regular entre los nodos que se rotulan solos); si no caben en su lado se prueba el otro y después un escalón más lejos; si no, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
 
-**Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo alineados con la escena; el actual se ilumina (en tramos estrechos se omiten los años o el título).
+**Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo, abarcando sus nodos; el actual se ilumina (en tramos estrechos se omiten los años o el título).
 
 ### Modo historia
 

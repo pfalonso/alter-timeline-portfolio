@@ -56,11 +56,21 @@ export const WASH_FRAGMENT = /* glsl */ `
     float total = 0.0;
     for (int i = 0; i < ${MAX_PIGMENTS}; i++) {
       float fi = float(i);
-      float w = max(0.0, 1.0 - abs(x - fi)) * step(fi, uCount - 1.0);
+      // Peso afilado: entre dos pigmentos domina uno (las mezclas a partes iguales ensucian).
+      float w = pow(max(0.0, 1.0 - abs(x - fi)), 3.0) * step(fi, uCount - 1.0);
       sum += uColors[i] * w;
       total += w;
     }
     return total > 0.0 ? sum / total : uFocusColor;
+  }
+
+  // Amarillos sobre papel ciruela dan oliva: se desaturan y se enfrían; el resto pierde algo de
+  // saturación para que el fondo acompañe sin competir.
+  vec3 tame(vec3 c) {
+    float luma = dot(c, vec3(0.299, 0.587, 0.114));
+    float yellow = clamp((min(c.r, c.g) - c.b) * 2.2, 0.0, 1.0);
+    c = mix(c, vec3(luma), 0.3 + 0.6 * yellow);
+    return mix(c, c * vec3(0.92, 0.9, 1.08), yellow);
   }
 
   void main() {
@@ -71,16 +81,16 @@ export const WASH_FRAGMENT = /* glsl */ `
     float f = fbm(p + 3.4 * r);
     float hue = fbm(p * 0.55 + 1.8 * r + vec2(11.0, 3.0) + t * 0.3);
     vec3 pigment = palette(smoothstep(0.25, 0.75, hue));
-    pigment = mix(pigment, uFocusColor, uFocusAmount * (0.35 + 0.45 * smoothstep(0.35, 0.75, q.x)));
+    pigment = tame(mix(pigment, uFocusColor, uFocusAmount * (0.35 + 0.45 * smoothstep(0.35, 0.75, q.x))));
 
     // Lavado + borde de pigmento acumulado donde el agua se secó + un segundo sangrado.
     float wash = smoothstep(0.43, 0.63, f);
     float rim = smoothstep(0.40, 0.455, f) * (1.0 - smoothstep(0.455, 0.56, f));
     float bleed = smoothstep(0.52, 0.8, fbm(p * 1.7 + 4.0 * q - t));
-    float density = clamp(wash * 0.55 + rim * 0.7 + bleed * 0.3, 0.0, 1.0);
+    float density = clamp(wash * 0.5 + rim * 0.45 + bleed * 0.25, 0.0, 1.0);
 
     // Viñeta suave: el centro (la banda de nodos) queda algo más limpio para que se lea la historia.
-    float band = 1.0 - 0.45 * exp(-pow((vUv.y - 0.5) * 3.2, 2.0));
+    float band = 1.0 - 0.6 * exp(-pow((vUv.y - 0.5) * 3.0, 2.0));
     float vignette = smoothstep(1.05, 0.2, length((vUv - 0.5) * vec2(1.3, 1.7)));
     vec3 color = uPaper * (0.82 + 0.3 * vignette) + pigment * density * uStrength * band * (0.35 + 0.65 * vignette);
     gl_FragColor = vec4(color, density);
@@ -122,7 +132,7 @@ export interface WatercolorOptions {
   readonly parallax: number;
 }
 
-export const DEFAULT_WATERCOLOR: WatercolorOptions = { paper: '#140e26', strength: 0.115, parallax: 0.0035 };
+export const DEFAULT_WATERCOLOR: WatercolorOptions = { paper: '#140e26', strength: 0.085, parallax: 0.0035 };
 
 /**
  * Fondo de acuarela en movimiento. Es un `SceneEffect` (se actualiza con cada fotograma: tiempo,

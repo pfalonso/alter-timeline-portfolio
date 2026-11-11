@@ -1,4 +1,5 @@
-import type { SelectionViewState, TimelineViewModel } from '../../application/ports';
+import type { FilterViewState, SelectionViewState, TimelineViewModel } from '../../application/ports';
+import type { TimelineLayoutResult } from '../../domain/services';
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
@@ -10,8 +11,9 @@ interface Label {
   width: number;
   height: number;
   shown: boolean;
-  /** Lado preferido respecto a la banda: alterna por orden cronológico. */
-  readonly above: boolean;
+  /** Lado preferido respecto a la banda: alterna con la posición ordinal del nodo. */
+  above: boolean;
+  readonly importance: number;
 }
 
 /** Alto estimado por nivel (título + año); se sustituye por el medido. */
@@ -77,8 +79,33 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         height: LABEL_HEIGHT[event.importance] ?? 32,
         shown: false,
         above: order % 2 === 0,
+        importance: event.importance,
       });
     });
+    this.alternate(model.layout);
+  }
+
+  /** Con el eje ordinal, los rótulos alternan arriba/abajo de forma regular: nodo par arriba. */
+  applyFilter(state: FilterViewState): void {
+    if (state.layout) this.alternate(state.layout);
+  }
+
+  /**
+   * Alterna entre los nodos que se rotulan solos (medios y mayores), en orden ordinal: dos rótulos
+   * vecinos nunca compiten por el mismo lado. Los menores (solo en hover) siguen su posición.
+   */
+  private alternate(layout: TimelineLayoutResult): void {
+    let labelled = 0;
+    for (const node of layout.nodes) {
+      const label = this.labels.get(node.eventId);
+      if (!label) continue;
+      if (label.importance >= 2) {
+        label.above = labelled % 2 === 0;
+        labelled += 1;
+      } else {
+        label.above = node.index % 2 === 0;
+      }
+    }
   }
 
   applySelection(state: SelectionViewState): void {
@@ -111,7 +138,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       candidates.push({
         id: node.eventId,
         x: clampLabelX(node.x, label.width, frame.viewport.width),
-        // Alternando arriba/abajo de la banda (por orden cronológico); si no cabe, el otro lado.
+        // Alternando arriba/abajo de la banda (por posición ordinal); si no cabe, el otro lado.
         ys: labelSlots(node.y, gap, label.height, label.above),
         width: label.width,
         height: label.height,
