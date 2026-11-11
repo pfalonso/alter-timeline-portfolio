@@ -15,7 +15,7 @@ export class YearMarkers implements SceneEffect {
     geometry.setAttribute('position', new Float32BufferAttribute(vertices, 3));
     this.lines = new LineSegments(
       geometry,
-      new LineBasicMaterial({ color, transparent: true, opacity: 0.085, depthWrite: false }),
+      new LineBasicMaterial({ color, transparent: true, opacity: 0.045, depthWrite: false }),
     );
     this.lines.name = 'year-markers';
   }

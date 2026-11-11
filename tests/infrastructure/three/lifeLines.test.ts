@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FOCUS_OUT } from '../../../src/domain/services';
 import { BranchCurve } from '../../../src/infrastructure/three/BranchCurve';
 import { PathTable, readTable, sampleAlongPath, valueAtX } from '../../../src/infrastructure/three/math';
-import { MergeSeam } from '../../../src/infrastructure/three/MergeSeam';
+import { DEFAULT_SEAM_OPTIONS, MergeSeam } from '../../../src/infrastructure/three/MergeSeam';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
 import { DEFAULT_PALETTE, SceneBuilder } from '../../../src/infrastructure/three/SceneBuilder';
 import { buildModel, makeLifeLinesData } from '../../helpers/fixtures';
@@ -109,7 +109,7 @@ describe('MergeSeam', () => {
     expect(sizes[0]).toBe(0);
     expect(colors[0]).toBeLessThan(1);
     const flash = new MergeSeam('f', { x: 0, y: 0, z: 0 }, '#ff0000', '#0000ff', { count: 10 });
-    expect((flash.points.geometry.getAttribute('aSize').array as Float32Array)[0]).toBeCloseTo(2.6, 5);
+    expect((flash.points.geometry.getAttribute('aSize').array as Float32Array)[0]).toBeCloseTo(DEFAULT_SEAM_OPTIONS.core, 5);
   });
 
   it('es un destello y un remolino de motas alrededor del punto de fusión que late con el tiempo', () => {

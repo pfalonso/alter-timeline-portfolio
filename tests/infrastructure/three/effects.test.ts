@@ -2,7 +2,7 @@ import { Scene, type BufferAttribute } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 import { BranchCurve, type BranchStyle } from '../../../src/infrastructure/three/BranchCurve';
 import { PathTable } from '../../../src/infrastructure/three/math';
-import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
+import { BAND_CLEAR_MIN, ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
 import { createRingTexture } from '../../../src/infrastructure/three/textures';
 import { YearMarkers } from '../../../src/infrastructure/three/YearMarkers';
@@ -109,6 +109,12 @@ describe('SelectionPulse', () => {
 
 describe('ParticleFlow', () => {
   const path = (): { path: PathTable; color: string } => ({ path: new PathTable(STRAIGHT, 11), color: '#00ff00' });
+  /** Rama por su carril (fuera de la banda de nodos, donde las motas se apagan). */
+  const LANE_Y = 5;
+  const lanePath = (): { path: PathTable; color: string } => ({
+    path: new PathTable(STRAIGHT.map((point) => ({ ...point, y: LANE_Y })), 11),
+    color: '#00ff00',
+  });
   const xs = (flow: ParticleFlow): number[] => {
     const position = flow.points.geometry.attributes.position.array;
     return Array.from({ length: flow.count }, (_, i) => position[i * 3]);
@@ -167,13 +173,13 @@ describe('ParticleFlow', () => {
   });
 
   it('en una rama que se disuelve, al final las motas se dispersan, suben y se apagan', () => {
-    const flow = new ParticleFlow([{ ...path(), dissolve: 0.3 }], { density: 60 });
+    const flow = new ParticleFlow([{ ...lanePath(), dissolve: 0.3 }], { density: 60 });
     const position = flow.points.geometry.attributes.position.array;
     const alpha = flow.points.geometry.attributes.aAlpha.array;
     let maxSpread = 0;
     for (let i = 0; i < flow.count; i += 1) {
       const x = position[i * 3];
-      const spread = Math.hypot(position[i * 3 + 1], position[i * 3 + 2]);
+      const spread = Math.hypot(position[i * 3 + 1] - LANE_Y, position[i * 3 + 2]);
       // Antes de la zona de disolución se comportan como siempre.
       if (x < 6.5) expect(spread).toBeLessThan(0.9);
       if (x > 9) maxSpread = Math.max(maxSpread, spread);
@@ -194,8 +200,17 @@ describe('ParticleFlow', () => {
     expect(moved(dissolving)).toBeLessThan(moved(normal));
   });
 
+  it('en la banda de los nodos (y ≈ 0) casi se apagan: no ensucian los símbolos', () => {
+    const band = new ParticleFlow([path()], { density: 40 });
+    const lane = new ParticleFlow([lanePath()], { density: 40 });
+    const max = (flow: ParticleFlow): number => Math.max(...flow.points.geometry.attributes.aAlpha.array);
+    expect(max(band)).toBeLessThan(0.5);
+    expect(BAND_CLEAR_MIN).toBeLessThan(0.2);
+    expect(max(lane)).toBe(1);
+  });
+
   it('se desvanecen en los extremos de la rama', () => {
-    const flow = new ParticleFlow([path()], { density: 40 });
+    const flow = new ParticleFlow([lanePath()], { density: 40 });
     const alpha = flow.points.geometry.attributes.aAlpha.array;
     const x = xs(flow);
     for (let i = 0; i < flow.count; i += 1) {

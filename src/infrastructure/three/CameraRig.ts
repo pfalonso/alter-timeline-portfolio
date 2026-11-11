@@ -23,9 +23,9 @@ export interface RigOptions {
 
 export const DEFAULT_RIG_OPTIONS: RigOptions = {
   minDistance: 9,
-  maxDistance: 165,
-  pitch: 0.16,
-  yaw: 0.2,
+  maxDistance: 260,
+  pitch: 0.12,
+  yaw: 0.1,
   damping: 3.2,
   parallax: 0.035,
 };
@@ -142,6 +142,15 @@ export class CameraRig {
     }
     this.flyTo(end, distance);
     this.flight = { route, duration, distance: this.goal.distance, lift, elapsed: 0 };
+  }
+
+  /** Traslada cámara y objetivo en X sin transición (re-layout: la escena se mueve bajo ella). */
+  shiftX(dx: number): void {
+    this.pose.x += dx;
+    this.goal.x += dx;
+    if (this.flight) this.flight = null;
+    this.clampGoal();
+    this.apply();
   }
 
   setDistance(distance: number): void {

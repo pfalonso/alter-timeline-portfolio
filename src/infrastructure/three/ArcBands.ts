@@ -17,7 +17,7 @@ import type { FrameContext } from './types';
 export const ARC_OPACITY = {
   // En el rango oscuro, una suma lineal mínima ya se ve tras el sRGB: el velo solo existe en el arco activo.
   veil: { idle: 0, active: 0.014 },
-  edge: { idle: 0.07, active: 0.2 },
+  edge: { idle: 0.05, active: 0.1 },
 } as const;
 
 /** Arco (id) que contiene la X del mundo, o `null`. */

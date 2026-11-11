@@ -48,6 +48,9 @@ export class ArcStrip implements TimelineViewPart, ProjectionListener {
 
   onProjected(frame: ProjectedFrame): void {
     const width = frame.viewport.width;
+    // Un capítulo sin nodos visibles (filtrado) no está en el layout: se oculta.
+    const present = new Set((frame.arcs ?? []).map((arc) => arc.id));
+    for (const [id, segment] of this.segments) if (!present.has(id)) segment.element.hidden = true;
     for (const arc of frame.arcs ?? []) {
       const segment = this.segments.get(arc.id);
       if (!segment) continue;

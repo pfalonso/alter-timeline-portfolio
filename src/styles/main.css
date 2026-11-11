@@ -400,7 +400,7 @@ a {
 .filters {
   position: absolute;
   left: var(--pad);
-  bottom: calc(var(--pad) + 40px);
+  bottom: calc(var(--pad) + 58px);
   max-width: min(700px, 58vw);
   transition: opacity 1s ease 0.7s, transform 1s var(--ease) 0.7s;
 }
@@ -579,7 +579,7 @@ a {
 .help {
   position: absolute;
   right: var(--pad);
-  bottom: calc(var(--pad) + 40px);
+  bottom: calc(var(--pad) + 58px);
   margin: 0;
   max-width: 34vw;
   text-align: right;

@@ -51,6 +51,9 @@ export const NODE_TIERS: Record<1 | 2 | 3, NodeTier> = {
 export const STYLE_CODE: Record<LineStyle, number> = { geometric: 0, organic: 1, neutral: 2 };
 /** Presencia de un nodo filtrado: se atenúa, no desaparece. */
 export const DIMMED_PRESENCE = 0.1;
+/** Duración del deslizamiento de un nodo tras cambiar los filtros. */
+export const SLIDE_SECONDS = 0.75;
+const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 /** Color del papel (para rellenos suaves y marcas interiores). */
 export const GLYPH_PAPER = '#171029';
 
@@ -73,6 +76,8 @@ export class NodeMesh {
   private readonly material: ShaderMaterial;
   private readonly tier: NodeTier;
   private readonly phase: number;
+  /** Deslizamiento tras un re-layout: de `slide.from` a la posición final, en `SLIDE_SECONDS`. */
+  private slide: { readonly from: Vec3; readonly to: Vec3; t: number } | null = null;
 
   constructor(spec: NodeSpec, assets: NodeAssets) {
     this.eventId = spec.eventId;
@@ -135,6 +140,23 @@ export class NodeMesh {
     if (immediate) this.presenceValue = this.presenceTarget;
   }
 
+  /**
+   * Re-layout: el nodo parte de `from` y se desliza hasta su posición (curva suave). Con movimiento
+   * reducido salta directamente.
+   */
+  slideFrom(from: Vec3): void {
+    const p = this.group.position;
+    const to = { x: p.x, y: p.y, z: p.z };
+    if (Math.hypot(from.x - to.x, from.y - to.y, from.z - to.z) < 1e-3) return;
+    this.slide = { from, to, t: 0 };
+    p.set(from.x, from.y, from.z);
+  }
+
+  /** Aparece desde cero (nodo que el filtro acaba de mostrar). */
+  fadeIn(): void {
+    this.presenceValue = 0;
+  }
+
   setHovered(hovered: boolean): void {
     this.hoverTarget = hovered ? 1 : 0;
   }
@@ -152,6 +174,17 @@ export class NodeMesh {
       this.presenceValue = damp(this.presenceValue, this.presenceTarget, 4.5, frame.delta);
       this.hover = damp(this.hover, this.hoverTarget, 10, frame.delta);
       this.focus = damp(this.focus, this.focusTarget, 6, frame.delta);
+    }
+    if (this.slide) {
+      const slide = this.slide;
+      slide.t = frame.reducedMotion ? 1 : Math.min(1, slide.t + frame.delta / SLIDE_SECONDS);
+      const k = easeInOut(slide.t);
+      this.group.position.set(
+        slide.from.x + (slide.to.x - slide.from.x) * k,
+        slide.from.y + (slide.to.y - slide.from.y) * k,
+        slide.from.z + (slide.to.z - slide.from.z) * k,
+      );
+      if (slide.t >= 1) this.slide = null;
     }
     // El glifo siempre mira a la cámara.
     this.glyph.quaternion.copy(frame.camera.quaternion);
