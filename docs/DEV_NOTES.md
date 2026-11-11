@@ -112,6 +112,34 @@ real es `webgl.ts` y `PostFX.ts`.
     desplazamiento. En escritorio la cabecera no reserva franja (ocupa solo la izquierda): las ramas
     antiguas pasan por detrás de ella, como antes. Los rótulos esquivan también controles y regla.
 
+15. **Líneas vitales** (`branches[]`, `meta.mainBranch`, 11/11/2026). Modelo nuevo encima del
+    antiguo, sin romperlo: los eventos sin `branch` van a la línea central (`mainBranch`, `main` por
+    defecto) y `Timeline.originOf` usa `origin` si es visible y, si no, el `branchFrom` de siempre.
+    Decisiones: un periodo de `focus` sin `end` sigue hasta hoy (como `"present"`); la central no
+    admite `origin` ni `mergeInto`; las líneas declaradas sin eventos dan error salvo la central;
+    `mainBranch` es obligatorio solo si hay `branches` y ningún evento usa `"main"` (los datos
+    antiguos no cambian). Una fusión cuyo evento está oculto o es anterior al nacimiento de la línea
+    se ignora (la línea se cierra como una rama normal). En `branchIds` van la central, después las
+    declaradas en su orden y luego el resto: el orden de declaración desempata los carriles de las
+    líneas que nacen a la vez.
+16. **Foco en la escena.** El dominio calcula la intensidad por punto (`LayoutBranch.focus`, con
+    `focusIntensityAt`); `BranchCurve` la convierte en atributos por vértice del tubo (`aFocus` y
+    `aWidth`, leídos en la X de cada anillo) y `ParticleFlow` en una tabla uniforme en t
+    (`sampleAlongPath`): fuera de foco hay menos motas visibles (umbral `rank` por mota), van más
+    despacio y brillan menos. Las líneas con `origin` declarado se abren en `bundleBlendYears` (2,6)
+    en vez de `blendYears` (1,1), y las fusiones convergen en `mergeBlendYears` (2,2). La costura es
+    un efecto propio (`MergeSeam`). Resaltado desde la leyenda: `ThreeTimelineView.highlightBranch`
+    → `BuiltScene.highlightBranch` (realce suave; inmediato con movimiento reducido).
+17. **Vista general de vidas largas.** Con un nacimiento en 1993 la escena mide ~175 unidades: la
+    vista general sube su tope de 105 a 160 (y el zoom máximo del `CameraRig` de 110 a 165), con
+    margen de ancho 1,1 (antes 1,04: la guiñada de la cámara recortaba el extremo izquierdo). Para
+    que lo lejano no se apague, la niebla se aclara en proporción más allá de 90 unidades de
+    distancia (`FrameContext.fogDensity`, que `BranchCurve` aplica a su uniforme).
+18. **Leyenda** (`LineLegend`): va dentro de `#filters` (encima de los chips, que ahora viven en
+    `#filter-bar`), así que las franjas reservadas del encuadre y los rótulos la tienen en cuenta
+    sin cambios. Solo aparece si los datos declaran `branches`. En móvil se pliega; desplegada,
+    oculta la ayuda de gestos, que ocuparía el mismo sitio.
+
 ## Seguridad
 
 - Todo el contenido del JSON entra por `textContent` (`dom.ts → el()`); no hay `innerHTML`.
@@ -181,6 +209,10 @@ Pasada de layout (11/11/2026, rama `feature/layout-carriles`): carriles compacto
 franjas reservadas (decisiones 13 y 14). Cadena de calidad en verde; capturas revisadas con datos
 reales (1600×900 y 390×844) y con el ejemplo.
 
+Pasada de líneas vitales (11/11/2026, rama `feature/lineas-vitales`): esquema `branches[]` y
+`meta.mainBranch`, foco, fusión, `until`, leyenda (decisiones 15–18). Cadena de calidad en verde;
+capturas con el ejemplo (apertura, vista general, hover en la leyenda, móvil y leyenda desplegada).
+
 ## Pendiente / limitaciones conocidas
 
 - No hay enlace profundo a un evento (`?event=id`); solo el filtro vive en la URL.
@@ -195,6 +227,10 @@ reales (1600×900 y 390×844) y con el ejemplo.
   podido medir en GPU real. El coste principal son el bloom y la nebulosa procedural a pantalla
   completa.
 - Probado solo en Chrome headless; sin pruebas en Firefox/Safari ni en dispositivos táctiles reales.
+- La leyenda solo resalta líneas en la escena 3D; sin WebGL no se muestra. Los rótulos de nodos no
+  conocen el foco: un evento de una línea fuera de foco se rotula igual que uno en foco.
+- En pantallas táctiles el resaltado de la leyenda depende de `pointerenter` (que en táctil llega con
+  el toque): el clic fija/suelta la línea, que es lo que funciona igual en todos los dispositivos.
 
 ## Tests (agente 3)
 

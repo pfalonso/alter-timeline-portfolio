@@ -23,7 +23,9 @@ Este README es la wiki completa del proyecto: cómo arrancarlo, cómo meter tus 
 
 ## 1. Qué es
 
-Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: el eje horizontal es el tiempo, cada evento es un nodo luminoso y cada bifurcación vital abre una **rama** que se separa del tronco. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
+Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: el eje horizontal es el tiempo y cada evento es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
+
+**Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: qué línea brilla en cada momento. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
 
 Está hecha con Vite, TypeScript estricto y three.js, sin framework de interfaz, con arquitectura hexagonal y servida por nginx dentro de Docker. Tus datos personales nunca entran en el repositorio ni en la imagen: se montan como volumen.
 
@@ -163,6 +165,7 @@ Raíz del documento:
 | `meta` | objeto | Sí | Datos de cabecera del sitio |
 | `categories` | lista | Sí | Al menos una categoría |
 | `events` | lista | Sí | Eventos de la línea temporal (puede estar vacía) |
+| `branches` | lista | No | Líneas vitales con nombre, color, nacimiento, fusión y foco (ver `branches[]`) |
 | `$schema` | texto | No | Referencia al JSON Schema para el autocompletado del editor |
 
 #### `meta`
@@ -174,6 +177,7 @@ Raíz del documento:
 | `locale` | texto no vacío | Sí | Idioma BCP 47 (`"es"`, `"en"`…). Se usa para formatear fechas y para el atributo `lang` de la página |
 | `tagline` | texto | No | Frase bajo el nombre |
 | `contact` | lista de `{ label, url }` | No | Enlaces de contacto en la cabecera. `url` debe ser http(s) absoluta |
+| `mainBranch` | texto kebab-case | No (por defecto `"main"`) | Línea vital central: va en el carril del centro y es la más brillante y gruesa en el presente. Los eventos sin `branch` pertenecen a ella |
 
 #### `categories[]`
 
@@ -204,9 +208,24 @@ Raíz del documento:
 | `links` | lista de `{ label, url }` | No | Sección «Enlaces». Solo http(s) |
 | `media` | lista de `{ type: "image", url, alt }` | No | Imágenes del pop-up. `url` http(s); `alt` obligatorio (puede ser vacío) |
 | `importance` | `1`, `2` o `3` | No (por defecto `2`) | Tamaño y brillo del nodo, y a qué distancia de cámara se sigue rotulando |
-| `branch` | texto kebab-case | No (por defecto `"main"`) | Rama a la que pertenece el evento |
-| `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama |
+| `branch` | texto kebab-case | No (por defecto la línea central: `meta.mainBranch`, o `"main"`) | Línea (rama) a la que pertenece el evento |
+| `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama (modelo clásico; `branches[].origin` prevalece) |
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
+
+#### `branches[]` (opcional)
+
+Describe las líneas vitales. Una línea existe porque algún evento la usa en `branch`; esta lista le da nombre, color y comportamiento. Las ramas que no aparecen aquí se comportan como siempre.
+
+| Campo | Tipo | Obligatorio | Descripción |
+| --- | --- | --- | --- |
+| `id` | texto kebab-case | Sí | Único. Debe usarlo algún `event.branch` (o ser `meta.mainBranch`) |
+| `label` | texto no vacío | Sí | Nombre visible de la línea: leyenda, pop-up («Línea: …») e índice |
+| `color` | texto `#RRGGBB` | No | Color del filamento y de la leyenda. Si falta, el de la categoría principal de su primer evento (la central, si no lo declara, es pálida) |
+| `description` | texto | No | `title` de la entrada de la leyenda |
+| `origin` | id de evento | No | Evento donde nace la línea (p. ej. `"nacimiento"`). Prevalece sobre `event.branchFrom`. Las líneas con el mismo `origin` salen del mismo punto y se abren como un haz |
+| `mergeInto` | `{ branch, event }` | No | La línea converge en la línea `branch` a la altura de `event` (que debe pertenecer a `branch`) y termina ahí, con una «costura» de partículas |
+| `until` | `"present"` | No | La línea llega hasta hoy aunque sus eventos hayan terminado (afición latente). Incompatible con `mergeInto` |
+| `focus` | lista de `{ start, end?, level? }` | No | Periodos de foco. `start`/`end` con el formato de fechas; `end` admite `"present"` y, si falta, el foco sigue hasta hoy. `level` `1`, `2` o `3` (por defecto `3`) |
 
 **Fechas.** `date.start` y `date.end` admiten tres precisiones: `"YYYY"`, `"YYYY-MM"` o `"YYYY-MM-DD"`. `date.end` admite además `"present"` (evento en curso: su tramo llega hasta hoy y el pop-up muestra «En curso»). Un evento sin `end` es puntual.
 
@@ -231,16 +250,65 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `importance`, `visibility` | Solo los valores permitidos |
 | `branch` | Id en kebab-case |
 | `branchFrom` | El evento existe; no es el propio evento; no pertenece a la misma rama |
-| Tronco | Un evento de la rama `main` no puede llevar `branchFrom` |
+| Tronco | Un evento de la línea central (`mainBranch`, por defecto `main`) no puede llevar `branchFrom` |
 | Un origen por rama | Todos los `branchFrom` de una misma rama deben apuntar al mismo evento |
-| Sin ciclos | Las ramas no pueden bifurcarse unas de otras en círculo |
+| Sin ciclos | Las ramas no pueden bifurcarse unas de otras en círculo (contando `branchFrom` y `origin`) |
+| `meta.mainBranch` | Kebab-case y con algún evento. Sin `mainBranch`, si hay `branches` y ningún evento pertenece a `"main"`, es obligatorio indicarlo |
+| `branches[].id` | Kebab-case, único y usado por algún evento (o igual a `mainBranch`) |
+| `branches[].color` | `#RRGGBB` |
+| `branches[].origin` | El evento existe y es de otra línea; la línea central no admite `origin` |
+| `branches[].mergeInto` | `branch` existe y es distinta; `event` existe y pertenece a `branch`; sin ciclos de fusión; la central no se fusiona |
+| `branches[].until` | Solo `"present"`, y no junto a `mergeInto` |
+| `branches[].focus[]` | Fechas válidas, `end >= start`, `level` 1, 2 o 3 |
 
 > [!NOTE]
 > `schema/life.schema.json` describe la **forma** del documento y sirve para el autocompletado del editor. Las reglas cruzadas (unicidad, referencias, `end ≥ start`, ciclos, días reales del mes) no son expresables en JSON Schema: la referencia es `npm run validate:data`. El proyecto no incluye ninguna librería que valide contra el schema.
 
-### 3.7 Ramas y bifurcaciones
+### 3.7 Líneas vitales, ramas y bifurcaciones
 
-- Todo evento sin `branch` pertenece al tronco, `main`.
+#### Líneas vitales (`branches[]`)
+
+La forma recomendada de contar una vida: varias líneas que nacen juntas y cambian de foco.
+
+1. Crea un evento de nacimiento en la línea central (por ejemplo `"id": "nacimiento"`) y declara la central en `meta.mainBranch`.
+2. Asigna cada evento a su línea con `branch` (los que no lo llevan van a la central).
+3. Declara las líneas en `branches` con `label`, `color` y `"origin": "nacimiento"`: todas salen del mismo punto y se abren despacio como un haz.
+4. Marca con `focus` los periodos en que cada línea fue protagonista.
+
+Cómo se ve:
+
+- **Carriles.** La central va siempre en el carril del centro (y = 0). Las demás se reparten alrededor con el algoritmo de carriles de siempre (carril libre más cercano, sin cruzar el tronco si se puede evitar).
+- **Foco.** El brillo y el bloom del filamento, la densidad, velocidad y brillo de sus partículas y su opacidad dependen de si ese momento cae dentro de un periodo de `focus`: fuera de foco la línea queda a ≈ 0,3; `level` 1, 2 y 3 suben a ≈ 0,55, 0,78 y 1. Las transiciones son suaves a lo largo de la curva (rampas de ~0,8 años centradas en cada borde), no saltos. Una línea sin `focus` brilla a pleno, como antes. La central además engorda un poco al acercarse a hoy.
+- **Fusión.** Con `mergeInto`, la línea se curva en sus últimos ~2 años hasta unirse a la línea destino en la posición del evento indicado y termina ahí, con una «costura»: un destello que late y un remolino de motas con los colores de las dos líneas.
+- **Final.** Una línea con `until: "present"` llega hasta hoy (atenuada según su foco). Sin `until` ni `mergeInto`, una línea cuyos eventos han terminado se disuelve en polvo como las ramas clásicas.
+- **Leyenda.** Encima de los filtros aparece la lista de líneas con su color y nombre (la central marcada como «foco actual»; las demás, «se une a …», «latente» o «cerrada»). Ver [4.2](#42-filtros-por-categoría).
+
+Mini ejemplo:
+
+```json
+{
+  "meta": { "owner": "…", "title": "…", "locale": "es", "mainBranch": "oficio" },
+  "events": [
+    { "id": "nacimiento", "title": "Nace", "date": { "start": "1993-04" }, "categories": ["personal"], "summary": "…" },
+    { "id": "dibujo", "title": "Cuadernos", "date": { "start": "1999", "end": "2006" }, "categories": ["arte"], "summary": "…", "branch": "arte" },
+    { "id": "master", "title": "Máster", "date": { "start": "2019-10", "end": "2021-06" }, "categories": ["academico"], "summary": "…" },
+    { "id": "obrador", "title": "Obrador", "date": { "start": "2013", "end": "2015" }, "categories": ["cocina"], "summary": "…", "branch": "cocina" }
+  ],
+  "branches": [
+    { "id": "oficio", "label": "Sonido y espacio", "focus": [{ "start": "2019-10", "end": "present" }] },
+    { "id": "arte", "label": "Artes visuales", "color": "#FF7EB6", "origin": "nacimiento",
+      "mergeInto": { "branch": "oficio", "event": "master" }, "focus": [{ "start": "1999", "end": "2006", "level": 2 }] },
+    { "id": "cocina", "label": "Cocina", "origin": "nacimiento", "until": "present",
+      "focus": [{ "start": "2013", "end": "2015" }] }
+  ]
+}
+```
+
+`public/data/life.example.json` usa este modelo completo (cinco líneas, una fusión, una línea latente y otra que se apaga).
+
+#### Ramas clásicas (`branch` + `branchFrom`)
+
+- Todo evento sin `branch` pertenece al tronco (la línea central: `main` si no hay `meta.mainBranch`).
 - Para abrir una rama, pon el mismo `branch` a todos sus eventos y añade `branchFrom` **en al menos uno** de ellos (lo habitual es el primero) con el id del evento donde la vida se bifurca.
 - El origen puede estar en el tronco o en otra rama (ramas que nacen de ramas).
 - Una rama con algún evento en curso (`"end": "present"`) se prolonga hasta hoy. Una rama cerrada (un camino que no siguió) se desvanece poco después de su último evento: el filamento se apaga y sus motas de energía se dispersan, suben y se disuelven en polvo.
@@ -301,12 +369,12 @@ Mini ejemplo: un tronco con dos eventos y una rama `obrador` que nace del interc
 
 Un evento con `"visibility": "private"` no se dibuja, no cuenta en los contadores y no aparece en el índice. Añadiendo `?private=1` a la URL sí se muestran, con la insignia «Privado» en su pop-up.
 
-Si una rama nace de un evento privado que está oculto, la rama se dibuja naciendo del tronco a la altura de su primer evento.
+Si una rama nace de un evento privado que está oculto, la rama se dibuja naciendo del tronco a la altura de su primer evento (si la línea declara `origin` oculto pero algún evento lleva `branchFrom` visible, se usa ese). Si el evento de `mergeInto` está oculto, la línea no converge: se comporta como una rama cerrada.
 
 > [!WARNING]
 > **`visibility: "private"` no es un control de acceso.** El filtrado se hace en el navegador (`TimelineFactory`): el fichero `life.json` se descarga entero, con los eventos privados dentro, y cualquiera puede leerlo en `/data/life.json` o activar `?private=1`. Sirve para tener dos vistas del mismo fichero, no para guardar secretos. Lo que no deba ver nadie no debe estar en el `life.json` que despliegues.
 
-**Versión publicable: `npm run build:public-data`.** El script `scripts/build-public-data.ts` lee `data/life.json`, lo valida y escribe `data/public/life.json` **sin** los eventos privados (y sin el campo `visibility`). Si una rama nacía de un evento privado, su `branchFrom` se reengancha al ancestro público más cercano siguiendo la cadena de orígenes; si no hay ninguno, la rama nace del tronco. Las categorías que solo usaban eventos privados se eliminan. El resultado se vuelve a validar antes de escribirlo. Admite rutas propias: `npm run build:public-data -- origen.json destino.json`. Códigos de salida: `0` bien, `1` el origen o el resultado no validan (no se escribe nada), `2` no se puede leer el origen.
+**Versión publicable: `npm run build:public-data`.** El script `scripts/build-public-data.ts` lee `data/life.json`, lo valida y escribe `data/public/life.json` **sin** los eventos privados (y sin el campo `visibility`). Si una rama nacía de un evento privado, su `branchFrom` se reengancha al ancestro público más cercano siguiendo la cadena de orígenes; si no hay ninguno, la rama nace del tronco. Las categorías que solo usaban eventos privados se eliminan. En `branches`, se quitan las líneas que se quedan sin eventos públicos, un `origin` privado se reengancha igual que `branchFrom` (o se quita) y una fusión en un evento privado se quita. El resultado se vuelve a validar antes de escribirlo. Admite rutas propias: `npm run build:public-data -- origen.json destino.json`. Códigos de salida: `0` bien, `1` el origen o el resultado no validan (no se escribe nada), `2` no se puede leer el origen.
 
 Para desplegar esa versión, `docker-compose.public.yml` sustituye el volumen de `docker-compose.yml` por `./data/public`:
 
@@ -358,9 +426,11 @@ Los rótulos de los nodos aparecen y desaparecen según el zoom: los eventos de 
 - Si el evento enfocado deja de ser visible, la selección se suelta y el pop-up se cierra.
 - El filtro se guarda en la URL (`?cat=`), así que un enlace conserva la vista.
 
+**Leyenda de líneas vitales** (solo si los datos declaran `branches`). Fila compacta encima de los filtros con el color y el nombre de cada línea; la central lleva «foco actual». Pasar el ratón o el foco de teclado por una línea la resalta en la escena (filamento y partículas) y atenúa las demás; un clic la deja fijada (`aria-pressed`) hasta otro clic. En móvil se pliega tras el botón «Líneas vitales (n)».
+
 ### 4.3 Pop-up de detalle
 
-Muestra, en este orden y solo si hay dato: etiquetas de categoría, título, subtítulo, insignias («En curso», «Privado», «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
+Muestra, en este orden y solo si hay dato: etiquetas de categoría, título, subtítulo, insignias («En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
 
 - En pantallas de 900 px o más de ancho es un panel lateral y la cámara desplaza el encuadre para que el nodo no quede tapado.
 - En pantallas de 720 px o menos ocupa toda la pantalla.
@@ -369,7 +439,7 @@ Muestra, en este orden y solo si hay dato: etiquetas de categoría, título, sub
 
 ### 4.4 Índice accesible
 
-El botón **Índice** abre la lista cronológica de todos los eventos (fecha, título, categoría y resumen). Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL. El enlace «Saltar al índice de eventos» es el primer elemento enfocable de la página.
+El botón **Índice** abre la lista cronológica de todos los eventos (fecha, título, categoría, línea vital si está declarada y resumen). Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL. El enlace «Saltar al índice de eventos» es el primer elemento enfocable de la página.
 
 ### 4.5 Parámetros de URL
 
@@ -426,10 +496,10 @@ src/
   infrastructure/
     http/                      HttpJsonTimelineRepository
     storage/                   UrlFilterStateStore, readUrlFlag
-    dom/                       CompositeTimelineView, Hud, FilterBar, EventPopup, EventList, Tooltip, NodeLabels,
+    dom/                       CompositeTimelineView, Hud, FilterBar, LineLegend, EventPopup, EventList, Tooltip, NodeLabels,
                                YearRuler, KeyboardShortcuts, LiveAnnouncer, ViewControls, labelLayout, dom, strings
     three/                     ThreeTimelineView, SceneBuilder, SceneEffect, NodeMesh, BranchCurve, ParticleFlow,
-                               Starfield, Nebula, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
+                               MergeSeam, Starfield, Nebula, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
                                PostFX, webgl, math, textures, types
   styles/main.css
 build/personalDataPlugin.ts    plugin de Vite que sirve data/life.json en dev y preview
@@ -504,8 +574,14 @@ classDiagram
         +now PartialDate
         +events LifeEvent[]
         +categories Category[]
+        +mainBranch string
+        +lines LifeLine[]
         +branchIds string[]
         +yearRange
+        +getLine(id) LifeLine
+        +lineColorOf(id) string
+        +originOf(id) LifeEvent
+        +mergeOf(id) ResolvedMerge
         +getEvent(id) LifeEvent
         +getCategory(id) Category
         +categoriesOf(event) Category[]
@@ -531,6 +607,23 @@ classDiagram
         +paragraphs string[]
         +hasAnyCategory(ids) boolean
         +formatDateRange(locale, presentLabel) string
+    }
+
+    class LifeLine {
+        <<interface>>
+        +id string
+        +label string
+        +color string
+        +originEventId string
+        +mergeInto LineMerge
+        +untilPresent boolean
+        +focus FocusPeriod[]
+    }
+
+    class LineFocus {
+        <<función pura>>
+        +focusIntensityAt(line, date) number
+        +sampleFocus(line, years) number[]
     }
 
     class PartialDate {
@@ -581,6 +674,7 @@ classDiagram
         +meta LifeMetaData
         +categories CategoryData[]
         +events LifeEventData[]
+        +branches BranchInfoData[]
     }
 
     class LifeDataValidator {
@@ -623,6 +717,9 @@ classDiagram
 
     Timeline "1" *-- "0..*" LifeEvent
     Timeline "1" *-- "1..*" Category
+    Timeline "1" *-- "0..*" LifeLine
+    LifeLine --> PartialDate : focus
+    TimelineLayout ..> LineFocus : foco por punto
     Timeline --> PartialDate : now
     LifeEvent --> PartialDate : start, end
     LifeEvent ..> Category : categoryIds
@@ -646,7 +743,7 @@ Notas:
 
 - `LifeData` es la forma en crudo del JSON; `Timeline` es el agregado ya validado y normalizado (valores por defecto aplicados, eventos ordenados por fecha de inicio).
 - `LifeEvent` y `CategorySelection` son inmutables: cada cambio de filtro devuelve una selección nueva.
-- `TimelineLayoutResult` es geometría pura (`{x, y, z}`), sin tipos de three.js.
+- `TimelineLayoutResult` es geometría pura (`{x, y, z}`), sin tipos de three.js. Cada `LayoutBranch` lleva además `main`, `focus` (intensidad 0..1 por punto, calculada con `focusIntensityAt`) y `merge` (`{ into, eventId, position }` o `null`); la capa three los consume como atributos por vértice (`aFocus`, `aWidth`) y como tabla de foco de `ParticleFlow`.
 
 ### 5.5 (c) Puertos y adaptadores
 
@@ -728,6 +825,7 @@ classDiagram
     class ThreeTimelineView
     class Hud
     class FilterBar
+    class LineLegend
     class EventPopup
     class EventList
     class Tooltip
@@ -755,6 +853,8 @@ classDiagram
     TimelineViewPart <|.. ThreeTimelineView
     TimelineViewPart <|.. Hud
     TimelineViewPart <|.. FilterBar
+    TimelineViewPart <|.. LineLegend
+    LineLegend ..> ThreeTimelineView : highlightBranch(id)
     TimelineViewPart <|.. EventPopup
     TimelineViewPart <|.. EventList
     TimelineViewPart <|.. Tooltip
@@ -807,6 +907,7 @@ classDiagram
     SceneEffect <|.. YearMarkers
     SceneEffect <|.. BranchCurve
     SceneEffect <|.. ParticleFlow
+    SceneEffect <|.. MergeSeam
     SceneEffect <|.. SelectionPulse
     SceneEffect ..> FrameContext
 
@@ -826,8 +927,10 @@ classDiagram
         <<interface>>
         +nodes NodeMesh[]
         +branches BranchCurve[]
+        +seams MergeSeam[]
         +effects SceneEffect[]
         +pulse SelectionPulse
+        +highlightBranch(id) void
         +dispose() void
     }
 
