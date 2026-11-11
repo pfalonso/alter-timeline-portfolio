@@ -98,3 +98,35 @@ describe('Timeline', () => {
     });
   });
 });
+
+describe('Timeline: enlaces causales y estilo de línea', () => {
+  it('consequencesOf / causesOf / causalLinks solo con eventos visibles', () => {
+    const data = makeData();
+    data.events[0].ledTo = ['b-job', 'd-secret'];
+    data.events[1].ledTo = ['c-side'];
+    const timeline = factory.create(data, { now: NOW });
+    expect(timeline.consequencesOf('a-school').map((event) => event.id)).toEqual(['b-job']);
+    expect(timeline.causesOf('b-job').map((event) => event.id)).toEqual(['a-school']);
+    expect(timeline.causesOf('nada')).toEqual([]);
+    expect(timeline.consequencesOf('nada')).toEqual([]);
+    expect(timeline.causalLinks).toEqual([
+      { from: 'a-school', to: 'b-job' },
+      { from: 'b-job', to: 'c-side' },
+    ]);
+    const all = factory.create(data, { now: NOW, includePrivate: true });
+    expect(all.consequencesOf('a-school').map((event) => event.id)).toEqual(['b-job', 'd-secret']);
+  });
+
+  it('lineStyleOf: el declarado o el de por defecto según el id', () => {
+    const data = makeData();
+    data.branches = [{ id: 'side', label: 'Lado', style: 'organic' }];
+    const timeline = factory.create(data, { now: NOW });
+    expect(timeline.lineStyleOf('side')).toBe('organic');
+    expect(timeline.lineStyleOf('tecnologia')).toBe('geometric');
+    expect(timeline.lineStyleOf('gestion')).toBe('geometric');
+    expect(timeline.lineStyleOf('arte')).toBe('organic');
+    expect(timeline.lineStyleOf('rol')).toBe('organic');
+    expect(timeline.lineStyleOf('vida')).toBe('neutral');
+    expect(timeline.lineStyleOf('otra')).toBe('neutral');
+  });
+});

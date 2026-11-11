@@ -65,8 +65,10 @@ describe('Timeline + layout + filtro', () => {
 
     const main = layout.nodes.filter((node) => node.branch === 'oficio');
     for (let i = 1; i < main.length; i += 1) expect(main[i].position.x).toBeGreaterThan(main[i - 1].position.x);
-    const side = layout.nodes.find((node) => node.eventId === 'faro-interior');
-    expect(Math.abs(side?.position.y ?? 0)).toBeGreaterThan(2);
+    // Los nodos viven en la banda central; las líneas laterales se alejan entre ellos.
+    for (const node of layout.nodes) expect(Math.abs(node.position.y)).toBeLessThan(4);
+    const side = layout.branches.find((branch) => branch.id === 'creacion');
+    expect(Math.max(...(side?.points ?? []).map((point) => Math.abs(point.y)))).toBeGreaterThan(2);
   });
 
   it('filtra por categoría (basta con que una coincida)', () => {

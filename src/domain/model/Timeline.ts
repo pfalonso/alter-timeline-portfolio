@@ -2,7 +2,7 @@ import type { Category } from './Category';
 import type { LifeMetaData } from './LifeData';
 import { MAIN_BRANCH, type LifeEvent } from './LifeEvent';
 import { arcEndYear, arcStartYear, type LifeArc, type Story } from './LifeArc';
-import type { LifeLine } from './LifeLine';
+import { defaultLineStyle, type LifeLine, type LineStyle } from './LifeLine';
 import type { PartialDate } from './PartialDate';
 
 /** Fusión resuelta: la línea converge en `branch` a la altura de `event`. */
@@ -107,6 +107,28 @@ export class Timeline {
 
   getLine(branchId: string): LifeLine | undefined {
     return this.linesById.get(branchId);
+  }
+
+  /** Lenguaje de forma de una línea: el declarado o el de por defecto según su id. */
+  lineStyleOf(branchId: string): LineStyle {
+    return this.linesById.get(branchId)?.style ?? defaultLineStyle(branchId);
+  }
+
+  /** Enlaces causales visibles: eventos a los que llevó `eventId` (en orden cronológico). */
+  consequencesOf(eventId: string): LifeEvent[] {
+    const event = this.eventsById.get(eventId);
+    if (!event) return [];
+    return this.events.filter((other) => event.ledTo.includes(other.id) && other.id !== eventId);
+  }
+
+  /** Enlaces causales visibles: eventos que llevaron a `eventId`. */
+  causesOf(eventId: string): LifeEvent[] {
+    return this.events.filter((other) => other.id !== eventId && other.ledTo.includes(eventId));
+  }
+
+  /** Todos los enlaces causales entre eventos visibles, en orden cronológico del origen. */
+  get causalLinks(): { from: string; to: string }[] {
+    return this.events.flatMap((event) => this.consequencesOf(event.id).map((target) => ({ from: event.id, to: target.id })));
   }
 
   /** Color de una línea: el declarado o el de la categoría principal de su primer evento. */

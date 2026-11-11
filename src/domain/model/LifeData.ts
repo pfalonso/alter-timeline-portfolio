@@ -43,6 +43,8 @@ export interface LifeEventData {
   visibility?: 'public' | 'private';
   /** Frase (≤ 160 caracteres) que enlaza con el evento anterior del recorrido de la historia. */
   bridge?: string;
+  /** Eventos (posteriores o de la misma fecha, de cualquier línea) a los que este llevó. */
+  ledTo?: string[];
 }
 
 export interface LifeMetaData {
@@ -77,6 +79,8 @@ export interface BranchInfoData {
   /** La línea sigue viva hasta hoy aunque su último evento haya terminado. */
   until?: 'present';
   focus?: FocusPeriodData[];
+  /** Lenguaje de forma de sus nodos: rectilíneo, orgánico o neutro (por defecto, según el id). */
+  style?: 'geometric' | 'organic' | 'neutral';
 }
 
 /** Arco temporal (capítulo). Los arcos son contiguos y no se solapan. */

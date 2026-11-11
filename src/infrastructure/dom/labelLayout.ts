@@ -115,3 +115,16 @@ export function labelDistanceLimit(importance: number): number {
 export function labelPriority(importance: number, pinned: boolean, wasShown: boolean, radius: number): number {
   return (pinned ? 1000 : 0) + importance * 100 + (wasShown ? 20 : 0) + Math.min(radius, 50) * 0.1;
 }
+
+/**
+ * Posiciones (borde superior) que se prueban para el rótulo de un nodo de la banda narrativa. Los
+ * nodos se rotulan alternando arriba y abajo de la banda (por orden cronológico) para que dos
+ * vecinos no compitan por el mismo hueco; si el lado preferido está ocupado se prueba el otro y,
+ * después, un escalón más lejos en cada lado.
+ */
+export function labelSlots(nodeY: number, gap: number, height: number, preferAbove: boolean): number[] {
+  const above = nodeY - gap - height;
+  const below = nodeY + gap;
+  const step = height * 0.85;
+  return preferAbove ? [above, below, above - step, below + step] : [below, above, below + step, above - step];
+}

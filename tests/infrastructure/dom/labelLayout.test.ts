@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampLabelX, labelDistanceLimit, labelPriority, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
+import { clampLabelX, labelDistanceLimit, labelPriority, labelSlots, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
 
 const VIEWPORT = { width: 800, height: 600 };
 
@@ -141,5 +141,16 @@ describe('clampLabelX', () => {
 
   it('si la etiqueta es más ancha que el visor, la centra', () => {
     expect(clampLabelX(10, 400, 300)).toBe(150);
+  });
+});
+
+describe('labelSlots (banda narrativa)', () => {
+  it('prueba primero el lado preferido, luego el otro y después un escalón más lejos', () => {
+    const above = labelSlots(100, 10, 20, true);
+    expect(above[0]).toBe(70);
+    expect(above[1]).toBe(110);
+    expect(above[2]).toBeLessThan(above[0]);
+    expect(above[3]).toBeGreaterThan(above[1]);
+    expect(labelSlots(100, 10, 20, false).slice(0, 2)).toEqual([110, 70]);
   });
 });

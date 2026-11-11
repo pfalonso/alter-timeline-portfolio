@@ -17,6 +17,7 @@ interface RawEvent {
   visibility?: string;
   branchFrom?: string;
   categories?: string[];
+  ledTo?: string[];
   [key: string]: unknown;
 }
 interface RawLine {
@@ -58,6 +59,12 @@ export function toPublicData(data: RawData): RawData {
       const copy: RawEvent = { ...event };
       delete copy.visibility;
       delete copy.branchFrom;
+      // Los enlaces causales a eventos privados desaparecen (sin dejar la lista vacía).
+      if (event.ledTo) {
+        const ledTo = event.ledTo.filter((id) => byId.has(id) && !isPrivate(byId.get(id)));
+        if (ledTo.length > 0) copy.ledTo = ledTo;
+        else delete copy.ledTo;
+      }
       const anchor = publicAncestor(event.branchFrom);
       return anchor === undefined ? copy : { ...copy, branchFrom: anchor };
     });

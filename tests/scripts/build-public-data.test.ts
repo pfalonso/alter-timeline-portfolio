@@ -185,3 +185,16 @@ describe('scripts/build-public-data.ts', () => {
     expect(run(notJson, join(dir, 'y.json')).status).toBe(2);
   }, 90_000);
 });
+
+describe('toPublicData con enlaces causales', () => {
+  it('quita los destinos privados de ledTo y la lista si se queda vacía', () => {
+    const data = makeData();
+    data.events[0].ledTo = ['b-job', 'd-secret'];
+    data.events[1].ledTo = ['d-secret'];
+    const result = toPublicData(asRaw(data));
+    expect(eventOf(result, 'a-school').ledTo).toEqual(['b-job']);
+    expect('ledTo' in eventOf(result, 'b-job')).toBe(false);
+    expect(new LifeDataValidator().validate(result).ok).toBe(true);
+    expect(data.events[1].ledTo).toEqual(['d-secret']);
+  });
+});

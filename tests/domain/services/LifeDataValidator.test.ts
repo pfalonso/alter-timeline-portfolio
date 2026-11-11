@@ -464,3 +464,31 @@ describe('LifeDataValidator: acumulación de errores', () => {
     expect(error.message).toContain('events[2].branchFrom: el evento "fantasma" no existe');
   });
 });
+
+describe('LifeDataValidator: enlaces causales (ledTo)', () => {
+  it('acepta destinos existentes, posteriores o de la misma fecha, en cualquier línea', () => {
+    expect(issuesAfter((data) => (data.events[0].ledTo = ['b-job', 'c-side']))).toEqual([]);
+  });
+
+  it('rechaza ids inexistentes, el propio evento, duplicados y destinos anteriores', () => {
+    expectSingleIssue((data) => (data.events[0].ledTo = ['nada']), 'events[0].ledTo[0]', /no existe/);
+    expectSingleIssue((data) => (data.events[1].ledTo = ['b-job']), 'events[1].ledTo[0]', /a sí mismo/);
+    expectSingleIssue((data) => (data.events[0].ledTo = ['b-job', 'b-job']), 'events[0].ledTo[1]', /repetido/);
+    expectSingleIssue((data) => (data.events[2].ledTo = ['a-school']), 'events[2].ledTo[0]', /anterior/);
+  });
+
+  it('rechaza formas inválidas', () => {
+    expectSingleIssue((data) => (data.events[0].ledTo = 'b-job'), 'events[0].ledTo', /lista/);
+    expectSingleIssue((data) => (data.events[0].ledTo = [3]), 'events[0].ledTo[0]', /id de un evento/);
+  });
+});
+
+describe('LifeDataValidator: estilo de línea', () => {
+  it('admite geometric, organic y neutral; rechaza otros valores', () => {
+    const withStyle = (style: unknown) => (data: Loose): void => {
+      data.branches = [{ id: 'side', label: 'Lado', style }];
+    };
+    for (const style of ['geometric', 'organic', 'neutral']) expect(issuesAfter(withStyle(style))).toEqual([]);
+    expectSingleIssue(withStyle('cuadrado'), 'branches[0].style', /geometric/);
+  });
+});

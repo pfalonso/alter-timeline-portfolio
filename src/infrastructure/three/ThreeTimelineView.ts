@@ -52,6 +52,8 @@ const OPENING_MAX_DISTANCE = 80;
 /** Margen vertical (mundo) alrededor de las ramas al encuadrar: radio de los nodos y halos. */
 const FRAME_MARGIN = 2.2;
 const DETAIL_DISTANCE = 21;
+/** Margen vertical (mundo) que se encuadra alrededor de la banda de nodos al abrir. */
+const BAND_FRAME = 4.5;
 /** Por encima de este ancho el pop-up es un panel lateral y el encuadre se desplaza. */
 const SIDE_PANEL_MIN_WIDTH = 900;
 
@@ -251,6 +253,13 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       const halfWidth = this.rig.halfHeightAt(distance) * this.camera.aspect;
       const x = nowX - halfWidth * 0.7;
       extent = verticalExtent(layout.branches, x - halfWidth, x + halfWidth) ?? extent;
+      // Lo que importa es la banda de los nodos: las hebras que se alejan pueden perderse por arriba/abajo.
+      if (layout.band) {
+        extent = {
+          minY: Math.max(extent.minY, layout.band.minY - BAND_FRAME),
+          maxY: Math.min(extent.maxY, layout.band.maxY + BAND_FRAME),
+        };
+      }
       distance = Math.min(
         OPENING_MAX_DISTANCE,
         Math.max(this.defaultDistance(), this.rig.distanceToFitHeight(extent.maxY - extent.minY + 2 * FRAME_MARGIN, band)),

@@ -91,6 +91,7 @@
         "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Si falta, el de la categoría principal de su primer evento" },
         "description": { "type": "string" },
         "origin": { "$ref": "#/$defs/kebabId", "description": "Evento donde nace la línea; prevalece sobre event.branchFrom" },
+        "style": { "enum": ["geometric", "organic", "neutral"], "description": "Lenguaje de forma de sus nodos. Por defecto: tecnologia/gestion → geometric; arte/gastronomia/rol → organic; resto → neutral" },
         "mergeInto": {
           "type": "object",
           "required": ["branch", "event"],
@@ -202,6 +203,12 @@
         "bridge": { "type": "string", "minLength": 1, "maxLength": 160, "description": "Frase que conecta con el evento anterior del recorrido (modo historia)" },
         "branch": { "$ref": "#/$defs/kebabId", "default": "main", "description": "Línea vital; por defecto la central (meta.mainBranch, \"main\" si no se indica)" },
         "branchFrom": { "$ref": "#/$defs/kebabId", "description": "Id del evento (de otra rama) del que nace esta rama" },
+        "ledTo": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabId" },
+          "description": "Enlaces causales «esto llevó a»: ids de eventos existentes, distintos de este y no anteriores (lo comprueba validate:data)"
+        },
         "visibility": { "enum": ["public", "private"], "default": "public" }
       }
     }
