@@ -53,6 +53,16 @@ interface LifeData {
   categories: Category[];     // N categorías, definidas en datos, no en código
   events: LifeEvent[];
   branches?: BranchInfo[];    // líneas vitales (opcional)
+  arcs?: Arc[];               // capítulos contiguos sin solape (opcional)
+  story?: { title?: string; path: string[] }; // recorrido del modo historia (opcional)
+}
+interface Arc {
+  id: string;                 // kebab-case único
+  title: string;
+  subtitle?: string;
+  start: string;              // fecha
+  end: string | "present";    // fin incluido; "present" solo en el último
+  summary?: string;
 }
 interface BranchInfo {
   id: string;                 // kebab-case único; debe usarse en algún event.branch (o ser mainBranch)
@@ -86,10 +96,11 @@ interface LifeEvent {
   highlights?: string[];      // logros en viñetas
   links?: { label: string; url: string }[];   // solo http(s)
   media?: { type: "image"; url: string; alt: string }[];
-  importance?: 1 | 2 | 3;     // tamaño/brillo del nodo; por defecto 2
+  importance?: 1 | 2 | 3;     // jerarquía: 1 menor, 2 medio (por defecto), 3 mayor
   branch?: string;            // id de rama; por defecto la central (meta.mainBranch, "main")
   branchFrom?: string;        // id del evento del que nace esta rama (bifurcación)
   visibility?: "public" | "private"; // "private" se oculta salvo ?private=1
+  bridge?: string;            // ≤ 160: frase que conecta con el evento anterior del recorrido
 }
 ```
 
@@ -97,9 +108,22 @@ Reglas de validación (dominio): ids únicos; categorías referenciadas existen;
 fechas con formato válido y `end >= start`; color hex válido; URLs http(s). Líneas: ids únicos y usados
 por algún evento (o `mainBranch`); `origin` y `mergeInto.event` existen; `mergeInto.branch` existe, es
 distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `focus` con fechas válidas,
-`end >= start` y `level` 1–3; `mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
+`end >= start` y `level` 1–3; `arcs` con ids únicos, fechas válidas, `end >= start` y sin solapes;
+`story.path` con ids existentes, sin repetir y en orden cronológico; `bridge` no vacío y ≤ 160;
+`mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
 `"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `origin` ni `mergeInto`.
 Errores acumulados con ruta (`events[3].date.start: ...`, `branches[1].mergeInto.event: ...`), no solo el primero.
+
+Jerarquía, arcos e historia: `importance` 3 = nodo grande con halo, anillo y rótulo siempre; 2 =
+mediano, rótulo al acercarse si cabe; 1 = punto sin halo ni rótulo salvo hover/foco/selección. Los
+rótulos se colocan por prioridad (fijado > mayor > medio > menor) y nunca se solapan. Los arcos son
+separadores verticales etéreos + velo del arco activo en la escena, franja de capítulos sobre la regla
+(se ilumina el de la cámara) y grupos en el índice. Modo historia («Ver la historia», tecla H): recorre
+`story.path` (limitado a lo visible) con vuelos que siguen las líneas (cortes con movimiento reducido),
+pop-up con progreso «3 / 22», arco y `bridge`, Anterior/Siguiente y ←/→ por el recorrido, tarjeta de
+capítulo al entrar en un arco nuevo; sale con Esc o botón. Sin `story.path` no hay botón. En modo
+libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. `build:public-data` quita del recorrido
+los ids privados y conserva los arcos.
 
 Comportamiento visual de las líneas: la central siempre en y = 0, la más brillante y algo más gruesa
 hoy; las que comparten `origin` salen del mismo punto como un haz; la intensidad (brillo/bloom, densidad
@@ -119,7 +143,7 @@ src/
     errors/
   application/
     ports/           # TimelineRepository (out), TimelineView (out), FilterStateStore (out)
-    usecases/        # LoadTimeline, ToggleCategoryFilter, SelectEvent, NavigateEvents
+    usecases/        # LoadTimeline, ToggleCategoryFilter, SelectEvent, NavigateEvents, FollowStory
     TimelineController.ts   # orquesta casos de uso ↔ vista
   infrastructure/
     http/            # HttpJsonTimelineRepository (fetch + fallback)
@@ -135,7 +159,8 @@ src/
 
 ## UX obligatoria
 
-- Línea temporal 3D navegable: arrastrar/scroll para recorrer el tiempo, zoom, y teclas ←/→ para saltar entre eventos.
+- Línea temporal 3D navegable: arrastrar/scroll para recorrer el tiempo, zoom, y teclas ←/→ para saltar entre eventos
+  (de importancia ≥ 2; Mayús+←/→ nodo a nodo). Modo historia guiado por `story.path` (botón y tecla H).
 - Nodo: hover → tooltip (título + fechas); clic/Enter → **pop-up** con todo el detalle del evento; Esc o clic fuera lo cierra; la cámara vuela al nodo.
 - **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados se atenúan/desvanecen con transición, no desaparecen en seco. Estado reflejado en la URL.
 - Marcas de año sobre el eje. HUD con nombre, tagline y contador de eventos visibles.

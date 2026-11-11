@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Comprobación visual automatizada: abre la web en Chrome headless, hace capturas de la escena,
- * de un pop-up, de un filtro activo, de la vista móvil y del fallback sin WebGL.
+ * de un pop-up, de un filtro activo, de la vista móvil, del fallback sin WebGL y del modo historia
+ * (entrar, avanzar dos pasos y la tarjeta de un capítulo nuevo).
  *
  * puppeteer-core NO es dependencia del proyecto. Instálalo fuera del repo y apunta NODE_PATH:
  *   npm i --prefix /tmp/ui-check puppeteer-core
@@ -177,6 +178,55 @@ try {
   await shot(reduced.page, '11-movimiento-reducido.png');
   check(reduced.errors.length === 0, `sin errores de consola (movimiento reducido)${reduced.errors.length ? `: ${reduced.errors.join(' | ')}` : ''}`);
   await reduced.page.close();
+
+  // 5. Modo historia: entrar, dos pasos y una tarjeta de capítulo.
+  console.log('\n[modo historia 1440×900]');
+  const tour = await open({ width: 1440, height: 900 });
+  await sleep(settleMs);
+  const storyButton = await tour.page.$('#story-toggle:not([hidden])');
+  if (!storyButton) {
+    console.log('  ·   los datos no tienen story.path: sin modo historia');
+  } else {
+    const story = () => tour.page.evaluate(() => window.__timelineDebug.story());
+    const cardVisible = () => tour.page.$eval('#chapter', (node) => !node.hidden);
+    await storyButton.click();
+    await sleep(3500);
+    const first = await story();
+    check(first.active && /^1 \/ \d+$/.test(first.step ?? ''), `«Ver la historia» entra en el recorrido (${first.step})`);
+    check(await tour.page.$eval('#popup', (node) => !node.hidden), 'el pop-up acompaña cada paso');
+    console.log(`  ·   tarjeta de capítulo al entrar: ${(await cardVisible()) ? 'sí' : 'no (el primer paso no tiene arco)'}`);
+    await shot(tour.page, '12-historia-inicio.png');
+    await tour.page.keyboard.press('ArrowRight');
+    await sleep(4500);
+    check(/^2 \//.test((await story()).step ?? ''), '→ avanza al paso 2 del recorrido');
+    await shot(tour.page, '13-historia-paso-2.png');
+    await tour.page.keyboard.press('ArrowRight');
+    await sleep(4500);
+    check(/^3 \//.test((await story()).step ?? ''), '→ avanza al paso 3 del recorrido');
+    await shot(tour.page, '14-historia-paso-3.png');
+    const total = Number(((await story()).step ?? '0 / 0').split('/')[1]);
+    let chapter = await cardVisible();
+    for (let i = 3; i < total && !chapter; i += 1) {
+      await tour.page.keyboard.press('ArrowRight');
+      await sleep(2500);
+      chapter = await cardVisible();
+    }
+    if (chapter) {
+      await sleep(2500);
+      await shot(tour.page, '15-historia-capitulo.png');
+      await tour.page.click('#chapter .chapter__continue');
+      await sleep(400);
+      check(!(await cardVisible()), '«Continuar» pasa la tarjeta de capítulo');
+    } else {
+      console.log('  ·   ningún paso abre capítulo (sin arcs)');
+    }
+    await tour.page.keyboard.press('Escape');
+    await sleep(800);
+    check(!(await story()).active, 'Esc sale del modo historia');
+    await shot(tour.page, '16-historia-salida.png');
+  }
+  check(tour.errors.length === 0, `sin errores de consola (historia)${tour.errors.length ? `: ${tour.errors.join(' | ')}` : ''}`);
+  await tour.page.close();
 } finally {
   await browser.close();
 }

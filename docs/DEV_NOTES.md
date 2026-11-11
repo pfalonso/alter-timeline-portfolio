@@ -147,11 +147,50 @@ real es `webgl.ts` y `PostFX.ts`.
   tres veces: validador, `TimelineFactory` y `safeLink()`.
 - `data/` está en `.gitignore` y `.dockerignore`.
 
+19. **Jerarquía de nodos y declutter** (11/11/2026, feedback: «todo parece igual de relevante»).
+    `NODE_TIERS` en `NodeMesh`: el menor (radio 0,17) no tiene halo, jaula, anillo ni satélites en
+    reposo y crece ×1,9 al señalarlo; el medio (0,4) lleva halo suave y jaula; el mayor (0,74),
+    halo amplio y anillo siempre. Rótulos: `labelDistanceLimit` = ∞ / 72 / 0 y `labelPriority` con
+    escalones de 100 por nivel (+1000 fijado, +20 si ya estaba visible para evitar parpadeos). El
+    tamaño de cada rótulo se **mide** (`offsetWidth/Height`) cuando se miden las zonas reservadas
+    (cada 20 fotogramas); la estimación por caracteres se quedaba corta con Instrument Serif y era
+    la causa de los solapes. Un rótulo que se oculta se va en 0,12 s (el que aparece tarda 0,45 s)
+    para que nunca convivan dos en el mismo hueco. Los puntos menores no son obstáculo (un rótulo
+    puede pasarles por encima); los medios y mayores sí. Se prueba una tercera posición (un poco
+    más abajo). El pop-up, el índice, la tarjeta de capítulo y la franja de arcos también reservan.
+20. **Arcos** (`arcs[]`). Contiguos sin solape con la regla «cada arco empieza cuando o después de
+    que empiece el periodo `end` del anterior» (así `end: "2014"` y `start: "2014"` se aceptan; en la
+    frontera gana el arco que empieza). `Timeline.arcAt` devuelve el último arco empezado si aún no ha
+    terminado. En la escena (`ArcBands`) solo hay velo en el arco **activo**: un velo aditivo en
+    todos los arcos, aunque fuera del 0,6 %, se veía como un bloque con borde duro en las zonas
+    oscuras tras la conversión sRGB; el velo se difumina en vertical y un 30 % del ancho por cada lado.
+    Los separadores usan mezcla normal (con aditiva el bloom los convertía en columnas blancas). El
+    arco activo lo decide la X a la que mira la cámara (`CameraRig.lookX`, incluye el desplazamiento
+    por el pop-up). Los títulos van en `ArcStrip`, una franja de 18 px entre la regla y los filtros
+    (hueco que ya existía), no en la zona superior, que ocupa la cabecera en escritorio.
+21. **Modo historia.** Estado en `TimelineController` (`StoryState`: paso, de dónde viene y si abre
+    capítulo) con las reglas en `FollowStory`; el recorrido es `story.path` ∩ visibles. El estado
+    viaja en `SelectionViewState.story` (opcional, para no romper a quien no lo usa) y, fuera del
+    modo, `storyNextId`. Decisiones: cerrar el pop-up, soltar la selección o `Esc` salen de la
+    historia (y `Esc`/salir cierran el detalle); pulsar un nodo del recorrido continúa desde él, uno
+    ajeno sale; el filtro acorta el recorrido y, si oculta el paso actual, sale. El vuelo
+    (`CameraRig.flyAlong`) recorre una ruta de `storyRoute`: X lineal en el tiempo, Y pegada a la
+    línea de salida y mezclada con `smoothstep` hacia la de llegada (recta donde una línea no
+    existe), con `easeInOutCubic`, duración 1,5–3,4 s según la distancia y un alejamiento de hasta 26
+    unidades a mitad de camino. Cualquier gesto, `flyTo` o el movimiento reducido cortan el vuelo.
+    La tarjeta de capítulo (`StoryControls`) no roba el foco (`role="status"`, `aria-live`): ←/→
+    siguen funcionando y «Continuar» devuelve el foco al pop-up. En modo historia `app--story`
+    recoge cabecera, filtros y ayuda (opacidad 0,12; en móvil, ocultos).
+22. **←/→ por importancia.** `NavigateEvents` admite `granularity`: `major` (teclado sin Mayús) busca el
+    siguiente visible con importancia ≥ 2 y, si no queda ninguno, cae al vecino; `all` (Mayús, y los
+    botones del pop-up fuera de la historia) va nodo a nodo como antes.
+
 ## Comprobación visual automatizada
 
 `scripts/ui-check.mjs` abre la web en Chrome headless (WebGL por software) y recorre: escena,
 hover, clic en nodo → pop-up, navegación, `Esc`, filtro (contador + URL), vista general, índice,
-móvil, fallback sin WebGL y movimiento reducido con privados. Guarda capturas numeradas y sale con
+móvil, fallback sin WebGL, movimiento reducido con privados y modo historia (entrar, dos pasos,
+tarjeta de capítulo, salida con `Esc`; capturas 12–16). Guarda capturas numeradas y sale con
 código 1 si falla alguna comprobación (incluidos errores de consola, salvo el 404 esperado de
 `/data/life.json`).
 
@@ -178,6 +217,7 @@ window.__timelineDebug.ready            // boolean: datos cargados
 window.__timelineDebug.webgl            // boolean: escena 3D activa
 window.__timelineDebug.nodes()          // [{ id, x, y, visible }] en píxeles CSS de la ventana
 window.__timelineDebug.open('id')       // abre el pop-up de un evento
+window.__timelineDebug.story()          // { active, step }: modo historia y progreso ("3 / 22")
 ```
 
 ## Estado
