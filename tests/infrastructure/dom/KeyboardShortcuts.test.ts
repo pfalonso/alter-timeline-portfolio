@@ -23,7 +23,7 @@ describe('KeyboardShortcuts', () => {
     const { target, handlers } = setup();
     const right = press(target, 'ArrowRight');
     const left = press(target, 'ArrowLeft');
-    expect(handlers.onNavigate.mock.calls).toEqual([['next'], ['previous']]);
+    expect(handlers.onNavigate.mock.calls).toEqual([['next', 'major'], ['previous', 'major']]);
     expect(right.defaultPrevented).toBe(true);
     expect(left.defaultPrevented).toBe(true);
   });
@@ -33,7 +33,7 @@ describe('KeyboardShortcuts', () => {
     const button = document.createElement('button');
     target.append(button);
     press(button, 'ArrowRight');
-    expect(handlers.onNavigate).toHaveBeenCalledExactlyOnceWith('next');
+    expect(handlers.onNavigate).toHaveBeenCalledExactlyOnceWith('next', 'major');
   });
 
   it.each([['Enter'], [' ']])('%j abre el evento enfocado si el detalle está cerrado', (key) => {
@@ -127,10 +127,42 @@ describe('KeyboardShortcuts', () => {
     const handlers = fakeHandlers();
     shortcuts.bind(handlers);
     press(document.body, 'ArrowRight');
-    expect(handlers.onNavigate).toHaveBeenCalledExactlyOnceWith('next');
+    expect(handlers.onNavigate).toHaveBeenCalledExactlyOnceWith('next', 'major');
     // Si el evento nace en window, el destino no es un Element: no debe fallar.
     shortcuts.applySelection(selection('b-job', false));
     press(window, 'Enter');
     expect(handlers.onEventActivated).toHaveBeenCalledExactlyOnceWith('b-job');
+  });
+});
+
+describe('KeyboardShortcuts: jerarquía y modo historia', () => {
+  const storyState = { index: 1, total: 3, eventId: 'b-job', fromEventId: 'a-school', arcId: null, newChapter: false };
+
+  it('Mayús+←/→ va nodo a nodo', () => {
+    const { target, handlers } = setup();
+    press(target, 'ArrowRight', { shiftKey: true });
+    press(target, 'ArrowLeft', { shiftKey: true });
+    expect(handlers.onNavigate.mock.calls).toEqual([['next', 'all'], ['previous', 'all']]);
+  });
+
+  it('H entra en la historia y, dentro, sale; no actúa escribiendo en un campo', () => {
+    const { target, shortcuts, handlers } = setup();
+    press(target, 'h');
+    expect(handlers.onStoryStart).toHaveBeenCalledTimes(1);
+    shortcuts.applySelection({ ...selection('b-job', true), story: storyState });
+    press(target, 'H');
+    expect(handlers.onStoryExit).toHaveBeenCalledTimes(1);
+    const input = document.createElement('input');
+    target.append(input);
+    press(input, 'h');
+    expect(handlers.onStoryStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('Esc en modo historia sale del recorrido (no solo cierra el pop-up)', () => {
+    const { target, shortcuts, handlers } = setup();
+    shortcuts.applySelection({ ...selection('b-job', true), story: storyState });
+    press(target, 'Escape');
+    expect(handlers.onStoryExit).toHaveBeenCalledTimes(1);
+    expect(handlers.onDetailClosed).not.toHaveBeenCalled();
   });
 });

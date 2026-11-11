@@ -74,8 +74,8 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
   it('los campos del schema coinciden con los del contrato', () => {
     expect(Object.keys(defs.event.properties ?? {}).sort()).toEqual(
       [
-        'branch', 'branchFrom', 'categories', 'date', 'description', 'highlights', 'id', 'importance', 'links', 'location',
-        'media', 'organization', 'shortTitle', 'skills', 'subtitle', 'summary', 'title', 'visibility',
+        'branch', 'branchFrom', 'bridge', 'categories', 'date', 'description', 'highlights', 'id', 'importance', 'links',
+        'location', 'media', 'organization', 'shortTitle', 'skills', 'subtitle', 'summary', 'title', 'visibility',
       ].sort(),
     );
     expect(Object.keys(defs.category.properties ?? {}).sort()).toEqual(['color', 'description', 'icon', 'id', 'label']);
@@ -86,6 +86,24 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
       ['color', 'description', 'focus', 'id', 'label', 'mergeInto', 'origin', 'until'].sort(),
     );
     expect(Object.keys(defs.focusPeriod.properties ?? {}).sort()).toEqual(['end', 'level', 'start']);
+    expect(Object.keys(defs.arc.properties ?? {}).sort()).toEqual(['end', 'id', 'start', 'subtitle', 'summary', 'title']);
+    expect(Object.keys(defs.story.properties ?? {}).sort()).toEqual(['path', 'title']);
+  });
+
+  it('arcos e historia: lo obligatorio del schema es lo que exige el dominio', () => {
+    expect(defs.arc.required).toEqual(['id', 'title', 'start', 'end']);
+    expect(defs.story.required).toEqual(['path']);
+    for (const key of defs.arc.required ?? []) {
+      expect(
+        domainAccepts((data) => {
+          const arc: Record<string, unknown> = { id: 'uno', title: 'Uno', start: '2010', end: '2012' };
+          delete arc[key];
+          Object.assign(data, { arcs: [arc] });
+        }),
+      ).toBe(false);
+    }
+    expect(domainAccepts((data) => Object.assign(data, { story: {} }))).toBe(false);
+    expect(domainAccepts((data) => Object.assign(data, { story: { path: ['a-school'] } }))).toBe(true);
   });
 
   it('líneas vitales: lo obligatorio y las enumeraciones del schema son lo que exige el dominio', () => {

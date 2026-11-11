@@ -25,6 +25,8 @@ Este README es la wiki completa del proyecto: cómo arrancarlo, cómo meter tus 
 
 Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: el eje horizontal es el tiempo y cada evento es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
 
+No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela siguiendo las líneas y cada paso trae una frase que lo enlaza con el anterior.
+
 **Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: qué línea brilla en cada momento. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
 
 Está hecha con Vite, TypeScript estricto y three.js, sin framework de interfaz, con arquitectura hexagonal y servida por nginx dentro de Docker. Tus datos personales nunca entran en el repositorio ni en la imagen: se montan como volumen.
@@ -35,7 +37,11 @@ Está hecha con Vite, TypeScript estricto y three.js, sin framework de interfaz,
 
 | Filtro por categoría | Móvil |
 | --- | --- |
-| ![Una categoría desactivada: sus nodos se atenúan y el contador pasa de 21 a 19](docs/img/05-filtro.png) | <img src="docs/img/08-movil.png" alt="Vista en un móvil, con los filtros en una fila deslizable" width="260"> |
+| ![Una categoría desactivada: sus nodos se atenúan y el contador baja](docs/img/05-filtro.png) | <img src="docs/img/08-movil.png" alt="Vista en un móvil, con los filtros en una fila deslizable" width="260"> |
+
+| Modo historia: tarjeta de capítulo y frase puente |
+| --- |
+| ![Modo historia: a la izquierda la tarjeta del capítulo «Aprender a escuchar»; a la derecha el pop-up con «5 / 16», el capítulo y la frase puente; en medio, el nodo mayor con su anillo](docs/img/12-historia.png) |
 
 Las capturas usan los datos de ejemplo del repositorio (`public/data/life.example.json`), que describen a una persona ficticia.
 
@@ -166,6 +172,8 @@ Raíz del documento:
 | `categories` | lista | Sí | Al menos una categoría |
 | `events` | lista | Sí | Eventos de la línea temporal (puede estar vacía) |
 | `branches` | lista | No | Líneas vitales con nombre, color, nacimiento, fusión y foco (ver `branches[]`) |
+| `arcs` | lista | No | Arcos temporales (capítulos) contiguos: bandas en la escena, franja sobre la regla e índice agrupado (ver `arcs[]`) |
+| `story` | `{ title?, path }` | No | Recorrido del modo historia: ids de eventos en orden cronológico (ver `story`) |
 | `$schema` | texto | No | Referencia al JSON Schema para el autocompletado del editor |
 
 #### `meta`
@@ -207,10 +215,11 @@ Raíz del documento:
 | `highlights` | lista de textos no vacíos | No | Sección «Hitos» |
 | `links` | lista de `{ label, url }` | No | Sección «Enlaces». Solo http(s) |
 | `media` | lista de `{ type: "image", url, alt }` | No | Imágenes del pop-up. `url` http(s); `alt` obligatorio (puede ser vacío) |
-| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Tamaño y brillo del nodo, y a qué distancia de cámara se sigue rotulando |
+| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Jerarquía del nodo (ver 4.1): `3` mayor (grande, halo, anillo y rótulo siempre), `2` medio (rótulo al acercarse), `1` menor (punto sin halo, rótulo solo al señalarlo). ←/→ saltan entre los de importancia ≥ 2 |
 | `branch` | texto kebab-case | No (por defecto la línea central: `meta.mainBranch`, o `"main"`) | Línea (rama) a la que pertenece el evento |
 | `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama (modelo clásico; `branches[].origin` prevalece) |
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
+| `bridge` | texto no vacío, máx. 160 caracteres | No | Frase puente que enlaza con el evento **anterior del recorrido** (`story.path`). Se muestra arriba del pop-up en el modo historia |
 
 #### `branches[]` (opcional)
 
@@ -226,6 +235,37 @@ Describe las líneas vitales. Una línea existe porque algún evento la usa en `
 | `mergeInto` | `{ branch, event }` | No | La línea converge en la línea `branch` a la altura de `event` (que debe pertenecer a `branch`) y termina ahí, con una «costura» de partículas |
 | `until` | `"present"` | No | La línea llega hasta hoy aunque sus eventos hayan terminado (afición latente). Incompatible con `mergeInto` |
 | `focus` | lista de `{ start, end?, level? }` | No | Periodos de foco. `start`/`end` con el formato de fechas; `end` admite `"present"` y, si falta, el foco sigue hasta hoy. `level` `1`, `2` o `3` (por defecto `3`) |
+
+#### `arcs[]` (opcional)
+
+Capítulos de la vida. Son contiguos y no se solapan; un evento pertenece al arco que contiene su `date.start` (en una frontera compartida gana el arco que empieza).
+
+| Campo | Tipo | Obligatorio | Descripción |
+| --- | --- | --- | --- |
+| `id` | texto kebab-case | Sí | Único |
+| `title` | texto no vacío | Sí | Nombre del capítulo: franja de la regla, tarjeta de capítulo, pop-up e índice |
+| `subtitle` | texto | No | Línea secundaria de la tarjeta de capítulo |
+| `start` | fecha | Sí | Inicio (`"YYYY"`, `"YYYY-MM"` o `"YYYY-MM-DD"`) |
+| `end` | fecha o `"present"` | Sí | Fin, incluido (`"2014"` llega al final de 2014). Un arco con `"present"` debe ser el último |
+| `summary` | texto | No | Una o dos frases para la tarjeta de capítulo |
+
+#### `story` (opcional)
+
+| Campo | Tipo | Obligatorio | Descripción |
+| --- | --- | --- | --- |
+| `title` | texto | No | Título del recorrido |
+| `path` | lista de ids de evento | Sí | Pasos del modo historia: ids existentes, sin repetir y en orden cronológico. Los eventos privados ocultos (o filtrados) se saltan. Si falta o queda vacío, el botón «Ver la historia» no aparece |
+
+```json
+{
+  "arcs": [
+    { "id": "aprender", "title": "Aprender a escuchar", "start": "2010-09", "end": "2016-12", "summary": "…" },
+    { "id": "lisboa", "title": "Lisboa", "start": "2017-01", "end": "present" }
+  ],
+  "story": { "title": "Cómo llegué aquí", "path": ["grado", "primer-estudio", "mudanza", "estudio-propio"] },
+  "events": [{ "id": "mudanza", "bridge": "El estudio se queda pequeño: una oferta en Lisboa cierra el capítulo.", "…": "…" }]
+}
+```
 
 **Fechas.** `date.start` y `date.end` admiten tres precisiones: `"YYYY"`, `"YYYY-MM"` o `"YYYY-MM-DD"`. `date.end` admite además `"present"` (evento en curso: su tramo llega hasta hoy y el pop-up muestra «En curso»). Un evento sin `end` es puntual.
 
@@ -260,6 +300,9 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `branches[].mergeInto` | `branch` existe y es distinta; `event` existe y pertenece a `branch`; sin ciclos de fusión; la central no se fusiona |
 | `branches[].until` | Solo `"present"`, y no junto a `mergeInto` |
 | `branches[].focus[]` | Fechas válidas, `end >= start`, `level` 1, 2 o 3 |
+| `arcs[]` | Ids kebab-case únicos; `title` no vacío; `start` y `end` (fecha o `"present"`) obligatorios y válidos; `end >= start`; sin solapes (cada arco empieza cuando o después de que empiece el periodo `end` del anterior; nada después de un arco con `"present"`) |
+| `story.path` | Lista de ids de eventos existentes, sin repetir y en orden cronológico (por `date.start`) |
+| `bridge` | Opcional; si está, texto no vacío de 160 caracteres como máximo |
 
 > [!NOTE]
 > `schema/life.schema.json` describe la **forma** del documento y sirve para el autocompletado del editor. Las reglas cruzadas (unicidad, referencias, `end ≥ start`, ciclos, días reales del mes) no son expresables en JSON Schema: la referencia es `npm run validate:data`. El proyecto no incluye ninguna librería que valide contra el schema.
@@ -399,20 +442,47 @@ docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
 | Ratón | Pasar sobre un nodo | Tooltip con categoría, título y fechas |
 | Ratón | Clic en un nodo | Abre el pop-up y la cámara vuela al nodo |
 | Ratón | Clic en el vacío | Cierra el pop-up; si no hay, suelta el evento enfocado |
-| Teclado | `←` / `→` | Enfoca el evento visible anterior / siguiente (no da la vuelta al llegar al final) |
+| Teclado | `←` / `→` | Enfoca el evento visible anterior / siguiente **de importancia ≥ 2** (si ya no quedan, el vecino); no da la vuelta al llegar al final. En modo historia, siguen el recorrido |
+| Teclado | `Mayús` + `←` / `→` | Nodo a nodo, incluidos los menores |
+| Teclado | `H` | Entra en el modo historia o sale de él |
 | Teclado | `Enter` o `Espacio` | Abre el pop-up del evento enfocado |
-| Teclado | `Esc` | Cierra el pop-up; si no hay, suelta el foco. En el índice, lo cierra |
+| Teclado | `Esc` | Sale del modo historia; si no, cierra el pop-up; si no hay, suelta el foco. En el índice, lo cierra |
 | Teclado | `+` / `-` | Acercar / alejar |
 | Teclado | `0` | Vista general |
 | Táctil | Arrastrar con un dedo | Desplaza la vista |
 | Táctil | Pellizco | Zoom |
 | Táctil | Toque en un nodo | Abre el pop-up |
 | Botones | `+`, `−`, `◇` | Acercar, alejar, vista general |
+| Botones | `Ver la historia` | Entra en el modo historia (solo si hay `story.path`); durante el recorrido pasa a «Salir de la historia» |
 | Botones | `Índice` | Abre o cierra el índice de eventos |
 
 La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cámara y pulso) y `Enter` lo **abre**. Con el pop-up abierto, las flechas cambian de evento sin cerrarlo.
 
-Los rótulos de los nodos aparecen y desaparecen según el zoom: los eventos de `importance` 3 se rotulan siempre, los de 2 y 1 solo cuando la cámara está lo bastante cerca, y nunca se pisan entre sí.
+**Jerarquía de nodos** (`importance`). No todo pesa igual:
+
+| Nivel | Nodo | Rótulo |
+| --- | --- | --- |
+| `3` mayor | Grande, con halo amplio, jaula y anillo siempre visibles | Siempre, en tipografía display |
+| `2` medio | Mediano, halo suave, sin anillo en reposo | Al acercarse (cámara a ≤ 72 unidades) y si cabe |
+| `1` menor | Punto pequeño sin halo, jaula ni satélites | Solo al pasar el ratón, al enfocarlo con el teclado o al seleccionarlo (y entonces crece y se enciende) |
+
+Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: si no caben debajo, encima o un poco más abajo, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
+
+**Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo alineados con la escena; el actual se ilumina (en tramos estrechos se omiten los años o el título).
+
+### Modo historia
+
+El botón **Ver la historia** (o la tecla `H`) recorre `story.path` de nodo en nodo:
+
+- La cámara **vuela siguiendo las líneas**: avanza por el tiempo pegada a la línea del evento de salida y pasa con suavidad a la del de llegada, alejándose un poco a mitad de camino. Con `prefers-reduced-motion` (o `?reduced-motion=1`) son cortes.
+- El pop-up se abre en cada paso con, arriba, el progreso (`3 / 22`), el capítulo actual y la **frase puente** (`bridge`) del evento.
+- `←` / `→`, y los botones **Anterior** / **Siguiente** del pop-up, siguen el recorrido, no la cronología.
+- Al entrar en un capítulo nuevo aparece una **tarjeta de capítulo** (número, título, años, subtítulo y resumen) que se pasa con **Continuar** o con el siguiente paso.
+- Durante el recorrido la cabecera, los filtros y la ayuda se recogen (vuelven al pasar el ratón).
+- Se sale con `Esc`, `H`, **Salir de la historia** o cerrando el pop-up. Pulsar un nodo del recorrido continúa desde él; uno ajeno al recorrido sale.
+- El filtro de categorías también acorta el recorrido; los eventos privados ocultos se saltan.
+
+Fuera del modo historia, el pop-up de un evento que forma parte del recorrido ofrece **Siguiente en la historia →**, que entra en el modo historia desde ahí.
 
 ### 4.2 Filtros por categoría
 
@@ -430,7 +500,7 @@ Los rótulos de los nodos aparecen y desaparecen según el zoom: los eventos de 
 
 ### 4.3 Pop-up de detalle
 
-Muestra, en este orden y solo si hay dato: etiquetas de categoría, título, subtítulo, insignias («En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
+Muestra, en este orden y solo si hay dato: (en modo historia) progreso, capítulo y frase puente; etiquetas de categoría, título, subtítulo, insignias («Capítulo: …» si hay `arcs`, «En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
 
 - En pantallas de 900 px o más de ancho es un panel lateral y la cámara desplaza el encuadre para que el nodo no quede tapado.
 - En pantallas de 720 px o menos ocupa toda la pantalla.
@@ -439,7 +509,7 @@ Muestra, en este orden y solo si hay dato: etiquetas de categoría, título, sub
 
 ### 4.4 Índice accesible
 
-El botón **Índice** abre la lista cronológica de todos los eventos (fecha, título, categoría, línea vital si está declarada y resumen). Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL. El enlace «Saltar al índice de eventos» es el primer elemento enfocable de la página.
+El botón **Índice** abre la lista cronológica de todos los eventos (fecha, título, categoría, línea vital si está declarada y resumen). Con `arcs`, los eventos se agrupan por capítulo bajo un encabezado con su título y sus años (lo que cae fuera de todo arco va a «Otros momentos»); los mayores se destacan con la tipografía display. Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL. El enlace «Saltar al índice de eventos» es el primer elemento enfocable de la página.
 
 ### 4.5 Parámetros de URL
 
@@ -491,15 +561,16 @@ src/
     errors/                    DomainError, InvalidDateError, ValidationError
   application/
     ports/                     TimelineRepository, TimelineView, FilterStateStore
-    usecases/                  LoadTimeline, ToggleCategoryFilter, SelectEvent, NavigateEvents
+    usecases/                  LoadTimeline, ToggleCategoryFilter, SelectEvent, NavigateEvents, FollowStory
     TimelineController.ts
   infrastructure/
     http/                      HttpJsonTimelineRepository
     storage/                   UrlFilterStateStore, readUrlFlag
     dom/                       CompositeTimelineView, Hud, FilterBar, LineLegend, EventPopup, EventList, Tooltip, NodeLabels,
-                               YearRuler, KeyboardShortcuts, LiveAnnouncer, ViewControls, labelLayout, dom, strings
+                               YearRuler, ArcStrip, StoryControls, KeyboardShortcuts, LiveAnnouncer, ViewControls,
+                               labelLayout, dom, strings
     three/                     ThreeTimelineView, SceneBuilder, SceneEffect, NodeMesh, BranchCurve, ParticleFlow,
-                               MergeSeam, Starfield, Nebula, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
+                               MergeSeam, ArcBands, Starfield, Nebula, YearMarkers, SelectionPulse, CameraRig, PointerInput, RenderLoop,
                                PostFX, webgl, math, textures, types
   styles/main.css
 build/personalDataPlugin.ts    plugin de Vite que sirve data/life.json en dev y preview
@@ -588,6 +659,22 @@ classDiagram
         +primaryCategoryOf(event) Category
         +eventsOfBranch(branchId) LifeEvent[]
         +countByCategory() Map
+        +arcs LifeArc[]
+        +storyTitle string
+        +storyPath string[]
+        +arcAt(year) LifeArc
+        +arcOf(event) LifeArc
+        +getArc(id) LifeArc
+    }
+
+    class LifeArc {
+        <<interface>>
+        +id string
+        +title string
+        +subtitle string
+        +start PartialDate
+        +end PartialDate
+        +summary string
     }
 
     class LifeEvent {
@@ -602,6 +689,7 @@ classDiagram
         +branch string
         +branchFrom string
         +isPrivate boolean
+        +bridge string
         +primaryCategoryId string
         +isRange boolean
         +paragraphs string[]
@@ -798,8 +886,14 @@ classDiagram
         +reconcile(visibleIds, current) SelectionState
     }
     class NavigateEvents {
-        +execute(timeline, visibleIds, currentId, direction) string
+        +execute(timeline, visibleIds, currentId, direction, granularity) string
         +neighbours(timeline, visibleIds, currentId)
+    }
+    class FollowStory {
+        +path(timeline, visibleIds) string[]
+        +start(path, fromId) StoryStep
+        +step(path, eventId, direction) StoryStep
+        +isNewChapter(timeline, fromId, toId) boolean
     }
 
     class HttpJsonTimelineRepository {
@@ -831,6 +925,8 @@ classDiagram
     class Tooltip
     class NodeLabels
     class YearRuler
+    class ArcStrip
+    class StoryControls
     class KeyboardShortcuts
     class LiveAnnouncer
 
@@ -841,6 +937,7 @@ classDiagram
     TimelineController --> ToggleCategoryFilter
     TimelineController --> SelectEvent
     TimelineController --> NavigateEvents
+    TimelineController --> FollowStory
     LoadTimeline --> TimelineRepository
     ToggleCategoryFilter --> FilterStateStore
     TimelineView ..> TimelineViewHandlers : bind
@@ -859,6 +956,8 @@ classDiagram
     TimelineViewPart <|.. EventList
     TimelineViewPart <|.. Tooltip
     TimelineViewPart <|.. NodeLabels
+    TimelineViewPart <|.. ArcStrip
+    TimelineViewPart <|.. StoryControls
     TimelineViewPart <|.. YearRuler
     TimelineViewPart <|.. KeyboardShortcuts
     TimelineViewPart <|.. LiveAnnouncer
@@ -908,6 +1007,7 @@ classDiagram
     SceneEffect <|.. BranchCurve
     SceneEffect <|.. ParticleFlow
     SceneEffect <|.. MergeSeam
+    SceneEffect <|.. ArcBands
     SceneEffect <|.. SelectionPulse
     SceneEffect ..> FrameContext
 
@@ -930,6 +1030,7 @@ classDiagram
         +seams MergeSeam[]
         +effects SceneEffect[]
         +pulse SelectionPulse
+        +arcs ArcBands
         +highlightBranch(id) void
         +dispose() void
     }
@@ -1444,7 +1545,7 @@ Además de las reglas recomendadas de ESLint y typescript-eslint:
 
 ### 7.4 Comprobación visual: `scripts/ui-check.mjs`
 
-Abre la web en Chrome sin interfaz (WebGL por software) y recorre el flujo completo: carga, escena, hover con tooltip, clic en nodo con pop-up y foco dentro, navegación, `Esc`, filtro (contador y URL), vista general, índice, móvil, modo sin WebGL y movimiento reducido con privados. Guarda capturas numeradas y termina con código 1 si falla alguna comprobación o hay errores de consola (salvo el 404 esperado de `/data/life.json`).
+Abre la web en Chrome sin interfaz (WebGL por software) y recorre el flujo completo: carga, escena, hover con tooltip, clic en nodo con pop-up y foco dentro, navegación, `Esc`, filtro (contador y URL), vista general, índice, móvil, modo sin WebGL, movimiento reducido con privados y **modo historia** (entrar, dos pasos, tarjeta de capítulo con «Continuar» y salida con `Esc`; capturas 12–16, se omite si los datos no tienen `story.path`). Guarda capturas numeradas y termina con código 1 si falla alguna comprobación o hay errores de consola (salvo el 404 esperado de `/data/life.json`).
 
 `puppeteer-core` no es dependencia del proyecto; se instala aparte:
 
@@ -1473,6 +1574,7 @@ window.__timelineDebug.ready        // boolean: datos cargados
 window.__timelineDebug.webgl        // boolean: escena 3D activa
 window.__timelineDebug.nodes()      // [{ id, x, y, visible }] en píxeles CSS de la ventana
 window.__timelineDebug.open('id')   // abre el pop-up de un evento
+window.__timelineDebug.story()      // { active, step }: modo historia y progreso ("3 / 22")
 ```
 
 </details>

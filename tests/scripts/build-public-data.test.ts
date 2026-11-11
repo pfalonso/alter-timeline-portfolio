@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { LifeData, LifeEventData } from '../../src/domain/model';
 import { LifeDataValidator } from '../../src/domain/services/LifeDataValidator';
 import { toPublicData } from '../../scripts/build-public-data';
-import { makeData, makeEvent, makeLifeLinesData } from '../helpers/fixtures';
+import { makeData, makeEvent, makeLifeLinesData, makeStoryData } from '../helpers/fixtures';
 
 type Raw = Parameters<typeof toPublicData>[0];
 const asRaw = (data: LifeData): Raw => data as unknown as Raw;
@@ -31,6 +31,16 @@ function chained(): LifeData {
 }
 
 describe('toPublicData()', () => {
+  it('quita del recorrido de la historia los pasos privados y conserva los arcos', () => {
+    const data = makeStoryData();
+    const output = toPublicData(asRaw(data));
+    expect(output.story).toEqual({ title: 'La historia de Ada', path: ['a-school', 'b-job', 'c-side', 'e-side-two'] });
+    expect(output.arcs).toEqual(data.arcs);
+    expect(data.story?.path).toContain('d-secret');
+    expect(new LifeDataValidator().validate(output).ok).toBe(true);
+    expect('story' in toPublicData(asRaw(makeData()))).toBe(false);
+  });
+
   it('quita los eventos privados y el campo visibility, sin tocar el original', () => {
     const data = makeData();
     const before = JSON.stringify(data);

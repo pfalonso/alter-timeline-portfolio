@@ -8,7 +8,7 @@ import { SceneBuilder, type BuiltScene } from '../../../src/infrastructure/three
 import { ThreeTimelineView } from '../../../src/infrastructure/three/ThreeTimelineView';
 import type { ProjectedFrame, ProjectedNode } from '../../../src/infrastructure/three/types';
 import { cleanupDom, mount } from '../../helpers/dom';
-import { buildModel, fakeHandlers, selection, type FakeHandlers } from '../../helpers/fixtures';
+import { buildModel, fakeHandlers, makeStoryData, selection, type FakeHandlers } from '../../helpers/fixtures';
 import { ManualScheduler, ManualVisibility } from '../../helpers/three';
 
 /** jsdom no trae ResizeObserver: doble que guarda los callbacks para dispararlos a mano. */
@@ -610,5 +610,70 @@ describe('ThreeTimelineView: líneas vitales', () => {
     h.step(2);
     expect(fog.density).toBeLessThan(near);
     expect(fog.density).toBeGreaterThan(0);
+  });
+});
+
+describe('ThreeTimelineView: arcos y modo historia', () => {
+  const storyModel = buildModel(makeStoryData());
+  const story = (eventId: string, fromEventId: string | null) => ({
+    index: 0,
+    total: 4,
+    eventId,
+    fromEventId,
+    arcId: null,
+    newChapter: false,
+  });
+
+  it('proyecta los arcos en pantalla y marca activo el capítulo en el que está la cámara', () => {
+    const h = harness();
+    h.view.render(storyModel);
+    h.view.applySelection(selection('a-school'));
+    h.step();
+    const arcs = h.last().arcs ?? [];
+    expect(arcs.map((arc) => arc.id)).toEqual(['aprender', 'oficio', 'desvio']);
+    expect(arcs.every((arc) => arc.endX > arc.startX)).toBe(true);
+    expect(arcs.filter((arc) => arc.active).map((arc) => arc.id)).toEqual(['aprender']);
+    expect(h.built.at(-1)?.arcs.active).toBe('aprender');
+  });
+
+  it('de muy cerca, los extremos de arco detrás de la cámara se mandan fuera de pantalla por su lado', () => {
+    const h = harness();
+    h.view.render(storyModel);
+    h.view.applySelection(selection('e-side-two', true));
+    h.view.zoomBy(0.01);
+    h.step();
+    const arcs = h.last().arcs ?? [];
+    // Orden conservado: cada arco empieza donde (o después de donde) acaba el anterior en pantalla.
+    for (let i = 0; i < arcs.length; i += 1) {
+      expect(arcs[i].endX).toBeGreaterThanOrEqual(arcs[i].startX);
+      if (i > 0) expect(arcs[i].startX).toBeGreaterThanOrEqual(arcs[i - 1].startX);
+    }
+    expect(arcs[0].startX).toBeLessThan(0);
+  });
+
+  it('en la historia, el paso siguiente es un vuelo a lo largo del tiempo (no un corte)', () => {
+    const h = harness({ reduced: false });
+    h.view.render(storyModel);
+    h.view.applySelection({ ...selection('a-school', true), story: story('a-school', null) });
+    h.step(400);
+    h.view.applySelection({ ...selection('b-job', true), story: story('b-job', 'a-school') });
+    h.step(20);
+    const mid = h.node('b-job').x;
+    h.step(400);
+    const end = h.node('b-job').x;
+    expect(mid).toBeGreaterThan(end + 50); // a mitad de vuelo el destino aún queda a la derecha
+    // Con el panel lateral el nodo queda desplazado a la izquierda del centro.
+    expect(end).toBeLessThan(600);
+    expect(h.node('b-job').highlighted).toBe(true);
+  });
+
+  it('con movimiento reducido el paso de la historia es un corte', () => {
+    const h = harness({ reduced: true, width: 700 });
+    h.view.render(storyModel);
+    h.view.applySelection({ ...selection('a-school', true), story: story('a-school', null) });
+    h.step();
+    h.view.applySelection({ ...selection('b-job', true), story: story('b-job', 'a-school') });
+    h.step();
+    expect(Math.abs(h.node('b-job').x - 350)).toBeLessThan(12);
   });
 });

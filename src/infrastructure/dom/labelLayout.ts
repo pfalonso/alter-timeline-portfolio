@@ -99,8 +99,19 @@ export function yearStep(pixelsPerYear: number, minLabelSpacing = 56): number {
   return 100;
 }
 
-/** Distancia de cámara a partir de la cual deja de rotularse un nodo de cierta importancia. */
+/**
+ * Distancia de cámara a partir de la cual deja de rotularse un nodo de cierta importancia: los
+ * mayores siempre, los medios al acercarse, los menores nunca (solo con hover, foco o selección).
+ */
 export function labelDistanceLimit(importance: number): number {
   if (importance >= 3) return Infinity;
-  return importance === 2 ? 58 : 30;
+  return importance === 2 ? 72 : 0;
+}
+
+/**
+ * Prioridad de un rótulo en el reparto: fijado (hover/foco) > mayor > medio > menor. Dentro de un
+ * nivel, el que ya estaba visible gana (evita parpadeos) y después el nodo más grande en pantalla.
+ */
+export function labelPriority(importance: number, pinned: boolean, wasShown: boolean, radius: number): number {
+  return (pinned ? 1000 : 0) + importance * 100 + (wasShown ? 20 : 0) + Math.min(radius, 50) * 0.1;
 }

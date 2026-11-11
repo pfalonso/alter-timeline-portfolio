@@ -60,16 +60,16 @@ describe('NodeLabels', () => {
   it('si no cabe debajo, lo coloca encima del nodo', () => {
     const { labels, label } = setup();
     labels.onProjected(frame([node('a-school', 200, 590)]));
-    // y = 590 − 31 − alto del rótulo (34) = 525
-    expect(translation(label('Escuela'))).toEqual([200, 525]);
+    // y = 590 − 31 − alto estimado de un rótulo medio (32) = 527
+    expect(translation(label('Escuela'))).toEqual([200, 527]);
   });
 
-  it('desde lejos solo se rotulan los nodos importantes', () => {
+  it('jerarquía: mayor siempre, medio al acercarse, menor nunca salvo hover/foco', () => {
     const { labels, label } = setup();
     const nodes = [node('a-school', 100, 100), node('b-job', 400, 100), node('c-side', 700, 100)];
-    labels.onProjected(frame(nodes, 20));
-    expect([shown(label('Escuela')), shown(label('Primer trabajo')), shown(label('Proyecto paralelo'))]).toEqual([true, true, true]);
-    labels.onProjected(frame(nodes, 45));
+    labels.onProjected(frame(nodes, 12));
+    expect([shown(label('Escuela')), shown(label('Primer trabajo')), shown(label('Proyecto paralelo'))]).toEqual([true, true, false]);
+    labels.onProjected(frame(nodes, 60));
     expect([shown(label('Escuela')), shown(label('Primer trabajo')), shown(label('Proyecto paralelo'))]).toEqual([true, true, false]);
     labels.onProjected(frame(nodes, 90));
     expect([shown(label('Escuela')), shown(label('Primer trabajo')), shown(label('Proyecto paralelo'))]).toEqual([false, true, false]);
@@ -107,7 +107,8 @@ describe('NodeLabels', () => {
     labels.onProjected(frame([node('a-school', 300, 200), node('b-job', 310, 200)]));
     expect(translation(label('Escuela'))).toEqual([300, 231]);
     expect(shown(label('Primer trabajo'))).toBe(true);
-    expect(translation(label('Primer trabajo'))).toEqual([310, 135]);
+    // Encima: 200 − 31 − alto estimado de un rótulo mayor (40) = 129.
+    expect(translation(label('Primer trabajo'))).toEqual([310, 129]);
   });
 
   it('un rótulo no tapa el disco de otro nodo', () => {
@@ -118,6 +119,17 @@ describe('NodeLabels', () => {
     // Un nodo atenuado no cuenta como obstáculo.
     labels.onProjected(frame([node('a-school', 300, 20), node('b-job', 300, 60, { presence: 0.1 })], 20));
     expect(shown(label('Escuela'))).toBe(true);
+    // Un punto menor tampoco: el rótulo puede pasarle por encima.
+    labels.onProjected(frame([node('a-school', 300, 20), node('c-side', 300, 60)], 20));
+    expect(shown(label('Escuela'))).toBe(true);
+  });
+
+  it('si debajo y encima están ocupados, prueba un poco más abajo', () => {
+    const { labels, label } = setup();
+    // El disco de e-side-two (medio) tapa la posición de debajo; arriba no cabe (borde superior).
+    labels.onProjected(frame([node('a-school', 300, 10), node('e-side-two', 300, 45)], 20));
+    expect(shown(label('Escuela'))).toBe(true);
+    expect(translation(label('Escuela'))[1]).toBeCloseTo(10 + 31 + 32 * 0.75, 5);
   });
 
   it('evita las zonas de interfaz reservadas (cabecera, filtros), medidas respecto a su contenedor', () => {
@@ -158,9 +170,9 @@ describe('NodeLabels', () => {
     const [long, , , short] = [...root.querySelectorAll<HTMLElement>('.node-label')];
     expect(shown(long)).toBe(true);
     expect(shown(short)).toBe(true);
-    // Largo: ancho máximo 230 → centro en 8 + 115. Corto: 1 × 7 + 18 = 25 → centro en 8 + 12,5.
+    // Largo: ancho máximo 230 → centro en 8 + 115. Corto: 1 × 7,2 + 18 = 25,2 → centro en 8 + 12,6.
     expect(translation(long)[0]).toBe(123);
-    expect(translation(short)[0]).toBeCloseTo(20.5);
+    expect(translation(short)[0]).toBeCloseTo(20.6);
   });
 
   it('un rótulo de un nodo junto al borde derecho tampoco se corta', () => {
@@ -197,5 +209,44 @@ describe('NodeLabels', () => {
     new NodeLabels(root).render(unsafeModel(buildModel(), { events: { 'a-school': { title: '<img src=x onerror=alert(1)>' } } }));
     expect(root.querySelector('img')).toBeNull();
     expect(texts(root, '.node-label__title')[0]).toBe('<img src=x onerror=alert(1)>');
+  });
+
+  it('usa el tamaño medido del rótulo en cuanto el DOM tiene layout', () => {
+    const { labels, label } = setup();
+    const element = label('Escuela');
+    Object.defineProperty(element, 'offsetWidth', { configurable: true, value: 300 });
+    Object.defineProperty(element, 'offsetHeight', { configurable: true, value: 50 });
+    labels.onProjected(frame([node('a-school', 4, 590)]));
+    // Centro desplazado a 8 + 150; encima del nodo: 590 − 31 − 50.
+    expect(translation(element)).toEqual([158, 509]);
+  });
+
+  it('declutter: con muchos nodos juntos se rotulan primero los mayores y ningún rótulo pisa a otro', () => {
+    const { labels, label } = setup();
+    // Los tres en el mismo punto: solo caben dos posiciones (debajo/encima).
+    labels.onProjected(frame([node('a-school', 500, 300), node('b-job', 505, 300), node('e-side-two', 510, 300)], 30));
+    expect(shown(label('Primer trabajo'))).toBe(true);
+    expect([shown(label('Escuela')), shown(label('Segunda parte'))].filter(Boolean)).toHaveLength(1);
+  });
+
+  it('abrir el pop-up o cambiar de paso en la historia vuelve a medir las zonas reservadas enseguida', () => {
+    const blocker = mount('div');
+    let calls = 0;
+    blocker.getBoundingClientRect = () => {
+      calls += 1;
+      return { left: 0, right: 10, top: 0, bottom: 10, width: 10, height: 10, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    const root = mount('div');
+    const labels = new NodeLabels(root, [blocker]);
+    labels.render(buildModel());
+    labels.onProjected(frame([]));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(1);
+    labels.applySelection(selection('a-school', true));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(2);
+    labels.applySelection(selection('a-school', true));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(2);
   });
 });

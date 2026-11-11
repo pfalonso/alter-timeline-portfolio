@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampLabelX, labelDistanceLimit, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
+import { clampLabelX, labelDistanceLimit, labelPriority, layoutLabels, yearStep, type LabelCandidate } from '../../../src/infrastructure/dom/labelLayout';
 
 const VIEWPORT = { width: 800, height: 600 };
 
@@ -100,9 +100,31 @@ describe('labelDistanceLimit', () => {
   it('cuanto más importante el nodo, desde más lejos se rotula', () => {
     expect(labelDistanceLimit(3)).toBe(Infinity);
     expect(labelDistanceLimit(4)).toBe(Infinity);
-    expect(labelDistanceLimit(2)).toBe(58);
-    expect(labelDistanceLimit(1)).toBe(30);
+    expect(labelDistanceLimit(2)).toBe(72);
+    expect(labelDistanceLimit(1)).toBe(0);
     expect(labelDistanceLimit(1)).toBeLessThan(labelDistanceLimit(2));
+  });
+});
+
+describe('labelPriority', () => {
+  it('fijado > mayor > medio > menor, sea cual sea el tamaño o la estabilidad', () => {
+    const order = [
+      labelPriority(1, true, false, 1),
+      labelPriority(3, false, false, 1),
+      labelPriority(2, false, true, 50),
+      labelPriority(1, false, true, 50),
+    ];
+    expect([...order].sort((a, b) => b - a)).toEqual(order);
+    expect(labelPriority(2, false, true, 5)).toBeGreaterThan(labelPriority(2, false, false, 40));
+  });
+
+  it('en el reparto, si no caben, se ocultan antes los de menor prioridad y nunca se solapan', () => {
+    const boxes = [
+      { id: 'menor', priority: labelPriority(1, false, false, 10) },
+      { id: 'medio', priority: labelPriority(2, false, false, 10) },
+      { id: 'mayor', priority: labelPriority(3, false, false, 10) },
+    ].map((item) => candidate(item.id, 400, [100], item.priority));
+    expect([...layoutLabels(boxes, VIEWPORT).keys()]).toEqual(['mayor']);
   });
 });
 

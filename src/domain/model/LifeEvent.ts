@@ -29,6 +29,8 @@ export interface LifeEventProps {
   readonly branch: string;
   readonly branchFrom?: string;
   readonly isPrivate: boolean;
+  /** Frase puente con el evento anterior de la historia. */
+  readonly bridge?: string;
 }
 
 /** Evento vital ya validado y normalizado (valores por defecto aplicados). */
@@ -53,6 +55,7 @@ export class LifeEvent implements LifeEventProps {
   readonly branch!: string;
   readonly branchFrom?: string;
   readonly isPrivate!: boolean;
+  readonly bridge?: string;
 
   constructor(props: LifeEventProps) {
     Object.assign(this, props);

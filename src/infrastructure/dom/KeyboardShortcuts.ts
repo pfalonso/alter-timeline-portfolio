@@ -7,7 +7,11 @@ export interface KeyTarget {
 
 const INTERACTIVE = 'button, a, input, select, textarea, [contenteditable]';
 
-/** Atajos globales: ←/→ saltan entre eventos, Enter abre el enfocado, Esc cierra/suelta. */
+/**
+ * Atajos globales: ←/→ saltan al siguiente evento de importancia ≥ 2 (Mayús+←/→ nodo a nodo; en
+ * modo historia, siguen el recorrido), Enter abre el enfocado, H entra o sale de la historia y
+ * Esc sale de la historia, cierra el pop-up o suelta el foco.
+ */
 export class KeyboardShortcuts implements TimelineViewPart {
   private handlers: TimelineViewHandlers | null = null;
   private selection: SelectionViewState | null = null;
@@ -27,14 +31,21 @@ export class KeyboardShortcuts implements TimelineViewPart {
   private onKeyDown(event: KeyboardEvent): void {
     if (!this.handlers || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
     const onControl = event.target instanceof Element && event.target.closest(INTERACTIVE) !== null;
+    const granularity = event.shiftKey ? 'all' : 'major';
     switch (event.key) {
       case 'ArrowRight':
         event.preventDefault();
-        this.handlers.onNavigate('next');
+        this.handlers.onNavigate('next', granularity);
         break;
       case 'ArrowLeft':
         event.preventDefault();
-        this.handlers.onNavigate('previous');
+        this.handlers.onNavigate('previous', granularity);
+        break;
+      case 'h':
+      case 'H':
+        if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) return;
+        if (this.selection?.story) this.handlers.onStoryExit();
+        else this.handlers.onStoryStart();
         break;
       case 'Enter':
       case ' ':
@@ -44,7 +55,8 @@ export class KeyboardShortcuts implements TimelineViewPart {
         this.handlers.onEventActivated(this.selection.focusedEventId);
         break;
       case 'Escape':
-        if (this.selection?.detailOpen) this.handlers.onDetailClosed();
+        if (this.selection?.story) this.handlers.onStoryExit();
+        else if (this.selection?.detailOpen) this.handlers.onDetailClosed();
         else if (this.selection?.focusedEventId) this.handlers.onSelectionCleared();
         break;
     }

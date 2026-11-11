@@ -38,6 +38,14 @@ export interface ProjectedYear {
   readonly inFront: boolean;
 }
 
+/** Capítulo proyectado: X en pantalla de su inicio y su fin; `active` si la cámara está dentro. */
+export interface ProjectedArc {
+  readonly id: string;
+  readonly startX: number;
+  readonly endX: number;
+  readonly active: boolean;
+}
+
 export interface ProjectedFrame {
   readonly nodes: readonly ProjectedNode[];
   readonly years: readonly ProjectedYear[];
@@ -45,6 +53,8 @@ export interface ProjectedFrame {
   readonly nowX: number | null;
   readonly cameraDistance: number;
   readonly viewport: Viewport;
+  /** Arcos temporales (si los datos los declaran). */
+  readonly arcs?: readonly ProjectedArc[];
 }
 
 /** Capas DOM que se colocan siguiendo la proyección de la escena (etiquetas, regla de años). */

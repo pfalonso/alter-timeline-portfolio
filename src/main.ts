@@ -9,6 +9,7 @@ import { TimelineController } from './application/TimelineController';
 import { LoadTimeline, NavigateEvents, SelectEvent, ToggleCategoryFilter } from './application/usecases';
 import { EventFilter, LifeDataValidator, TimelineFactory, TimelineLayout } from './domain/services';
 import { CompositeTimelineView, type TimelineViewPart } from './infrastructure/dom/CompositeTimelineView';
+import { ArcStrip } from './infrastructure/dom/ArcStrip';
 import { EventList } from './infrastructure/dom/EventList';
 import { EventPopup } from './infrastructure/dom/EventPopup';
 import { FilterBar } from './infrastructure/dom/FilterBar';
@@ -17,6 +18,7 @@ import { KeyboardShortcuts } from './infrastructure/dom/KeyboardShortcuts';
 import { LineLegend } from './infrastructure/dom/LineLegend';
 import { LiveAnnouncer } from './infrastructure/dom/LiveAnnouncer';
 import { NodeLabels } from './infrastructure/dom/NodeLabels';
+import { StoryControls } from './infrastructure/dom/StoryControls';
 import { STRINGS } from './infrastructure/dom/strings';
 import { Tooltip } from './infrastructure/dom/Tooltip';
 import { ViewControls } from './infrastructure/dom/ViewControls';
@@ -36,6 +38,8 @@ declare global {
       webgl: boolean;
       nodes(): { id: string; x: number; y: number; visible: boolean }[];
       open(eventId: string): void;
+      /** Estado del modo historia: activo y texto del progreso ("3 / 22"). */
+      story(): { active: boolean; step: string | null };
     };
   }
 }
@@ -69,8 +73,19 @@ async function bootstrap(): Promise<void> {
   );
   const filterStore = new UrlFilterStateStore(window.location, window.history);
   const tooltip = new Tooltip(byId('tooltip'));
-  const labels = new NodeLabels(byId('labels'), [byId('hud'), byId('filters'), byId('controls'), byId('ruler')]);
+  const labels = new NodeLabels(byId('labels'), [
+    byId('hud'),
+    byId('filters'),
+    byId('controls'),
+    byId('ruler'),
+    byId('arc-strip'),
+    byId('chapter'),
+    byId('story-toggle'),
+    byId('popup'),
+    byId('index'),
+  ]);
   const ruler = new YearRuler(byId('ruler'));
+  const arcStrip = new ArcStrip(byId('arc-strip'));
   const eventList = new EventList(byId('index'), byId<HTMLButtonElement>('index-toggle'));
 
   const parts: TimelineViewPart[] = [
@@ -83,6 +98,11 @@ async function bootstrap(): Promise<void> {
     tooltip,
     labels,
     ruler,
+    arcStrip,
+    new StoryControls(byId<HTMLButtonElement>('story-toggle'), byId('chapter'), {
+      app,
+      focusAfterCard: () => document.getElementById('popup'),
+    }),
   ];
 
   const backend = readUrlFlag(href, 'nowebgl') ? null : createWebGLBackend();
@@ -99,7 +119,7 @@ async function bootstrap(): Promise<void> {
       loop: new RenderLoop(),
       reducedMotion,
       hoverListener: tooltip,
-      projectionListeners: [labels, ruler],
+      projectionListeners: [labels, ruler, arcStrip],
       safeInsets: () =>
         measureSafeInsets(
           stage,
@@ -140,6 +160,10 @@ async function bootstrap(): Promise<void> {
       webgl: three !== null,
       nodes: () => three?.getNodeScreenPositions() ?? [],
       open: (eventId) => controller.onEventActivated(eventId),
+      story: () => ({
+        active: app.classList.contains('app--story'),
+        step: document.querySelector('#popup .popup__step')?.textContent ?? null,
+      }),
     };
   }
 }

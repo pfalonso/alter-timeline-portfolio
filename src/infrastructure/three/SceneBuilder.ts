@@ -1,4 +1,5 @@
 import type { TimelineViewModel } from '../../application/ports';
+import { ArcBands } from './ArcBands';
 import { BranchCurve, type BranchStyle } from './BranchCurve';
 import { sampleAlongPath, smoothstep, valueAtX } from './math';
 import { MergeSeam } from './MergeSeam';
@@ -52,6 +53,8 @@ export interface BuiltScene {
   /** Todo lo que se actualiza por fotograma (ramas incluidas). */
   readonly effects: readonly SceneEffect[];
   readonly pulse: SelectionPulse;
+  /** Velos y separadores de los arcos temporales. */
+  readonly arcs: ArcBands;
   dispose(): void;
 }
 
@@ -173,11 +176,13 @@ export class SceneBuilder {
     ];
 
     const pulse = new SelectionPulse(assets.ring);
+    const arcs = new ArcBands(layout.arcs, layout.bounds);
     const flow = new ParticleFlow(flowPaths, { density: 2.6 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
     const effects: SceneEffect[] = [
       new Nebula(palette.nebula),
       new Starfield(starLayers),
       new YearMarkers(layout.years, layout.bounds),
+      arcs,
       ...branches.map(({ curve }) => curve),
       ...spans,
       flow,
@@ -195,6 +200,7 @@ export class SceneBuilder {
       },
       effects,
       pulse,
+      arcs,
       dispose: () => {
         for (const effect of effects) effect.dispose();
         for (const node of nodes) node.dispose();

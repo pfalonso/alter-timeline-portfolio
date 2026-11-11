@@ -186,3 +186,57 @@ export function readTable(table: Float32Array | undefined, t: number): number {
   const i = Math.min(table.length - 2, Math.floor(f));
   return lerp(table[i], table[i + 1], f - i);
 }
+
+/** Y de una polilínea en una X (interpolada); `null` si la X cae fuera de ella. */
+export function yOnLine(points: readonly Vec3[] | undefined, x: number): number | null {
+  if (!points || points.length === 0 || x < points[0].x - 1e-6 || x > points[points.length - 1].x + 1e-6) return null;
+  let lo = 0;
+  let hi = points.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].x <= x) lo = mid;
+    else hi = mid;
+  }
+  const span = points[hi].x - points[lo].x;
+  return lerp(points[lo].y, points[hi].y, span > 0 ? (x - points[lo].x) / span : 0);
+}
+
+/**
+ * Ruta del vuelo del modo historia entre dos nodos: avanza por el tiempo (X) pegada a la línea de
+ * salida y pasa con suavidad a la línea de llegada, en vez de cortar en línea recta. Donde una
+ * línea no llega (antes de nacer o tras cerrarse) se usa la recta entre ambos nodos.
+ */
+export function storyRoute(
+  from: Vec3,
+  to: Vec3,
+  fromLine?: readonly Vec3[],
+  toLine?: readonly Vec3[],
+  samples = 24,
+): { x: number; y: number }[] {
+  const route: { x: number; y: number }[] = [];
+  for (let i = 0; i <= samples; i += 1) {
+    const t = i / samples;
+    const x = lerp(from.x, to.x, t);
+    const straight = lerp(from.y, to.y, t);
+    const a = yOnLine(fromLine, x) ?? straight;
+    const b = yOnLine(toLine, x) ?? straight;
+    const w = smoothstep(0, 1, t);
+    route.push({ x, y: a * (1 - w) + b * w });
+  }
+  route[0] = { x: from.x, y: from.y };
+  route[samples] = { x: to.x, y: to.y };
+  return route;
+}
+
+/** Punto de una ruta (polilínea) en t ∈ [0,1], uniforme en el índice. */
+export function pointOnRoute(route: readonly { x: number; y: number }[], t: number): { x: number; y: number } {
+  if (route.length === 0) return { x: 0, y: 0 };
+  const f = clamp(t, 0, 1) * (route.length - 1);
+  const i = Math.min(route.length - 2, Math.floor(f));
+  if (i < 0) return route[0];
+  const k = f - i;
+  return { x: lerp(route[i].x, route[i + 1].x, k), y: lerp(route[i].y, route[i + 1].y, k) };
+}
+
+/** Curva de aceleración suave (entrada y salida). */
+export const easeInOutCubic = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);

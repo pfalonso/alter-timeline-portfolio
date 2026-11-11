@@ -3,10 +3,13 @@ import type { EventFilter } from '../domain/services';
 import type {
   FilterStateStore,
   NavigationDirection,
+  NavigationGranularity,
+  StoryViewState,
   TimelineView,
   TimelineViewHandlers,
 } from './ports';
 import {
+  FollowStory,
   NO_SELECTION,
   type FilterAction,
   type LoadTimeline,
@@ -24,6 +27,15 @@ export interface TimelineControllerDeps {
   readonly toggleCategoryFilter: ToggleCategoryFilter;
   readonly selectEvent: SelectEvent;
   readonly navigateEvents: NavigateEvents;
+  /** Reglas del modo historia (por defecto, `FollowStory`). */
+  readonly followStory?: FollowStory;
+}
+
+/** Paso actual del modo historia. */
+interface StoryState {
+  readonly eventId: string;
+  readonly fromEventId: string | null;
+  readonly newChapter: boolean;
 }
 
 /** Orquesta casos de uso ↔ vista. Mantiene el estado de sesión (filtro y selección). */
@@ -32,8 +44,12 @@ export class TimelineController implements TimelineViewHandlers {
   private filter: CategorySelection = CategorySelection.all([]);
   private visibleIds: ReadonlySet<string> = new Set();
   private selection: SelectionState = NO_SELECTION;
+  private story: StoryState | null = null;
+  private readonly followStory: FollowStory;
 
-  constructor(private readonly deps: TimelineControllerDeps) {}
+  constructor(private readonly deps: TimelineControllerDeps) {
+    this.followStory = deps.followStory ?? new FollowStory();
+  }
 
   /** Carga los datos y pinta el estado inicial. Devuelve `false` si la carga falla. */
   async start(): Promise<boolean> {
@@ -77,29 +93,75 @@ export class TimelineController implements TimelineViewHandlers {
 
   onDetailClosed(): void {
     if (!this.selection.detailOpen) return;
+    // Cerrar el detalle durante el recorrido es salir de la historia.
+    this.story = null;
     this.selection = { ...this.selection, detailOpen: false };
     this.pushSelection();
   }
 
   onSelectionCleared(): void {
+    this.story = null;
     this.select(null, false);
   }
 
-  onNavigate(direction: NavigationDirection): void {
+  onNavigate(direction: NavigationDirection, granularity: NavigationGranularity = 'all'): void {
     if (!this.timeline) return;
+    // En modo historia ←/→ siguen el recorrido, no la cronología.
+    if (this.story) {
+      this.onStoryStep(direction);
+      return;
+    }
     const target = this.deps.navigateEvents.execute(
       this.timeline,
       this.visibleIds,
       this.selection.focusedEventId,
       direction,
+      granularity,
     );
     if (target !== null) this.select(target, this.selection.detailOpen);
+  }
+
+  onStoryStart(fromEventId?: string): void {
+    if (!this.timeline) return;
+    const step = this.followStory.start(this.followStory.path(this.timeline, this.visibleIds), fromEventId);
+    if (step) this.goToStory(step.eventId, null);
+  }
+
+  onStoryStep(direction: NavigationDirection): void {
+    if (!this.timeline) return;
+    const path = this.followStory.path(this.timeline, this.visibleIds);
+    const current = this.story?.eventId ?? this.selection.focusedEventId;
+    const step = this.followStory.step(path, current, direction);
+    if (step) this.goToStory(step.eventId, current);
+  }
+
+  onStoryExit(): void {
+    if (!this.story) return;
+    this.story = null;
+    this.selection = { ...this.selection, detailOpen: false };
+    this.pushSelection();
+  }
+
+  private goToStory(eventId: string, fromEventId: string | null): void {
+    const timeline = this.timeline as Timeline;
+    this.story = { eventId, fromEventId, newChapter: this.followStory.isNewChapter(timeline, fromEventId, eventId) };
+    this.selection = { focusedEventId: eventId, detailOpen: true };
+    this.pushSelection();
   }
 
   private select(eventId: string | null, openDetail: boolean): void {
     if (!this.timeline) return;
     const next = this.deps.selectEvent.execute(this.timeline, this.visibleIds, this.selection, eventId, openDetail);
     if (next.focusedEventId === this.selection.focusedEventId && next.detailOpen === this.selection.detailOpen) return;
+    // Elegir otro evento durante la historia: si está en el recorrido, se sigue desde él; si no, se sale.
+    if (this.story && next.focusedEventId !== this.story.eventId) {
+      const path = this.followStory.path(this.timeline, this.visibleIds);
+      const id = next.focusedEventId;
+      this.story =
+        id !== null && path.includes(id)
+          ? { eventId: id, fromEventId: this.story.eventId, newChapter: this.followStory.isNewChapter(this.timeline, this.story.eventId, id) }
+          : null;
+    }
     this.selection = next;
     this.pushSelection();
   }
@@ -110,6 +172,7 @@ export class TimelineController implements TimelineViewHandlers {
     this.pushFilter();
     const reconciled = this.deps.selectEvent.reconcile(this.visibleIds, this.selection);
     if (reconciled !== this.selection) this.selection = reconciled;
+    if (this.story && !this.visibleIds.has(this.story.eventId)) this.story = null;
     this.pushSelection();
   }
 
@@ -130,6 +193,34 @@ export class TimelineController implements TimelineViewHandlers {
       this.visibleIds,
       this.selection.focusedEventId,
     );
-    this.deps.view.applySelection({ ...this.selection, ...neighbours });
+    const path = this.followStory.path(this.timeline, this.visibleIds);
+    const story = this.storyView(path);
+    const focused = this.selection.focusedEventId;
+    const next = story || focused === null ? null : this.followStory.step(path, focused, 'next');
+    if (story) {
+      this.deps.view.applySelection({
+        ...this.selection,
+        hasPrevious: story.index > 0,
+        hasNext: story.index < story.total - 1,
+        story,
+      });
+      return;
+    }
+    this.deps.view.applySelection({ ...this.selection, ...neighbours, storyNextId: next?.eventId });
+  }
+
+  private storyView(path: readonly string[]): StoryViewState | undefined {
+    if (!this.story || !this.timeline) return undefined;
+    const index = path.indexOf(this.story.eventId);
+    if (index === -1) return undefined;
+    const event = this.timeline.getEvent(this.story.eventId);
+    return {
+      index,
+      total: path.length,
+      eventId: this.story.eventId,
+      fromEventId: this.story.fromEventId,
+      arcId: (event && this.timeline.arcOf(event)?.id) ?? null,
+      newChapter: this.story.newChapter,
+    };
   }
 }

@@ -1,6 +1,7 @@
 import type { Category } from './Category';
 import type { LifeMetaData } from './LifeData';
 import { MAIN_BRANCH, type LifeEvent } from './LifeEvent';
+import { arcEndYear, arcStartYear, type LifeArc, type Story } from './LifeArc';
 import type { LifeLine } from './LifeLine';
 import type { PartialDate } from './PartialDate';
 
@@ -8,6 +9,12 @@ import type { PartialDate } from './PartialDate';
 export interface ResolvedMerge {
   readonly branch: string;
   readonly event: LifeEvent;
+}
+
+/** Arcos y recorrido de la historia (opcionales). */
+export interface TimelineNarrative {
+  readonly arcs?: readonly LifeArc[];
+  readonly story?: Story;
 }
 
 /** Agregado raíz: eventos ordenados cronológicamente, categorías y líneas vitales (ramas). */
@@ -21,6 +28,12 @@ export class Timeline {
   private readonly eventsById = new Map<string, LifeEvent>();
   private readonly categoriesById = new Map<string, Category>();
   private readonly linesById = new Map<string, LifeLine>();
+  /** Capítulos ordenados por inicio. */
+  readonly arcs: readonly LifeArc[];
+  /** Título del recorrido guiado, si lo hay. */
+  readonly storyTitle?: string;
+  /** Recorrido guiado: solo eventos presentes (los privados ocultos se quitan), en orden. */
+  readonly storyPath: readonly string[];
 
   constructor(
     readonly meta: Readonly<LifeMetaData>,
@@ -29,6 +42,7 @@ export class Timeline {
     /** "Hoy" para los eventos en curso; se inyecta para que todo sea determinista. */
     readonly now: PartialDate,
     lines: readonly LifeLine[] = [],
+    narrative: TimelineNarrative = {},
   ) {
     this.mainBranch = meta.mainBranch ?? MAIN_BRANCH;
     this.lines = [...lines];
@@ -37,6 +51,28 @@ export class Timeline {
     this.events = [...events].sort((a, b) => a.start.compareTo(b.start) || a.id.localeCompare(b.id));
     for (const category of this.categories) this.categoriesById.set(category.id, category);
     for (const event of this.events) this.eventsById.set(event.id, event);
+    this.arcs = [...(narrative.arcs ?? [])].sort((a, b) => a.start.compareTo(b.start) || a.id.localeCompare(b.id));
+    this.storyTitle = narrative.story?.title;
+    this.storyPath = (narrative.story?.path ?? []).filter((id) => this.eventsById.has(id));
+  }
+
+  /** Arco que contiene un año decimal: el último que ya ha empezado, si aún no ha terminado. */
+  arcAt(decimalYear: number): LifeArc | undefined {
+    let found: LifeArc | undefined;
+    for (const arc of this.arcs) {
+      if (arcStartYear(arc) <= decimalYear + 1e-9) found = arc;
+      else break;
+    }
+    return found && decimalYear < arcEndYear(found) ? found : undefined;
+  }
+
+  /** Arco (capítulo) al que pertenece un evento según su fecha de inicio. */
+  arcOf(event: LifeEvent): LifeArc | undefined {
+    return this.arcAt(event.start.toDecimalYear());
+  }
+
+  getArc(id: string): LifeArc | undefined {
+    return this.arcs.find((arc) => arc.id === id);
   }
 
   getEvent(id: string): LifeEvent | undefined {

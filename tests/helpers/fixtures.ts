@@ -156,6 +156,9 @@ export function fakeHandlers(): FakeHandlers {
     onDetailClosed: vi.fn<TimelineViewHandlers['onDetailClosed']>(),
     onSelectionCleared: vi.fn<TimelineViewHandlers['onSelectionCleared']>(),
     onNavigate: vi.fn<TimelineViewHandlers['onNavigate']>(),
+    onStoryStart: vi.fn<TimelineViewHandlers['onStoryStart']>(),
+    onStoryStep: vi.fn<TimelineViewHandlers['onStoryStep']>(),
+    onStoryExit: vi.fn<TimelineViewHandlers['onStoryExit']>(),
   };
 }
 
@@ -166,4 +169,22 @@ export function selection(
   neighbours: { hasPrevious?: boolean; hasNext?: boolean } = {},
 ): { focusedEventId: string | null; detailOpen: boolean; hasPrevious: boolean; hasNext: boolean } {
   return { focusedEventId, detailOpen, hasPrevious: neighbours.hasPrevious ?? true, hasNext: neighbours.hasNext ?? true };
+}
+
+/**
+ * `makeData` con arcos (capítulos) y recorrido de historia: tres arcos contiguos, un recorrido que
+ * incluye el evento privado `d-secret` y frases puente en `b-job` y `e-side-two`.
+ */
+export function makeStoryData(mutate: (data: LifeData) => void = () => undefined): LifeData {
+  const data = makeData();
+  data.arcs = [
+    { id: 'aprender', title: 'Aprender', subtitle: 'La escuela', start: '2010', end: '2014', summary: 'Años de estudio.' },
+    { id: 'oficio', title: 'Oficio', start: '2015', end: '2017' },
+    { id: 'desvio', title: 'Desvío', start: '2018', end: 'present', summary: 'La rama toma el relevo.' },
+  ];
+  data.story = { title: 'La historia de Ada', path: ['a-school', 'b-job', 'c-side', 'd-secret', 'e-side-two'] };
+  data.events[1].bridge = 'Al salir de la escuela, el primer trabajo.';
+  data.events[4].bridge = 'La rama paralela sigue creciendo.';
+  mutate(data);
+  return data;
 }
