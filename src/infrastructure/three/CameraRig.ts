@@ -80,6 +80,11 @@ export class CameraRig {
     return width / 2 / (Math.tan((this.camera.fov * Math.PI) / 360) * Math.max(0.2, this.camera.aspect));
   }
 
+  /** Distancia a la que un alto de mundo dado ocupa la fracción `band` del alto de la ventana. */
+  distanceToFitHeight(height: number, band = 1): number {
+    return height / 2 / (Math.tan((this.camera.fov * Math.PI) / 360) * Math.max(0.05, band));
+  }
+
   /** Arrastre: desplaza el punto de interés según píxeles de pantalla. */
   panByPixels(dx: number, dy: number, viewportHeight: number): void {
     const worldPerPixel = (2 * this.halfHeightAt(this.goal.distance)) / Math.max(1, viewportHeight);

@@ -304,6 +304,95 @@ describe('TimelineLayout: carriles', () => {
   });
 });
 
+describe('TimelineLayout: carriles compactos', () => {
+  const branchEvent = (id: string, start: string, branch: string, extra: Partial<LifeData['events'][number]> = {}): LifeData['events'][number] =>
+    makeEvent({ id, date: { start }, branch, ...extra });
+  /** n ramas abiertas que nacen del tronco casi a la vez (todas conviven hasta hoy). */
+  const concurrent = (n: number): LifeData['events'] => [
+    makeEvent({ id: 'm', date: { start: '2005' } }),
+    ...Array.from({ length: n }, (_, i) =>
+      makeEvent({ id: `e${i}`, date: { start: `2010-01-${String(i + 1).padStart(2, '0')}`, end: 'present' }, branch: `b${String(i).padStart(2, '0')}` }),
+    ),
+  ];
+
+  it('una rama nace en el carril libre más cercano al de su madre, sin cruzar el tronco', () => {
+    const layout = layoutOf(
+      dataWith([
+        makeEvent({ id: 'm', date: { start: '2010' } }),
+        makeEvent({ id: 'up', date: { start: '2011', end: 'present' }, branch: 'arriba' }),
+        makeEvent({ id: 'down', date: { start: '2011-06', end: 'present' }, branch: 'abajo' }),
+        branchEvent('hija', '2013', 'hija', { branchFrom: 'down' }),
+      ]),
+    );
+    expect(branchOf(layout, 'arriba').lane).toBe(1);
+    expect(branchOf(layout, 'abajo').lane).toBe(-1);
+    // Antes habría ido a +2 (alternando); ahora queda junto a su madre, en el mismo lado.
+    expect(branchOf(layout, 'hija').lane).toBe(-2);
+  });
+
+  it('a igual distancia de la madre, prefiere el carril más cercano al tronco', () => {
+    const layout = layoutOf(
+      dataWith([
+        makeEvent({ id: 'm', date: { start: '2010' } }),
+        makeEvent({ id: 'a', date: { start: '2011-01', end: 'present' }, branch: 'ba' }),
+        makeEvent({ id: 'b', date: { start: '2011-02', end: '2012' }, branch: 'bb' }),
+        makeEvent({ id: 'c', date: { start: '2011-03', end: 'present' }, branch: 'bc' }),
+        makeEvent({ id: 'd', date: { start: '2011-04', end: 'present' }, branch: 'bd' }),
+        branchEvent('d2', '2016', 'bd'),
+        branchEvent('e', '2017', 'be', { branchFrom: 'd2' }),
+      ]),
+    );
+    expect(['ba', 'bb', 'bc', 'bd'].map((id) => branchOf(layout, id).lane)).toEqual([1, -1, 2, -2]);
+    // `bb` ya terminó: −1 y −3 están libres y a distancia 1 de −2; gana −1, el más cercano al tronco.
+    expect(branchOf(layout, 'be').lane).toBe(-1);
+  });
+
+  it('el número de carriles depende de las ramas simultáneas, no del total', () => {
+    // 10 ramas en secuencia (cada una termina antes de que nazca la siguiente): un único carril.
+    const sequential = layoutOf(
+      dataWith([
+        makeEvent({ id: 'm', date: { start: '2000' } }),
+        ...Array.from({ length: 10 }, (_, i) => branchEvent(`s${i}`, String(2001 + i * 3), `s${String(i).padStart(2, '0')}`)),
+      ]),
+    );
+    const lanes = new Set(sequential.branches.filter((branch) => branch.id !== 'main').map((branch) => branch.lane));
+    expect(lanes.size).toBe(1);
+
+    for (const n of [2, 5, 8, 10]) {
+      const layout = layoutOf(dataWith(concurrent(n)));
+      const side = layout.branches.filter((branch) => branch.id !== 'main').map((branch) => branch.lane);
+      expect(new Set(side).size).toBe(n);
+      expect(Math.max(...side.map(Math.abs))).toBe(Math.ceil(n / 2));
+    }
+  });
+
+  it('con muchos carriles la separación se comprime, acotada entre el mínimo y el máximo', () => {
+    expect(layoutOf(dataWith(concurrent(2))).laneSpacing).toBe(O.laneSpacing);
+    const eight = layoutOf(dataWith(concurrent(8)));
+    expect(eight.laneSpacing).toBeCloseTo(Math.max(O.minLaneSpacing, O.maxLaneSpread / 4), 3);
+    expect(eight.laneSpacing).toBeLessThan(O.laneSpacing);
+    // Cota: ningún punto se aleja del tronco más que el carril extremo + la ondulación.
+    const reach = 4 * eight.laneSpacing + O.waveAmplitude + 1e-6;
+    for (const point of eight.branches.flatMap((branch) => branch.points)) expect(Math.abs(point.y)).toBeLessThanOrEqual(reach);
+    // Con 20 ramas la separación no baja del mínimo.
+    expect(layoutOf(dataWith(concurrent(20))).laneSpacing).toBe(O.minLaneSpacing);
+  });
+
+  it('la profundidad (Z) se comprime en la misma proporción que la separación', () => {
+    const flat = { waveAmplitude: 0 };
+    const two = layoutOf(dataWith(concurrent(2)), flat);
+    const eight = layoutOf(dataWith(concurrent(8)), flat);
+    const zOf = (layout: TimelineLayoutResult, id: string): number => nodeOf(layout, id).position.z;
+    expect(zOf(two, 'e0')).toBeCloseTo(-O.laneDepth, 3);
+    expect(zOf(eight, 'e0')).toBeCloseTo(-O.laneDepth * (eight.laneSpacing / O.laneSpacing), 3);
+  });
+
+  it('el reparto es determinista aunque cambie el orden de los eventos', () => {
+    const events = concurrent(9);
+    expect(layoutOf(dataWith([...events].reverse()))).toEqual(layoutOf(dataWith(events)));
+  });
+});
+
 describe('TimelineLayout: tramos de duración y límites', () => {
   it('los eventos con duración llevan un tramo (span) sobre su rama; los puntuales no', () => {
     const layout = layoutOf(makeData());

@@ -92,6 +92,26 @@ real es `webgl.ts` y `PostFX.ts`.
 12. **Media**: los datos de ejemplo no llevan imágenes para no depender de terceros. El pop-up las
     soporta (`<img loading="lazy" referrerpolicy="no-referrer">`, se retira la figura si falla).
 
+13. **Carriles compactos** (`TimelineLayout.assignLanes`, 11/11/2026). Con los datos reales (45
+    eventos, 10 ramas, hasta 8 simultáneas) el reparto alterno +1/−1/+2… llevaba ramas hijas al
+    lado contrario de su madre (cruces de 30 unidades) y la separación fija (4,6) daba ±18 de alto.
+    Ahora es un *interval scheduling*: por orden de nacimiento, cada rama toma el carril libre de
+    menor coste = |carril − carril madre| + 1,5 si cruza el tronco; a igual coste, el más cercano al
+    tronco y, para hijas del tronco, el lado con menos carriles ocupados en ese momento. Un carril se
+    libera `0,8` años después del final de su rama. La separación efectiva es
+    `clamp(maxLaneSpread / carril_más_alejado, minLaneSpacing, laneSpacing)` = `[2,6, 4,6]`, y la
+    profundidad Z se escala igual; el resultado expone `laneSpacing`. Con ≤ 2 carriles por lado (el
+    ejemplo) no cambia nada. Datos reales: ±10,7 en vez de ±18,7. No se acortaron las curvas de
+    salida (`blendYears`): con carriles contiguos el salto ya es corto.
+14. **Encuadre con franjas reservadas** (`ThreeTimelineView`). `main.ts` mide `safeInsets`
+    (arriba: controles, y la cabecera solo si ocupa ≥ 60 % del ancho, como en móvil; abajo: borde
+    superior de los filtros, y la ayuda si es ancha). La apertura calcula la extensión vertical de
+    las ramas visibles cerca de hoy (`verticalExtent`) y se aleja lo justo (tope 80) para que quepan
+    en la franja libre, centradas en ella (`bandFraction`/`bandOffset`, franja mínima 35 %). La
+    vista general ajusta ancho **y** alto (tope 105) y los límites Y de la cámara admiten ese
+    desplazamiento. En escritorio la cabecera no reserva franja (ocupa solo la izquierda): las ramas
+    antiguas pasan por detrás de ella, como antes. Los rótulos esquivan también controles y regla.
+
 ## Seguridad
 
 - Todo el contenido del JSON entra por `textContent` (`dom.ts → el()`); no hay `innerHTML`.
@@ -157,6 +177,10 @@ Bloques del encargo (para reanudar si se corta la sesión):
   el usuario ya lo movió a un chip.
 - CI de GitHub en verde (jobs `quality` y `docker`); `main` solo recibe cambios por PR desde `develop`.
 
+Pasada de layout (11/11/2026, rama `feature/layout-carriles`): carriles compactos y encuadre con
+franjas reservadas (decisiones 13 y 14). Cadena de calidad en verde; capturas revisadas con datos
+reales (1600×900 y 390×844) y con el ejemplo.
+
 ## Pendiente / limitaciones conocidas
 
 - No hay enlace profundo a un evento (`?event=id`); solo el filtro vive en la URL.
@@ -164,8 +188,9 @@ Bloques del encargo (para reanudar si se corta la sesión):
   el formato de fechas y el atributo `lang`.
 - El ancho de los rótulos de nodo se estima por número de caracteres (no se mide el DOM). Para
   títulos largos existe `shortTitle`; un rótulo junto al borde se desplaza para verse entero.
-- Las ramas se separan por carriles en Y/Z; con muchas ramas simultáneas (> 4) la escena crece en
-  vertical y habría que revisar el encuadre por defecto.
+- Con más de ~8 ramas simultáneas la separación queda en su mínimo (`minLaneSpacing`) y la escena
+  vuelve a crecer en vertical (el encuadre se aleja para que quepa). Los rótulos esquivan nodos e
+  interfaz, pero no los filamentos: alguno puede quedar sobre una rama.
 - Rendimiento medido solo con renderizado por software (SwiftShader, ~4 fps a 1440×900); no se ha
   podido medir en GPU real. El coste principal son el bloom y la nebulosa procedural a pantalla
   completa.
