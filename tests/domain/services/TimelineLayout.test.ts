@@ -190,6 +190,18 @@ describe('TimelineLayout: líneas y carriles', () => {
     for (const point of main.points.filter((item) => item.x >= 0 && item.x <= STEP)) expect(point.y).toBe(0);
   });
 
+  it('la línea central es una columna recta por la banda, por detrás de los símbolos', () => {
+    for (const data of [makeData(), makeLifeLinesData(), sparseData()]) {
+      const layout = layoutOf(data);
+      const main = layout.branches.find((item) => item.main);
+      if (!main) continue;
+      for (const point of main.points) {
+        expect(point.y).toBe(0);
+        expect(point.z).toBeLessThan(0);
+      }
+    }
+  });
+
   it('si hay nodos de otras líneas en medio, viaja por su carril (amplitud acotada) y no los tapa', () => {
     const layout = layoutOf(sparseData());
     const side = branchOf(layout, 'side');

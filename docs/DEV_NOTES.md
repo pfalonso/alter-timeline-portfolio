@@ -389,3 +389,8 @@ Convenciones:
 - jsdom no trae `ResizeObserver`: `ThreeTimelineView.test.ts` lo sustituye con `vi.stubGlobal`.
 - No hay exclusiones de cobertura nuevas: siguen siendo `main.ts` y los ficheros que solo declaran
   tipos.
+
+### 28. Columna central recta y carriles más cercanos
+
+- La línea central (`mainBranch`) ya no sube a su carril entre nodos: va siempre recta por la banda (y = 0) y un poco por detrás en Z (`mainBehind`), pasando por detrás de los símbolos de otras líneas. Elimina el "diente de sierra" que se veía en la vista general.
+- Los carriles de las demás líneas se acercan a la banda (`laneMin` 0,42 y `laneMax` 0,78 pasos) para que sus curvas de bajada sean cortas y tranquilas.

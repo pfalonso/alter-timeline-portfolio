@@ -103,6 +103,8 @@ export interface LayoutOptions {
   readonly laneMax: number;
   /** Retroceso en Z del carril más alejado (las líneas pasan por detrás de los nodos). */
   readonly laneDepth: number;
+  /** Retroceso en Z de la línea central para que pase por detrás de los símbolos de la banda. */
+  readonly mainBehind: number;
   /** Longitud de la curva que baja del carril a un nodo (o sube), en fracciones de `nodeStep`. */
   readonly ramp: number;
   /** Distancia en X entre muestras de la polilínea. */
@@ -121,9 +123,10 @@ export interface LayoutOptions {
 
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   nodeStep: 3.6,
-  laneMin: 0.6,
-  laneMax: 1.15,
+  laneMin: 0.42,
+  laneMax: 0.78,
   laneDepth: 1.4,
+  mainBehind: 0.25,
   ramp: 0.75,
   sampleStep: 0.3,
   padSteps: 1.2,
@@ -447,6 +450,9 @@ export class TimelineLayout {
     const o = this.options;
     const ramp = o.ramp * o.nodeStep;
     const stations = plan.stations;
+    // La central es la columna vertebral: va siempre recta por la banda y pasa por detrás de los
+    // nodos de otras líneas en lugar de esquivarlos (sin "dientes de sierra").
+    if (plan.main) return { x: round(x), y: 0, z: round(-o.mainBehind) };
     let out: number;
     if (stations.length === 0) out = plan.flatBefore ? 0 : 1;
     else if (x <= stations[0]) out = plan.flatBefore ? 0 : smoothstep((stations[0] - x) / ramp);
