@@ -1,4 +1,4 @@
-import type { Camera, Scene } from 'three';
+import type { Camera, FogExp2, Scene } from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TimelineViewModel } from '../../../src/application/ports';
 import type { NodeHoverListener } from '../../../src/infrastructure/dom/Tooltip';
@@ -533,7 +533,7 @@ describe('ThreeTimelineView: controles de cámara', () => {
     const visible = h.view.getNodeScreenPositions();
     expect(visible.map((node) => node.visible)).toEqual([true, true, true, true]);
     expect(h.last().cameraDistance).toBeGreaterThan(44);
-    expect(h.last().cameraDistance).toBeLessThanOrEqual(105);
+    expect(h.last().cameraDistance).toBeLessThanOrEqual(160);
   });
 
   it('getNodeScreenPositions devuelve píxeles de ventana y marca lo que queda fuera de pantalla', () => {
@@ -577,5 +577,38 @@ describe('ThreeTimelineView: encuadre con franjas reservadas', () => {
     tight.step();
     expect(Number.isFinite(meanY(tight))).toBe(true);
     expect(tight.last().cameraDistance).toBeGreaterThanOrEqual(free.last().cameraDistance);
+  });
+});
+
+describe('ThreeTimelineView: líneas vitales', () => {
+  it('highlightBranch resalta la línea en la escena y se conserva al volver a pintar', () => {
+    const h = harness();
+    h.view.highlightBranch('side');
+    h.step();
+    const curves = (index: number): Record<string, number> =>
+      Object.fromEntries(h.built[index].branches.map((curve) => [curve.id, curve.currentEmphasis]));
+    expect(curves(0).side).toBeGreaterThan(1);
+    expect(curves(0).main).toBeLessThan(1);
+    h.view.render(h.model);
+    h.step();
+    expect(curves(1).side).toBeGreaterThan(1);
+    h.view.highlightBranch(null);
+    h.step();
+    expect(curves(1)).toEqual({ main: 1, side: 1 });
+  });
+
+  it('highlightBranch antes de pintar no falla', () => {
+    expect(() => harness({ render: false }).view.highlightBranch('side')).not.toThrow();
+  });
+
+  it('la niebla se aclara al alejarse (la vista general de una vida larga no se apaga)', () => {
+    const h = harness();
+    h.step();
+    const fog = h.scene().fog as FogExp2;
+    const near = fog.density;
+    h.view.zoomBy(4);
+    h.step(2);
+    expect(fog.density).toBeLessThan(near);
+    expect(fog.density).toBeGreaterThan(0);
   });
 });

@@ -1,5 +1,6 @@
 import {
   AdditiveBlending,
+  BufferAttribute,
   CatmullRomCurve3,
   Color,
   Mesh,
@@ -9,7 +10,7 @@ import {
   type Scene,
 } from 'three';
 import type { Vec3 } from '../../domain/services';
-import { PathTable } from './math';
+import { damp, PathTable, valueAtX } from './math';
 import type { SceneEffect } from './SceneEffect';
 import type { FrameContext } from './types';
 
@@ -24,15 +25,30 @@ export interface BranchStyle {
   /** Velocidad del pulso de energía que recorre la rama. */
   readonly flowSpeed: number;
   readonly fogDensity: number;
+  /** Intensidad de foco (0..1) en cada punto; sin ella, 1 en toda la curva. */
+  readonly focus?: readonly number[];
+  /** Factor de grosor en cada punto (1 = `radius`); sin él, grosor constante. */
+  readonly widths?: readonly number[];
 }
 
+/** Realce de una línea desde la leyenda: neutro, resaltada o atenuada (porque se resalta otra). */
+export type BranchEmphasis = 'none' | 'on' | 'off';
+const EMPHASIS_VALUE: Readonly<Record<BranchEmphasis, number>> = { none: 1, on: 1.7, off: 0.28 };
+
 const VERTEX = /* glsl */ `
+  attribute float aFocus;
+  attribute float aWidth;
+  uniform float uRadius;
   varying vec2 vUv;
   varying float vDepth;
   varying float vRim;
+  varying float vFocus;
   void main() {
     vUv = uv;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vFocus = aFocus;
+    // La normal del tubo es radial: ensanchar es desplazar el vértice a lo largo de ella.
+    vec3 p = position + normal * uRadius * (aWidth - 1.0);
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
     vDepth = -mv.z;
     vec3 n = normalize(normalMatrix * normal);
     vRim = abs(n.z);
@@ -49,9 +65,11 @@ const FRAGMENT = /* glsl */ `
   uniform float uFadeOut;
   uniform float uFlowSpeed;
   uniform float uFogDensity;
+  uniform float uEmphasis;
   varying vec2 vUv;
   varying float vDepth;
   varying float vRim;
+  varying float vFocus;
   void main() {
     float along = vUv.x * uLength;
     // Pulsos de energía que viajan hacia el futuro, a dos escalas.
@@ -66,7 +84,9 @@ const FRAGMENT = /* glsl */ `
     vec3 color = uColor * (0.3 + 0.85 * pulse + 0.2 * ripple) + vec3(0.25) * pulse * pulse;
     // De cerca el filamento se suaviza para no quemar la imagen.
     float near = mix(0.5, 1.0, smoothstep(14.0, 46.0, vDepth));
-    gl_FragColor = vec4(color * uIntensity * core * near, edge * fog);
+    // Foco: fuera de foco la línea sigue ahí, pero tenue (brillo y opacidad bajan juntos).
+    float focus = vFocus * uEmphasis;
+    gl_FragColor = vec4(color * uIntensity * core * near * focus, edge * fog * mix(0.55, 1.0, min(1.0, vFocus)));
   }
 `;
 
@@ -75,6 +95,8 @@ export class BranchCurve implements SceneEffect {
   readonly mesh: Mesh<TubeGeometry, ShaderMaterial>;
   readonly path: PathTable;
   private readonly material: ShaderMaterial;
+  private emphasis = 1;
+  private emphasisTarget = 1;
 
   constructor(
     readonly id: string,
@@ -102,9 +124,29 @@ export class BranchCurve implements SceneEffect {
         uFadeOut: { value: style.fadeOut },
         uFlowSpeed: { value: style.flowSpeed },
         uFogDensity: { value: style.fogDensity },
+        uRadius: { value: style.radius },
+        uEmphasis: { value: 1 },
       },
     });
-    this.mesh = new Mesh(new TubeGeometry(curve, Math.max(8, points.length * 2), style.radius, 6, false), this.material);
+    const segments = Math.max(8, points.length * 2);
+    const radial = 6;
+    const geometry = new TubeGeometry(curve, segments, style.radius, radial, false);
+    // Un valor de foco y de grosor por anillo del tubo, leído en la X de su centro.
+    const focus = new Float32Array((segments + 1) * (radial + 1));
+    const width = new Float32Array(focus.length);
+    const center = new Vector3();
+    for (let i = 0; i <= segments; i += 1) {
+      curve.getPointAt(i / segments, center);
+      const f = valueAtX(points, style.focus, center.x);
+      const w = valueAtX(points, style.widths, center.x);
+      for (let j = 0; j <= radial; j += 1) {
+        focus[i * (radial + 1) + j] = f;
+        width[i * (radial + 1) + j] = w;
+      }
+    }
+    geometry.setAttribute('aFocus', new BufferAttribute(focus, 1));
+    geometry.setAttribute('aWidth', new BufferAttribute(width, 1));
+    this.mesh = new Mesh(geometry, this.material);
     this.mesh.name = `branch:${id}`;
     this.mesh.frustumCulled = false;
   }
@@ -113,8 +155,21 @@ export class BranchCurve implements SceneEffect {
     scene.add(this.mesh);
   }
 
+  /** Resalta o atenúa la línea (leyenda). La transición es suave salvo con movimiento reducido. */
+  setEmphasis(emphasis: BranchEmphasis): void {
+    this.emphasisTarget = EMPHASIS_VALUE[emphasis];
+  }
+
+  /** Realce actual (1 = neutro). */
+  get currentEmphasis(): number {
+    return this.emphasis;
+  }
+
   update(frame: FrameContext): void {
     this.material.uniforms.uTime.value = frame.reducedMotion ? 0 : frame.time;
+    this.emphasis = frame.reducedMotion ? this.emphasisTarget : damp(this.emphasis, this.emphasisTarget, 8, frame.delta);
+    this.material.uniforms.uEmphasis.value = this.emphasis;
+    if (frame.fogDensity !== undefined) this.material.uniforms.uFogDensity.value = frame.fogDensity;
   }
 
   dispose(): void {

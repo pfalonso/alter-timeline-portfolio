@@ -141,3 +141,48 @@ export function verticalExtent(
   }
   return minY <= maxY ? { minY, maxY } : null;
 }
+
+/**
+ * Interpola `values[i]` (uno por punto) en la X dada. Los puntos van en orden creciente de X (como
+ * las polilíneas del layout); fuera del rango devuelve el extremo. Sin valores, 1.
+ */
+export function valueAtX(points: readonly Vec3[], values: readonly number[] | undefined, x: number): number {
+  if (!values || values.length === 0 || points.length === 0) return 1;
+  const n = Math.min(points.length, values.length);
+  if (x <= points[0].x) return values[0];
+  if (x >= points[n - 1].x) return values[n - 1];
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (points[mid].x <= x) lo = mid;
+    else hi = mid;
+  }
+  const span = points[hi].x - points[lo].x;
+  return lerp(values[lo], values[hi], span > 0 ? (x - points[lo].x) / span : 0);
+}
+
+/** Tabla de `samples` valores a lo largo de la longitud de `path` (t uniforme), leídos por X. */
+export function sampleAlongPath(
+  path: PathTable,
+  points: readonly Vec3[],
+  values: readonly number[] | undefined,
+  samples = 64,
+): Float32Array {
+  const table = new Float32Array(samples);
+  const scratch = [0, 0, 0];
+  for (let i = 0; i < samples; i += 1) {
+    path.sample(i / (samples - 1), scratch);
+    table[i] = valueAtX(points, values, scratch[0]);
+  }
+  return table;
+}
+
+/** Lee una tabla uniforme (de `sampleAlongPath`) en t ∈ [0,1] con interpolación lineal. */
+export function readTable(table: Float32Array | undefined, t: number): number {
+  if (!table || table.length === 0) return 1;
+  if (table.length === 1) return table[0];
+  const f = clamp(t, 0, 1) * (table.length - 1);
+  const i = Math.min(table.length - 2, Math.floor(f));
+  return lerp(table[i], table[i + 1], f - i);
+}

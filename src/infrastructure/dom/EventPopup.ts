@@ -122,6 +122,7 @@ export class EventPopup implements TimelineViewPart {
     addFact(STRINGS.with, event.organization);
 
     const origin = event.branchFrom ? timeline.getEvent(event.branchFrom) : undefined;
+    const line = timeline.getLine(event.branch);
 
     append(
       this.body,
@@ -131,7 +132,8 @@ export class EventPopup implements TimelineViewPart {
       el('div', { class: 'popup__badges' }, [
         event.ongoing ? el('span', { class: 'badge badge--live', text: STRINGS.ongoing }) : null,
         event.isPrivate ? el('span', { class: 'badge', text: STRINGS.privateEvent }) : null,
-        origin ? el('span', { class: 'badge badge--branch', text: STRINGS.branchFrom(origin.title) }) : null,
+        line ? el('span', { class: 'badge badge--branch badge--line', text: STRINGS.lineOf(line.label) }) : null,
+        origin && !line ? el('span', { class: 'badge badge--branch', text: STRINGS.branchFrom(origin.title) }) : null,
       ]),
       facts,
       el('p', { class: 'popup__summary', text: event.summary }),

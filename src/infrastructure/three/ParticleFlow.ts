@@ -7,13 +7,20 @@ import {
   ShaderMaterial,
   type Scene,
 } from 'three';
-import { createRandom, smoothstep, type PathTable } from './math';
+import { createRandom, damp, readTable, smoothstep, type PathTable } from './math';
 import type { SceneEffect } from './SceneEffect';
 import type { FrameContext } from './types';
 
 export interface FlowPath {
+  /** Id de la línea (para resaltarla desde la leyenda). */
+  readonly id?: string;
   readonly path: PathTable;
   readonly color: string;
+  /**
+   * Foco a lo largo de la rama (tabla uniforme en t, ver `sampleAlongPath`): fuera de foco hay
+   * menos motas visibles, más lentas y más tenues. Sin tabla, foco pleno.
+   */
+  readonly focus?: Float32Array;
   /**
    * Fracción final de la rama en la que las motas se dispersan y se apagan, como si la rama se
    * deshiciera en polvo (ramas que no llegan al presente). 0 o ausente = final normal.
@@ -65,6 +72,8 @@ export const POINTS_FRAGMENT = /* glsl */ `
 
 interface Particle {
   readonly pathIndex: number;
+  /** Umbral de densidad: la mota solo se ve donde la densidad local lo supera. */
+  readonly rank: number;
   t: number;
   readonly speed: number;
   readonly angle: number;
@@ -83,12 +92,16 @@ export class ParticleFlow implements SceneEffect {
   private readonly positions: Float32Array;
   private readonly alphas: Float32Array;
   private readonly options: ParticleFlowOptions;
+  private readonly emphasis: number[];
+  private readonly emphasisTarget: number[];
 
   constructor(
     private readonly paths: readonly FlowPath[],
     options: Partial<ParticleFlowOptions> = {},
   ) {
     this.options = { ...DEFAULT_FLOW_OPTIONS, ...options };
+    this.emphasis = paths.map(() => 1);
+    this.emphasisTarget = paths.map(() => 1);
     const random = createRandom(this.options.seed);
     const totalLength = paths.reduce((sum, item) => sum + item.path.length, 0);
     const budget = Math.min(this.options.maxParticles, Math.round(totalLength * this.options.density));
@@ -102,6 +115,7 @@ export class ParticleFlow implements SceneEffect {
         const bright = random() < 0.18;
         this.particles.push({
           pathIndex,
+          rank: random(),
           t: random(),
           speed: (0.55 + random() * 0.9) * (bright ? 1.6 : 1),
           angle: random() * Math.PI * 2,
@@ -142,7 +156,24 @@ export class ParticleFlow implements SceneEffect {
     scene.add(this.points);
   }
 
+  /** Resalta las motas de una línea y atenúa las demás; `null` = todas neutras. */
+  highlight(id: string | null): void {
+    this.paths.forEach((item, index) => {
+      this.emphasisTarget[index] = id === null ? 1 : item.id === id ? 1.6 : 0.25;
+    });
+  }
+
+  /** Realce actual de cada ruta (1 = neutro). */
+  get emphasisLevels(): readonly number[] {
+    return this.emphasis;
+  }
+
   update(frame: FrameContext): void {
+    for (let i = 0; i < this.emphasis.length; i += 1) {
+      this.emphasis[i] = frame.reducedMotion
+        ? this.emphasisTarget[i]
+        : damp(this.emphasis[i], this.emphasisTarget[i], 8, frame.delta);
+    }
     this.points.material.uniforms.uScale.value = frame.viewport.height * 0.9;
     // Con movimiento reducido las motas siguen ahí pero casi quietas.
     this.step(frame.delta * (frame.reducedMotion ? 0.12 : 1), frame.time);
@@ -158,10 +189,12 @@ export class ParticleFlow implements SceneEffect {
     const { positions, alphas } = this;
     for (let i = 0; i < this.count; i += 1) {
       const particle = this.particles[i];
-      const { path, dissolve = 0 } = this.paths[particle.pathIndex];
+      const { path, dissolve = 0, focus } = this.paths[particle.pathIndex];
       const tail = dissolve > 0 ? Math.max(0, (particle.t - (1 - dissolve)) / dissolve) : 0;
+      // Foco local: fuera de foco las motas van más despacio, hay menos y brillan menos.
+      const f = readTable(focus, particle.t);
       // En la zona de disolución las motas frenan: se quedan flotando mientras se apagan.
-      const slow = 1 - 0.55 * tail;
+      const slow = (1 - 0.55 * tail) * (0.45 + 0.55 * f);
       particle.t += (particle.speed * this.options.speed * delta * slow) / Math.max(1, path.length);
       if (particle.t > 1) particle.t -= 1;
       path.sample(particle.t, positions, i * 3);
@@ -172,7 +205,9 @@ export class ParticleFlow implements SceneEffect {
       positions[i * 3 + 1] += Math.cos(angle) * orbit + scatter * DISSOLVE_RISE * (0.4 + particle.orbit);
       positions[i * 3 + 2] += Math.sin(angle) * orbit;
       const fadeOut = dissolve > 0 ? 1 - smoothstep(0.45, 1, k) : 1 - smoothstep(0.9, 1, particle.t);
-      alphas[i] = smoothstep(0, 0.04, particle.t) * fadeOut;
+      const density = 0.15 + 0.95 * f;
+      const shown = 1 - smoothstep(density - 0.08, density + 0.08, particle.rank);
+      alphas[i] = smoothstep(0, 0.04, particle.t) * fadeOut * shown * (0.45 + 0.55 * f) * this.emphasis[particle.pathIndex];
     }
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.aAlpha.needsUpdate = true;

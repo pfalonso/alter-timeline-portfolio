@@ -71,10 +71,12 @@ export class EventList implements TimelineViewPart {
     const { timeline } = model;
     for (const event of timeline.events) {
       const category = timeline.primaryCategoryOf(event);
+      const line = timeline.getLine(event.branch);
       const button = el('button', { class: 'index__button', attrs: { type: 'button' } }, [
         el('span', { class: 'index__date', text: event.formatDateRange(timeline.meta.locale, STRINGS.present) }),
         el('span', { class: 'index__name', text: event.title }),
         el('span', { class: 'index__category', text: category?.label ?? '' }),
+        line ? el('span', { class: 'index__line', text: STRINGS.lineOf(line.label) }) : null,
         el('span', { class: 'index__summary', text: event.summary }),
       ]);
       button.style.setProperty('--accent', category?.color ?? '#ffffff');

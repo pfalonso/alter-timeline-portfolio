@@ -49,7 +49,7 @@ describe('CameraRig: objetivo y límites', () => {
     rig.setDistance(1);
     expect(rig.target.distance).toBe(30);
     rig.setDistance(999);
-    expect(rig.target.distance).toBe(110);
+    expect(rig.target.distance).toBe(165);
   });
 
   it('setBounds acota el objetivo actual y los movimientos posteriores', () => {

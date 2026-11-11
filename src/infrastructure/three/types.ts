@@ -14,6 +14,8 @@ export interface FrameContext {
   readonly camera: PerspectiveCamera;
   readonly viewport: Viewport;
   readonly reducedMotion: boolean;
+  /** Densidad de niebla vigente (se aclara al alejarse para que la vista general no se apague). */
+  readonly fogDensity?: number;
 }
 
 export interface ProjectedNode {

@@ -33,4 +33,13 @@ export const STRINGS = {
   loadError: 'No se han podido cargar los datos de la línea temporal.',
   loading: 'Trazando la línea temporal…',
   branchFrom: (title: string): string => `Rama que nace de «${title}»`,
+  lineOf: (label: string): string => `Línea: ${label}`,
+  linesLabel: 'Líneas vitales',
+  linesToggle: (count: number): string => `Líneas vitales (${count})`,
+  lineHint: 'Pasa por encima para resaltarla; clic para fijarla',
+  mainLine: 'Línea principal',
+  currentFocus: 'foco actual',
+  latent: 'latente',
+  closedLine: 'cerrada',
+  mergesInto: (label: string): string => `se une a ${label}`,
 } as const;

@@ -14,6 +14,7 @@ import { EventPopup } from './infrastructure/dom/EventPopup';
 import { FilterBar } from './infrastructure/dom/FilterBar';
 import { Hud } from './infrastructure/dom/Hud';
 import { KeyboardShortcuts } from './infrastructure/dom/KeyboardShortcuts';
+import { LineLegend } from './infrastructure/dom/LineLegend';
 import { LiveAnnouncer } from './infrastructure/dom/LiveAnnouncer';
 import { NodeLabels } from './infrastructure/dom/NodeLabels';
 import { STRINGS } from './infrastructure/dom/strings';
@@ -23,7 +24,7 @@ import { YearRuler } from './infrastructure/dom/YearRuler';
 import { DEFAULT_URLS, HttpJsonTimelineRepository } from './infrastructure/http/HttpJsonTimelineRepository';
 import { readUrlFlag, UrlFilterStateStore } from './infrastructure/storage/UrlFilterStateStore';
 import { RenderLoop } from './infrastructure/three/RenderLoop';
-import { SceneBuilder } from './infrastructure/three/SceneBuilder';
+import { DEFAULT_PALETTE, SceneBuilder } from './infrastructure/three/SceneBuilder';
 import { ThreeTimelineView } from './infrastructure/three/ThreeTimelineView';
 import { createWebGLBackend } from './infrastructure/three/webgl';
 
@@ -74,7 +75,7 @@ async function bootstrap(): Promise<void> {
 
   const parts: TimelineViewPart[] = [
     new Hud(byId('hud')),
-    new FilterBar(byId('filters')),
+    new FilterBar(byId('filter-bar')),
     new EventPopup(byId('popup')),
     new LiveAnnouncer(byId('announcer')),
     new KeyboardShortcuts(window),
@@ -108,6 +109,7 @@ async function bootstrap(): Promise<void> {
     });
     parts.push(three);
     new ViewControls(byId('controls'), three);
+    parts.push(new LineLegend(byId('lines'), three, { fallbackColor: DEFAULT_PALETTE.trunk }));
   } else {
     app.classList.add('app--no-webgl');
     eventList.showAsMainContent(STRINGS.noWebgl);

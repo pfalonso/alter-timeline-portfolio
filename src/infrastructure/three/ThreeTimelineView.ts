@@ -41,6 +41,11 @@ export interface ThreeTimelineViewDeps {
 }
 
 const DEFAULT_DISTANCE = 44;
+/** Tope de la vista general: vidas largas (desde el nacimiento) necesitan alejarse más. */
+const OVERVIEW_MAX_DISTANCE = 160;
+const FOG_DENSITY = 0.0068;
+/** Más allá de esta distancia la niebla se aclara en proporción, para que lo lejano no se apague. */
+const FOG_REFERENCE_DISTANCE = 90;
 /** Tope del alejamiento inicial: más lejos, los nodos se vuelven demasiado pequeños. */
 const OPENING_MAX_DISTANCE = 80;
 /** Margen vertical (mundo) alrededor de las ramas al encuadrar: radio de los nodos y halos. */
@@ -69,6 +74,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   private detailOpen = false;
   private overviewDistance = 80;
   private distanceBeforeDetail: number | null = null;
+  private highlightedBranch: string | null = null;
 
   constructor(private readonly deps: ThreeTimelineViewDeps) {
     const canvas = deps.backend.renderer.domElement;
@@ -105,8 +111,9 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
 
     const built = this.deps.sceneBuilder.build(model);
     this.built = built;
-    this.scene.fog = new FogExp2(DEFAULT_PALETTE.background, 0.0068);
+    this.scene.fog = new FogExp2(DEFAULT_PALETTE.background, FOG_DENSITY);
     for (const effect of built.effects) effect.attach(this.scene);
+    if (this.highlightedBranch !== null) built.highlightBranch(this.highlightedBranch);
     for (const node of built.nodes) {
       this.scene.add(node.group);
       this.nodesById.set(node.eventId, node);
@@ -117,9 +124,9 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const band = bandFraction(this.viewport.height, insets);
     // Vista general: cabe todo el ancho y todo el alto (más margen) dentro de la franja libre.
     this.overviewDistance = Math.min(
-      105,
+      OVERVIEW_MAX_DISTANCE,
       Math.max(
-        this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.04,
+        this.rig.distanceToFitWidth(bounds.maxX - bounds.minX) * 1.1,
         this.rig.distanceToFitHeight(bounds.maxY - bounds.minY + 2 * FRAME_MARGIN, band),
       ),
     );
@@ -135,6 +142,12 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     if (this.deps.reducedMotion()) this.rig.snap();
 
     this.deps.loop.start((delta, time) => this.frame(delta, time));
+  }
+
+  /** Resalta una línea vital en la escena (p. ej. al pasar por la leyenda); `null` la suelta. */
+  highlightBranch(id: string | null): void {
+    this.highlightedBranch = id;
+    this.built?.highlightBranch(id);
   }
 
   applyFilter(state: FilterViewState): void {
@@ -260,7 +273,9 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const reducedMotion = this.deps.reducedMotion();
     this.rig.update(delta, reducedMotion);
     this.camera.updateMatrixWorld();
-    const context: FrameContext = { time, delta, camera: this.camera, viewport: this.viewport, reducedMotion };
+    const fogDensity = FOG_DENSITY * Math.min(1, FOG_REFERENCE_DISTANCE / Math.max(1, this.rig.distance));
+    if (this.scene.fog instanceof FogExp2) this.scene.fog.density = fogDensity;
+    const context: FrameContext = { time, delta, camera: this.camera, viewport: this.viewport, reducedMotion, fogDensity };
     for (const effect of this.built.effects) effect.update(context);
     for (const node of this.built.nodes) node.update(context);
 

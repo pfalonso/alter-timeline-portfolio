@@ -23,7 +23,7 @@ export interface RigOptions {
 
 export const DEFAULT_RIG_OPTIONS: RigOptions = {
   minDistance: 9,
-  maxDistance: 110,
+  maxDistance: 165,
   pitch: 0.16,
   yaw: 0.2,
   damping: 3.2,
