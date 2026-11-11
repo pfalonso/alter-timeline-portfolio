@@ -183,6 +183,7 @@ export class TimelineController implements TimelineViewHandlers {
       activeCategoryIds: this.filter.activeIds,
       visibleEventIds: this.visibleIds,
       totalEvents: this.timeline.events.length,
+      layout: this.deps.loadTimeline.relayout(this.timeline, this.visibleIds),
     });
   }
 

@@ -67,6 +67,11 @@ describe('TimelineController.start', () => {
     expect(ids(view.lastFilter.visibleEventIds)).toEqual(['b-job', 'e-side-two']);
     expect(view.lastFilter.totalEvents).toBe(4);
     expect(store.saved).toEqual([]);
+    // Eje ordinal: el layout del filtro solo coloca los visibles, con paso constante.
+    expect(view.lastFilter.layout?.nodes.map((node) => [node.eventId, node.index])).toEqual([
+      ['b-job', 0],
+      ['e-side-two', 1],
+    ]);
   });
 
   it('un filtro guardado vacío significa "ninguna"', async () => {

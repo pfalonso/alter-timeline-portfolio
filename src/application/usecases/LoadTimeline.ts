@@ -1,4 +1,5 @@
-import type { TimelineFactory, TimelineLayout } from '../../domain/services';
+import type { Timeline } from '../../domain/model';
+import type { TimelineFactory, TimelineLayout, TimelineLayoutResult } from '../../domain/services';
 import type { TimelineRepository, TimelineViewModel } from '../ports';
 
 export interface LoadTimelineOptions {
@@ -23,5 +24,10 @@ export class LoadTimeline {
       now: this.options.clock(),
     });
     return { timeline, layout: this.layout.compute(timeline), source: loaded.source };
+  }
+
+  /** Disposición solo con los eventos visibles (el eje ordinal se recoloca al filtrar). */
+  relayout(timeline: Timeline, visibleIds: ReadonlySet<string>): TimelineLayoutResult {
+    return this.layout.compute(timeline, visibleIds);
   }
 }

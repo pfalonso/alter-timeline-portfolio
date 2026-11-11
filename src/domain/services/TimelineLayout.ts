@@ -1,4 +1,3 @@
-import { arcEndYear, arcStartYear } from '../model/LifeArc';
 import type { LifeEvent } from '../model/LifeEvent';
 import type { Timeline } from '../model/Timeline';
 import { focusIntensityAt } from './LineFocus';
@@ -13,6 +12,8 @@ export interface LayoutNode {
   readonly eventId: string;
   readonly position: Vec3;
   readonly branch: string;
+  /** Posición ordinal (0…n−1) entre los nodos visibles. */
+  readonly index: number;
   /** Para eventos con duración: puntos sobre la rama desde el inicio hasta el fin (o "hoy"). */
   readonly span?: readonly Vec3[];
 }
@@ -21,10 +22,12 @@ export interface LayoutBranch {
   readonly id: string;
   /** Polilínea muestreada de la rama, en orden creciente de X. */
   readonly points: readonly Vec3[];
-  /** Evento del que nace (bifurcación); `null` para el tronco. */
+  /** Evento del que nace (bifurcación); `null` para la central o si no tiene origen visible. */
   readonly originEventId: string | null;
-  /** Carril: 0 = tronco; positivos hacia arriba, negativos hacia abajo. */
+  /** Carril: 0 = central; positivos arriba, negativos abajo (orden de reparto). */
   readonly lane: number;
+  /** Altura (Y) del carril por el que viaja la línea entre sus nodos. */
+  readonly laneY: number;
   /** `true` si la rama sigue viva hoy (no se desvanece al final). */
   readonly open: boolean;
   /** `true` para la línea central (`meta.mainBranch`). */
@@ -41,7 +44,7 @@ export interface LayoutMerge {
   readonly position: Vec3;
 }
 
-/** Enlace causal («esto llevó a esto»): hebra de tinta del nodo origen al nodo destino. */
+/** Enlace causal («esto llevó a esto»): arco por encima de la banda, del nodo origen al destino. */
 export interface LayoutLink {
   readonly from: string;
   readonly to: string;
@@ -52,13 +55,14 @@ export interface LayoutLink {
   readonly points: readonly Vec3[];
 }
 
-/** Capítulo proyectado sobre el eje X. */
+/** Capítulo proyectado sobre el eje X: abarca sus nodos (medio paso de margen a cada lado). */
 export interface LayoutArc {
   readonly id: string;
   readonly startX: number;
   readonly endX: number;
 }
 
+/** Marca de año: en el primer nodo de cada año (solo donde cambia el año entre nodos consecutivos). */
 export interface YearMark {
   readonly year: number;
   readonly x: number;
@@ -76,116 +80,112 @@ export interface TimelineLayoutResult {
   readonly branches: readonly LayoutBranch[];
   readonly years: readonly YearMark[];
   readonly bounds: LayoutBounds;
-  /** X correspondiente a "hoy". */
+  /** X correspondiente a "hoy" (medio paso largo tras el último nodo). */
   readonly nowX: number;
-  /** Separación vertical efectiva entre carriles (puede ser menor que `laneSpacing`). */
+  /** Separación entre nodos consecutivos (paso constante del eje ordinal). */
+  readonly nodeStep: number;
+  /** Separación vertical entre carriles contiguos. */
   readonly laneSpacing: number;
-  /** Arcos temporales (capítulos) en X, en orden. */
+  /** Arcos temporales (capítulos) en X, en orden; solo los que tienen nodos visibles. */
   readonly arcs: readonly LayoutArc[];
   /** Enlaces causales entre eventos visibles. */
   readonly links: readonly LayoutLink[];
-  /** Banda narrativa: extensión vertical de los nodos (todos viven cerca de y = 0). */
+  /** Banda narrativa: extensión vertical de los nodos (todos en y = 0). */
   readonly band: { readonly minY: number; readonly maxY: number };
 }
 
 export interface LayoutOptions {
-  /** Unidades de mundo por año (eje X = tiempo). */
-  readonly unitsPerYear: number;
-  /** Separación vertical entre carriles (la máxima; se comprime si hay muchos carriles). */
-  readonly laneSpacing: number;
-  /** Separación vertical mínima: la compresión nunca baja de aquí. */
-  readonly minLaneSpacing: number;
-  /** Altura objetivo (por encima o por debajo del tronco) del carril más alejado. */
-  readonly maxLaneSpread: number;
-  /** Retroceso en Z por carril. */
+  /** Distancia en X entre nodos consecutivos (eje ordinal: no depende de las fechas). */
+  readonly nodeStep: number;
+  /** Carril más cercano a la banda, en fracciones de `nodeStep`. */
+  readonly laneMin: number;
+  /** Carril más alejado de la banda, en fracciones de `nodeStep`. */
+  readonly laneMax: number;
+  /** Retroceso en Z del carril más alejado (las líneas pasan por detrás de los nodos). */
   readonly laneDepth: number;
-  /** Años que tarda una rama en alcanzar su carril tras bifurcarse. */
-  readonly blendYears: number;
-  /** Años que tarda en abrirse una línea con `origin` declarado (haz desde el nacimiento). */
-  readonly bundleBlendYears: number;
-  /** Años que dura la curva de convergencia de una línea que se fusiona. */
-  readonly mergeBlendYears: number;
+  /** Longitud de la curva que baja del carril a un nodo (o sube), en fracciones de `nodeStep`. */
+  readonly ramp: number;
   /** Distancia en X entre muestras de la polilínea. */
   readonly sampleStep: number;
-  /** Años de margen antes del primer evento y después de "hoy". */
-  readonly padYears: number;
-  /** Años que se prolonga (desvaneciéndose) una rama cerrada tras su último evento. */
-  readonly tailYears: number;
-  /** Separación mínima en X entre nodos consecutivos de una misma rama. */
-  readonly minNodeGap: number;
-  /** Amplitud de la ondulación orgánica de las ramas. */
-  readonly waveAmplitude: number;
-  /** Media altura de la banda narrativa donde viven los nodos. */
-  readonly bandHalfHeight: number;
-  /** Desfase vertical de los nodos por carril dentro de la banda. */
-  readonly bandLaneStep: number;
-  /** Separación vertical mínima entre nodos que coinciden en fecha (se apilan). */
-  readonly stackGap: number;
-  /** Distancia en X por debajo de la cual dos nodos «coinciden» y se apilan. */
-  readonly stackDx: number;
-  /** Distancia en X que tarda una línea en salir de la banda (o volver a ella) junto a un nodo. */
-  readonly pinchX: number;
+  /** Margen antes del primer nodo, en pasos. */
+  readonly padSteps: number;
+  /** Distancia de "hoy" tras el último nodo, en pasos. */
+  readonly nowSteps: number;
+  /** Prolongación (desvaneciéndose) de una rama cerrada tras su último nodo, en pasos. */
+  readonly tailSteps: number;
+  /** Altura mínima y máxima de los arcos causales; crecen `linkRise` por paso salvado. */
+  readonly linkMinHeight: number;
+  readonly linkMaxHeight: number;
+  readonly linkRise: number;
 }
 
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
-  unitsPerYear: 5,
-  laneSpacing: 3.6,
-  minLaneSpacing: 1.7,
-  maxLaneSpread: 6.5,
-  laneDepth: 2.4,
-  blendYears: 1.1,
-  bundleBlendYears: 2.6,
-  mergeBlendYears: 2.2,
-  sampleStep: 0.5,
-  padYears: 1.2,
-  tailYears: 0.9,
-  minNodeGap: 1.7,
-  waveAmplitude: 0.7,
-  bandHalfHeight: 1.5,
-  bandLaneStep: 0.42,
-  stackGap: 1.25,
-  stackDx: 1.4,
-  pinchX: 3.2,
+  nodeStep: 3.6,
+  laneMin: 0.6,
+  laneMax: 1.15,
+  laneDepth: 1.4,
+  ramp: 0.75,
+  sampleStep: 0.3,
+  padSteps: 1.2,
+  nowSteps: 0.8,
+  tailSteps: 0.7,
+  linkMinHeight: 1.6,
+  linkMaxHeight: 6.5,
+  linkRise: 0.45,
 };
-
-interface Anchor {
-  readonly x: number;
-  readonly y: number;
-}
 
 interface BranchPlan {
   readonly id: string;
   readonly main: boolean;
   readonly order: number;
-  readonly events: LifeEvent[];
-  readonly origin: LifeEvent | null;
-  /** Unidades de X que tarda en alcanzar su carril. */
-  readonly blendX: number;
-  merge: { readonly target: BranchPlan; readonly event: LifeEvent; readonly x: number; readonly blendX: number } | null;
+  /** X de los nodos visibles de la línea, en orden. */
+  readonly anchors: readonly number[];
+  /** Estaciones: puntos en los que la línea toca la banda (origen, nodos, fusión). */
+  stations: number[];
+  origin: LifeEvent | null;
+  merge: { readonly event: LifeEvent; readonly into: string; readonly x: number } | null;
   startX: number;
   endX: number;
   open: boolean;
   lane: number;
   laneY: number;
   laneZ: number;
-  originPosition: Vec3;
-  /** Nodos de la línea dentro de la banda, ordenados por X: la línea pasa por cada uno. */
-  anchors: Anchor[];
+  /** Si la línea va por la banda antes de su primera estación / después de la última. */
+  flatBefore: boolean;
+  flatAfter: boolean;
 }
 
-/** Coste de mover una rama de su carril madre a otro: distancia en carriles + castigo por cruzar el tronco. */
+/** Coste de mover una rama de su carril madre a otro: distancia en carriles + castigo por cruzar la central. */
 const TRUNK_CROSSING_COST = 1.5;
 const MAX_LANE = 64;
+const EPS = 1e-6;
 
-const smoothstep = (t: number): number => {
+/** Curva de Hermite con tangentes horizontales: monótona y sin *overshoot*. */
+export const smoothstep = (t: number): number => {
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
 };
 const round = (value: number): number => Math.round(value * 1000) / 1000 || 0;
 
 /**
- * Posiciona nodos y ramas. Puro y determinista: mismo `Timeline` → mismo resultado.
- * El eje X es el tiempo; cada rama se desvía en Y/Z desde el evento `branchFrom`.
+ * Orden ordinal: fecha, después importancia (mayor primero), la línea central antes que las demás
+ * y, por último, el id. Determinista.
+ */
+export function compareOrdinal(a: LifeEvent, b: LifeEvent, mainBranch: string): number {
+  return (
+    a.start.toDecimalYear() - b.start.toDecimalYear() ||
+    b.importance - a.importance ||
+    Number(b.branch === mainBranch) - Number(a.branch === mainBranch) ||
+    a.id.localeCompare(b.id)
+  );
+}
+
+/**
+ * Posiciona nodos y líneas. Puro y determinista: mismo `Timeline` (y mismos visibles) → mismo
+ * resultado. El eje X es **ordinal**: los nodos visibles, en orden cronológico, se separan siempre
+ * `nodeStep`, sin escala temporal. Todos viven en la banda (y = 0); cada línea pasa por los suyos y,
+ * entre dos nodos suyos separados por otros, viaja por su carril (cerca y tenue) con curvas cortas
+ * y monótonas para bajar y subir.
  */
 export class TimelineLayout {
   private readonly options: LayoutOptions;
@@ -194,46 +194,31 @@ export class TimelineLayout {
     this.options = { ...DEFAULT_LAYOUT_OPTIONS, ...options };
   }
 
-  compute(timeline: Timeline): TimelineLayoutResult {
+  compute(timeline: Timeline, visibleIds?: ReadonlySet<string>): TimelineLayoutResult {
     const o = this.options;
-    const range = timeline.yearRange;
-    const originYear = Math.floor(range.start);
-    const toX = (decimalYear: number): number => (decimalYear - originYear) * o.unitsPerYear;
-    const nowX = toX(timeline.now.toDecimalYear());
-    const lastX = Math.max(nowX, toX(range.end));
+    const step = o.nodeStep;
+    const isVisible = (event: LifeEvent | undefined): event is LifeEvent =>
+      event !== undefined && (visibleIds === undefined || visibleIds.has(event.id));
+    const ordered = timeline.events.filter(isVisible).sort((a, b) => compareOrdinal(a, b, timeline.mainBranch));
+    const nodeX = new Map(ordered.map((event, index) => [event.id, index * step]));
+    const lastNodeX = Math.max(0, (ordered.length - 1) * step);
+    const nowX = ordered.length > 0 ? lastNodeX + o.nowSteps * step : 0;
+    const firstX = -o.padSteps * step;
+    const endX = nowX + o.padSteps * step * 0.5;
+    const yearAtX = this.yearScale(ordered, nowX, timeline.now.toDecimalYear());
+    const xAtYear = (year: number): number => this.inverse(ordered, nowX, timeline.now.toDecimalYear(), year);
 
-    const nodeX = this.assignNodeX(timeline, toX);
-    const plans = this.planBranches(timeline, nodeX, toX, toX(range.start), lastX);
-    const planById = new Map(plans.map((plan) => [plan.id, plan]));
-    this.planMerges(timeline, plans, planById, nodeX);
+    const plans = this.planBranches(timeline, ordered, nodeX, isVisible, { firstX, endX, lastNodeX });
     const laneSpacing = this.assignLanes(plans);
-    const nodeY = this.assignBand(timeline, plans, planById, nodeX);
 
-    const resolved = new Set<string>();
-    const positionOn = (plan: BranchPlan, x: number): Vec3 => this.pointOnBranch(plan, x);
-    const resolveOrigin = (plan: BranchPlan): void => {
-      if (resolved.has(plan.id)) return;
-      resolved.add(plan.id);
-      if (plan.merge) resolveOrigin(plan.merge.target);
-      if (!plan.origin) return;
-      const parent = planById.get(plan.origin.branch);
-      if (!parent || parent === plan) return;
-      resolveOrigin(parent);
-      // Normalmente startX es la X del evento de origen y la rama sale de su nodo. Si la rama tiene
-      // eventos anteriores a su origen, empieza antes: entonces se separa de la línea madre a esa
-      // altura (en la misma X), en vez de nacer «flotando» con la Y/Z del nodo de origen.
-      plan.originPosition = positionOn(parent, Math.min(nodeX.get(plan.origin.id) ?? plan.startX, plan.startX));
-    };
-    plans.forEach(resolveOrigin);
-
-    const nodes: LayoutNode[] = timeline.events.map((event) => {
-      const plan = planById.get(event.branch) as BranchPlan;
+    const nodes: LayoutNode[] = ordered.map((event, index) => {
       const x = nodeX.get(event.id) as number;
-      const node: LayoutNode = { eventId: event.id, position: positionOn(plan, x), branch: event.branch };
+      const node: LayoutNode = { eventId: event.id, position: { x: round(x), y: 0, z: 0 }, branch: event.branch, index };
       if (!event.isRange) return node;
-      const endX = event.ongoing ? nowX : toX((event.end ?? event.start).toDecimalYear());
-      if (endX - x < o.sampleStep) return node;
-      return { ...node, span: this.sample(plan, x, Math.min(endX, plan.endX)) };
+      const plan = plans.find((item) => item.id === event.branch) as BranchPlan;
+      const spanEnd = Math.min(plan.endX, event.ongoing ? nowX : xAtYear((event.end ?? event.start).toDecimalYear()));
+      if (spanEnd - x < o.sampleStep) return node;
+      return { ...node, span: this.sample(plan, x, spanEnd) };
     });
 
     const branches: LayoutBranch[] = plans.map((plan) => {
@@ -244,170 +229,155 @@ export class TimelineLayout {
         points,
         originEventId: plan.origin?.id ?? null,
         lane: plan.lane,
+        laneY: round(plan.laneY),
         open: plan.open,
         main: plan.main,
-        focus: points.map((point) => focusIntensityAt(line, originYear + point.x / o.unitsPerYear)),
-        merge: plan.merge ? { into: plan.merge.target.id, eventId: plan.merge.event.id, position: points[points.length - 1] } : null,
+        focus: points.map((point) => focusIntensityAt(line, yearAtX(point.x))),
+        merge: plan.merge ? { into: plan.merge.into, eventId: plan.merge.event.id, position: points[points.length - 1] } : null,
       };
     });
 
-    const nodePosition = new Map(nodes.map((node) => [node.eventId, node]));
-    const links: LayoutLink[] = timeline.causalLinks.flatMap((link, index) => {
-      const a = nodePosition.get(link.from);
-      const b = nodePosition.get(link.to);
-      if (!a || !b) return [];
-      return [{ from: link.from, to: link.to, fromBranch: a.branch, toBranch: b.branch, points: this.strand(a.position, b.position, index) }];
+    const byId = new Map(nodes.map((node) => [node.eventId, node]));
+    const links: LayoutLink[] = timeline.causalLinks.flatMap((link) => {
+      const a = byId.get(link.from);
+      const b = byId.get(link.to);
+      if (!a || !b || b.position.x <= a.position.x) return [];
+      return [{ from: link.from, to: link.to, fromBranch: a.branch, toBranch: b.branch, points: this.arch(a.position.x, b.position.x) }];
     });
-    const ys = [...nodeY.values()];
 
     const years: YearMark[] = [];
-    const firstYear = Math.ceil(originYear + plans[0].startX / o.unitsPerYear);
-    // No se rotulan años que aún no han empezado.
-    const lastYear = Math.floor(originYear + lastX / o.unitsPerYear);
-    for (let year = firstYear; year <= lastYear; year += 1) years.push({ year, x: toX(year) });
-
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (const branch of branches) {
-      for (const point of branch.points) {
-        minY = Math.min(minY, point.y);
-        maxY = Math.max(maxY, point.y);
-        minX = Math.min(minX, point.x);
-        maxX = Math.max(maxX, point.x);
-      }
-    }
-    const arcs: LayoutArc[] = timeline.arcs.map((arc) => {
-      const end = arcEndYear(arc);
-      return {
-        id: arc.id,
-        startX: round(toX(arcStartYear(arc))),
-        endX: round(Number.isFinite(end) ? Math.min(toX(end), Math.max(lastX, maxX)) : Math.max(lastX, maxX)),
-      };
+    ordered.forEach((event, index) => {
+      const year = event.start.year;
+      if (index === 0 || ordered[index - 1].start.year !== year) years.push({ year, x: round(index * step) });
     });
+
+    const arcs: LayoutArc[] = timeline.arcs.flatMap((arc, index) => {
+      const xs = ordered.filter((event) => timeline.arcOf(event)?.id === arc.id).map((event) => nodeX.get(event.id) as number);
+      if (xs.length === 0) return [];
+      const last = index === timeline.arcs.length - 1;
+      const start = Math.min(...xs) - step / 2;
+      const end = Math.max(...xs) + step / 2;
+      return [{ id: arc.id, startX: round(start), endX: round(last && arc.end === null ? Math.max(end, endX) : end) }];
+    });
+
+    let minY = 0;
+    let maxY = 0;
+    for (const point of [...branches.flatMap((branch) => branch.points), ...links.flatMap((link) => link.points)]) {
+      minY = Math.min(minY, point.y);
+      maxY = Math.max(maxY, point.y);
+    }
     return {
       nodes,
       branches,
       years,
-      bounds: { minX, maxX, minY, maxY },
+      bounds: { minX: round(firstX), maxX: round(endX), minY, maxY },
       nowX: round(nowX),
+      nodeStep: step,
       laneSpacing: round(laneSpacing),
       arcs,
       links,
-      band: { minY: ys.length ? Math.min(...ys) : 0, maxY: ys.length ? Math.max(...ys) : 0 },
+      band: { minY: 0, maxY: 0 },
     };
   }
 
-  /** X de cada nodo, separando los que caerían demasiado juntos en la misma rama. */
-  private assignNodeX(timeline: Timeline, toX: (year: number) => number): Map<string, number> {
-    const result = new Map<string, number>();
-    for (const branchId of timeline.branchIds) {
-      let previous = -Infinity;
-      for (const event of timeline.eventsOfBranch(branchId)) {
-        const x = Math.max(toX(event.start.toDecimalYear()), previous + this.options.minNodeGap);
-        result.set(event.id, x);
-        previous = x;
+  /** Año decimal en una X (lineal a trozos entre nodos; de "hoy" en adelante, hoy). */
+  private yearScale(ordered: readonly LifeEvent[], nowX: number, now: number): (x: number) => number {
+    const step = this.options.nodeStep;
+    const years = ordered.map((event) => event.start.toDecimalYear());
+    return (x: number): number => {
+      if (years.length === 0) return now;
+      if (x <= 0) return years[0];
+      const i = Math.floor(x / step);
+      if (i >= years.length - 1) {
+        const last = years[years.length - 1];
+        const t = Math.min(1, (x - (years.length - 1) * step) / Math.max(EPS, nowX - (years.length - 1) * step));
+        return last + (Math.max(last, now) - last) * t;
       }
+      return years[i] + (years[i + 1] - years[i]) * (x / step - i);
+    };
+  }
+
+  /** X de un año decimal (inversa de `yearScale`): para el final de los periodos. */
+  private inverse(ordered: readonly LifeEvent[], nowX: number, now: number, year: number): number {
+    const step = this.options.nodeStep;
+    const years = ordered.map((event) => event.start.toDecimalYear());
+    if (years.length === 0 || year <= years[0]) return 0;
+    for (let i = 1; i < years.length; i += 1) {
+      if (years[i] >= year) return (i - 1 + (year - years[i - 1]) / Math.max(EPS, years[i] - years[i - 1])) * step;
     }
-    return result;
+    const lastX = (years.length - 1) * step;
+    const last = years[years.length - 1];
+    return lastX + (nowX - lastX) * Math.min(1, (year - last) / Math.max(EPS, now - last));
   }
 
   private planBranches(
     timeline: Timeline,
-    nodeX: Map<string, number>,
-    toX: (year: number) => number,
-    firstX: number,
-    lastX: number,
+    ordered: readonly LifeEvent[],
+    nodeX: ReadonlyMap<string, number>,
+    isVisible: (event: LifeEvent | undefined) => event is LifeEvent,
+    span: { firstX: number; endX: number; lastNodeX: number },
   ): BranchPlan[] {
     const o = this.options;
-    const pad = o.padYears * o.unitsPerYear;
+    const step = o.nodeStep;
     const plans: BranchPlan[] = [];
     timeline.branchIds.forEach((id, order) => {
-      const events = timeline.eventsOfBranch(id);
-      const base = { id, order, events, merge: null, lane: 0, laneY: 0, laneZ: 0, anchors: [] };
-      if (id === timeline.mainBranch) {
-        plans.push({
-          ...base,
-          main: true,
-          origin: null,
-          blendX: o.blendYears * o.unitsPerYear,
-          startX: firstX - pad,
-          endX: lastX + pad * 0.5,
-          open: true,
-          originPosition: { x: firstX - pad, y: 0, z: 0 },
-        });
-        return;
-      }
+      const events = ordered.filter((event) => event.branch === id);
+      const main = id === timeline.mainBranch;
+      if (!main && events.length === 0) return;
+      const anchors = events.map((event) => nodeX.get(event.id) as number);
       const line = timeline.getLine(id);
-      // Si el origen no existe (p. ej. es privado y está oculto) la rama nace del tronco.
-      const origin = timeline.originOf(id) ?? null;
-      // Las líneas con `origin` declarado se abren despacio, como un haz desde su nacimiento.
-      const bundle = origin !== null && line?.originEventId === origin.id;
-      const xs = events.map((event) => nodeX.get(event.id) as number);
-      const firstNodeX = Math.min(...xs);
-      const startX = origin
-        ? Math.min(nodeX.get(origin.id) as number, firstNodeX - 0.5 * o.unitsPerYear)
-        : firstNodeX - o.blendYears * o.unitsPerYear;
-      const open = events.some((event) => event.ongoing) || line?.untilPresent === true;
-      const lastNodeX = Math.max(...xs);
-      const lastEndX = Math.max(
-        lastNodeX,
-        ...events.map((event) => (event.end ? toX(event.end.toDecimalYear()) : -Infinity)),
-      );
+      const first = anchors[0] ?? span.firstX;
+      const last = anchors[anchors.length - 1] ?? span.firstX;
+      // Origen visible y anterior al primer nodo: la línea sale de él.
+      const originEvent = main ? undefined : timeline.originOf(id);
+      const origin = isVisible(originEvent) && (nodeX.get(originEvent.id) as number) < first - EPS ? originEvent : null;
+      const mergeInfo = main ? undefined : timeline.mergeOf(id);
+      const merge =
+        mergeInfo && isVisible(mergeInfo.event) && (nodeX.get(mergeInfo.event.id) as number) > last + EPS
+          ? { event: mergeInfo.event, into: mergeInfo.branch, x: nodeX.get(mergeInfo.event.id) as number }
+          : null;
+      const open = !merge && (main || events.some((event) => event.ongoing) || line?.untilPresent === true);
+      const stations = [...(origin ? [nodeX.get(origin.id) as number] : []), ...anchors, ...(merge ? [merge.x] : [])];
+      const startX = origin ? stations[0] : main ? span.firstX : first - o.padSteps * step * 0.75;
       plans.push({
-        ...base,
-        main: false,
+        id,
+        main,
+        order,
+        anchors,
+        stations,
         origin,
-        blendX: (bundle ? o.bundleBlendYears : o.blendYears) * o.unitsPerYear,
+        merge,
         startX,
-        endX: open ? lastX + pad * 0.5 : lastEndX + o.tailYears * o.unitsPerYear,
+        endX: merge ? merge.x : open ? span.endX : last + o.tailSteps * step,
         open,
-        originPosition: { x: startX, y: 0, z: 0 },
+        lane: 0,
+        laneY: 0,
+        laneZ: 0,
+        // La central va por la banda antes de su primer nodo y tras el último si ningún otro nodo
+        // se interpone (no hay nodos antes / después).
+        flatBefore: main && (anchors.length === 0 ? ordered.length === 0 : first <= EPS),
+        flatAfter: main && anchors.length > 0 && last >= span.lastNodeX - EPS,
       });
     });
     return plans;
   }
 
-  /** Líneas que convergen en otra: terminan en la X del evento de fusión, sin cola ni «hoy». */
-  private planMerges(
-    timeline: Timeline,
-    plans: readonly BranchPlan[],
-    planById: ReadonlyMap<string, BranchPlan>,
-    nodeX: ReadonlyMap<string, number>,
-  ): void {
-    for (const plan of plans) {
-      if (plan.main) continue;
-      const merge = timeline.mergeOf(plan.id);
-      const target = merge ? planById.get(merge.branch) : undefined;
-      if (!merge || !target) continue;
-      const x = nodeX.get(merge.event.id) as number;
-      // Una fusión anterior al nacimiento de la línea no tiene sentido geométrico: se ignora.
-      if (x <= plan.startX + this.options.sampleStep) continue;
-      const blendX = Math.min(this.options.mergeBlendYears * this.options.unitsPerYear, (x - plan.startX) * 0.6);
-      plan.merge = { target, event: merge.event, x, blendX };
-      plan.endX = x;
-      plan.open = false;
-    }
-  }
-
   /**
-   * Reparte carriles como un *interval scheduling*: cada rama, por orden de nacimiento, ocupa el
-   * carril libre más cercano al de su rama madre (los carriles de ramas ya cerradas se reutilizan),
-   * evitando cruzar el tronco. Así el nº de carriles depende de cuántas ramas conviven a la vez, no
-   * del total. Después la separación vertical se comprime para que el carril más alejado no pase
-   * de `maxLaneSpread` (sin bajar de `minLaneSpacing`). Devuelve la separación usada.
+   * Reparte carriles como un *interval scheduling*: cada línea, por orden de nacimiento, ocupa el
+   * carril libre más cercano al de su madre (los de líneas ya cerradas se reutilizan), evitando
+   * cruzar la central. La central ocupa el primer carril de abajo. Las alturas se reparten en
+   * `[laneMin, laneMax] × nodeStep`: amplitud pequeña y constante. Devuelve la separación usada.
    */
   private assignLanes(plans: BranchPlan[]): number {
     const o = this.options;
-    const gap = o.unitsPerYear * 0.8;
+    const step = o.nodeStep;
+    const gap = step * 0.5;
     const occupiedUntil = new Map<number, number>();
     const laneOf = new Map<string, number>(plans.filter((plan) => plan.main).map((plan) => [plan.id, 0]));
     const side = plans.filter((plan) => !plan.main).sort((a, b) => a.startX - b.startX || a.order - b.order);
     const isFree = (lane: number, x: number): boolean => (occupiedUntil.get(lane) ?? -Infinity) + gap <= x;
     for (const plan of side) {
       const parent = plan.origin ? (laneOf.get(plan.origin.branch) ?? 0) : 0;
-      // Lado con menos carriles ocupados ahora mismo: desempata las ramas que salen del tronco.
       let up = 0;
       let down = 0;
       for (const [lane, until] of occupiedUntil) {
@@ -415,9 +385,9 @@ export class TimelineLayout {
         if (lane > 0) up += 1;
         else down += 1;
       }
-      const preferUp = up <= down;
-      // Si converge en una línea que ya tiene carril, conviene quedar cerca de ella (y de su lado).
-      const mergeLane = plan.merge ? laneOf.get(plan.merge.target.id) : undefined;
+      // La central ya ocupa un carril de abajo: a igualdad, arriba.
+      const preferUp = up <= down + 1;
+      const mergeLane = plan.merge ? laneOf.get(plan.merge.into) : undefined;
       const cost = (lane: number): number =>
         Math.abs(lane - parent) +
         (parent !== 0 && Math.sign(lane) !== Math.sign(parent) ? TRUNK_CROSSING_COST : 0) +
@@ -428,15 +398,8 @@ export class TimelineLayout {
       for (let n = 1; n <= MAX_LANE; n += 1) {
         for (const lane of preferUp ? [n, -n] : [-n, n]) {
           if (!isFree(lane, plan.startX)) continue;
-          const better =
-            best === 0 ||
-            cost(lane) < cost(best) ||
-            // Mismo coste: el más cercano al tronco (y, a igual distancia, el del lado preferido,
-            // que es el primero que se prueba).
-            (cost(lane) === cost(best) && Math.abs(lane) < Math.abs(best));
-          if (better) best = lane;
+          if (best === 0 || cost(lane) < cost(best) || (cost(lane) === cost(best) && Math.abs(lane) < Math.abs(best))) best = lane;
         }
-        // Ningún carril más lejano puede mejorar al encontrado.
         if (best !== 0 && n - Math.abs(parent) > cost(best) && (mergeLane === undefined || n - Math.abs(mergeLane) > cost(best))) break;
       }
       plan.lane = best;
@@ -444,155 +407,77 @@ export class TimelineLayout {
       occupiedUntil.set(best, plan.endX);
     }
 
-    const reach = Math.max(1, ...side.map((plan) => Math.abs(plan.lane)));
-    const spacing = Math.min(o.laneSpacing, Math.max(o.minLaneSpacing, o.maxLaneSpread / reach));
-    const depth = o.laneDepth * (spacing / o.laneSpacing);
-    for (const plan of side) {
-      plan.laneY = plan.lane * spacing;
-      plan.laneZ = -Math.abs(plan.lane) * depth;
+    // Niveles: arriba, el carril; abajo, la central es el nivel 1 y las demás bajan uno.
+    const levelOf = (plan: BranchPlan): number => (plan.main ? 1 : plan.lane > 0 ? plan.lane : -plan.lane + 1);
+    const maxLevel = Math.max(1, ...plans.map(levelOf));
+    const spacing = maxLevel > 1 ? ((o.laneMax - o.laneMin) * step) / (maxLevel - 1) : 0;
+    for (const plan of plans) {
+      const level = levelOf(plan);
+      const sign = plan.main || plan.lane < 0 ? -1 : 1;
+      plan.laneY = sign * (o.laneMin * step + spacing * (level - 1));
+      plan.laneZ = -o.laneDepth * (level / maxLevel);
     }
     return spacing;
   }
 
   /**
-   * Banda narrativa: cada nodo vive cerca de y = 0 con un ligero desfase por carril (arriba los
-   * carriles positivos, abajo los negativos). Si dos nodos coinciden en fecha, el segundo se apila
-   * en el hueco libre más cercano (separación `stackGap`). Rellena `plan.anchors`.
+   * Arco causal por encima de la banda (como en un diagrama de arcos): sale del nodo origen, sube
+   * tanto más cuanto más pasos salva (acotado) y baja al destino. Un poco por delante en Z.
    */
-  private assignBand(
-    timeline: Timeline,
-    plans: readonly BranchPlan[],
-    planById: ReadonlyMap<string, BranchPlan>,
-    nodeX: ReadonlyMap<string, number>,
-  ): Map<string, number> {
+  private arch(ax: number, bx: number): Vec3[] {
     const o = this.options;
-    const items = timeline.events
-      .map((event) => ({ event, x: nodeX.get(event.id) as number, plan: planById.get(event.branch) as BranchPlan }))
-      .sort((a, b) => a.x - b.x || a.plan.order - b.plan.order || a.event.id.localeCompare(b.event.id));
-    const placed: { x: number; y: number }[] = [];
-    const result = new Map<string, number>();
-    for (const item of items) {
-      const base = Math.max(-o.bandHalfHeight, Math.min(o.bandHalfHeight, item.plan.lane * o.bandLaneStep));
-      const near = placed.filter((other) => Math.abs(other.x - item.x) < o.stackDx);
-      const free = (y: number): boolean => near.every((other) => Math.abs(other.y - y) >= o.stackGap - 1e-9);
-      let y = base;
-      // Alterna arriba/abajo empezando por el lado del carril.
-      const side = item.plan.lane < 0 ? -1 : 1;
-      for (let k = 1; !free(y) && k < 64; k += 1) {
-        const step = Math.ceil(k / 2) * o.stackGap;
-        y = base + (k % 2 === 1 ? side : -side) * step;
-      }
-      y = round(y);
-      placed.push({ x: item.x, y });
-      result.set(item.event.id, y);
-    }
-    for (const plan of plans) {
-      plan.anchors = plan.events
-        .map((event) => ({ x: nodeX.get(event.id) as number, y: result.get(event.id) as number }))
-        .sort((a, b) => a.x - b.x);
-    }
-    return result;
-  }
-
-  /** Hebra causal: arco suave del nodo origen al destino, un poco por delante de las líneas. */
-  private strand(a: Vec3, b: Vec3, index: number): Vec3[] {
-    const dx = b.x - a.x;
-    const length = Math.hypot(dx, b.y - a.y);
-    const steps = Math.max(10, Math.ceil(length / this.options.sampleStep));
-    const arch = (index % 2 === 0 ? 1 : -1) * Math.min(2.4, 0.7 + 0.05 * Math.abs(dx));
+    const dx = bx - ax;
+    const height = Math.min(o.linkMaxHeight, o.linkMinHeight + o.linkRise * (dx / o.nodeStep - 1));
+    const steps = Math.max(12, Math.ceil(dx / o.sampleStep));
     const points: Vec3[] = [];
     for (let i = 0; i <= steps; i += 1) {
       const s = i / steps;
       const bow = Math.sin(Math.PI * s);
-      points.push({
-        x: round(a.x + dx * s),
-        y: round(a.y + (b.y - a.y) * smoothstep(s) + arch * bow),
-        z: round(a.z + (b.z - a.z) * s + 0.8 * bow),
-      });
+      points.push({ x: round(ax + dx * s), y: round(height * bow), z: round(0.3 * bow) });
     }
     return points;
   }
 
   /**
-   * Punto de la línea en X: la curva de su carril, atraída hacia la banda junto a cada uno de sus
-   * nodos. Entre dos nodos la línea sale de la banda (tanto más cuanto más separados estén) y vuelve
-   * para pasar exactamente por el siguiente.
+   * Punto de la línea en X. Entre dos estaciones contiguas (sin nodos por medio) va recta por la
+   * banda; si hay nodos de otras líneas entre ellas, sube a su carril con una curva corta (`ramp`),
+   * lo recorre recto y vuelve a bajar. Antes de la primera y tras la última, va por su carril.
    */
   private pointOnBranch(plan: BranchPlan, x: number): Vec3 {
-    const lane = this.pointOnLane(plan, x);
-    const anchors = plan.anchors;
-    if (anchors.length === 0) return lane;
-    const pinch = this.options.pinchX;
-    let bandY: number;
-    let bandZ = 0;
+    const o = this.options;
+    const ramp = o.ramp * o.nodeStep;
+    const stations = plan.stations;
     let out: number;
-    const first = anchors[0];
-    const last = anchors[anchors.length - 1];
-    if (x <= first.x) {
-      if (plan.main) {
-        out = smoothstep((first.x - x) / pinch);
-        bandY = first.y;
-      } else {
-        // Antes del primer nodo: del nacimiento (origen) al nodo, saliendo de la banda entre medias.
-        const from = plan.originPosition;
-        const t = (x - plan.startX) / Math.max(1e-6, first.x - plan.startX);
-        bandY = from.y + (first.y - from.y) * smoothstep(t);
-        bandZ = from.z * (1 - smoothstep(t));
-        out = smoothstep((x - plan.startX) / pinch) * smoothstep((first.x - x) / pinch);
-      }
-    } else if (x >= last.x) {
-      out = smoothstep((x - last.x) / pinch);
-      bandY = last.y;
-      if (plan.merge) {
-        // Fusión: vuelve a la banda en el nodo de destino.
-        out *= smoothstep((plan.endX - x) / pinch);
-        const k = smoothstep((x - last.x) / Math.max(1e-6, plan.endX - last.x));
-        bandY = last.y + (lane.y - last.y) * k;
-        bandZ = lane.z * k;
-      }
-    } else {
+    if (stations.length === 0) out = plan.flatBefore ? 0 : 1;
+    else if (x <= stations[0]) out = plan.flatBefore ? 0 : smoothstep((stations[0] - x) / ramp);
+    else if (x >= stations[stations.length - 1]) out = plan.flatAfter ? 0 : smoothstep((x - stations[stations.length - 1]) / ramp);
+    else {
       let lo = 0;
-      let hi = anchors.length - 1;
+      let hi = stations.length - 1;
       while (hi - lo > 1) {
         const mid = (lo + hi) >> 1;
-        if (anchors[mid].x <= x) lo = mid;
+        if (stations[mid] <= x) lo = mid;
         else hi = mid;
       }
-      const a = anchors[lo];
-      const b = anchors[hi];
-      const t = (x - a.x) / Math.max(1e-6, b.x - a.x);
-      bandY = a.y + (b.y - a.y) * smoothstep(t);
-      out = smoothstep((x - a.x) / pinch) * smoothstep((b.x - x) / pinch);
-    }
-    return { x: lane.x, y: round(bandY + (lane.y - bandY) * out), z: round(bandZ + (lane.z - bandZ) * out) };
-  }
-
-  private pointOnLane(plan: BranchPlan, x: number): Vec3 {
-    const o = this.options;
-    const { laneY, laneZ } = plan;
-    const waveY = o.waveAmplitude * Math.sin(x * 0.13 + plan.lane * 1.7);
-    const waveZ = o.waveAmplitude * 0.8 * Math.cos(x * 0.09 + plan.lane * 0.9);
-    if (plan.main) return { x: round(x), y: round(waveY), z: round(waveZ) };
-    const blend = smoothstep((x - plan.startX) / plan.blendX);
-    const from = plan.originPosition;
-    let y = from.y + (laneY + waveY - from.y) * blend;
-    let z = from.z + (laneZ + waveZ - from.z) * blend;
-    if (plan.merge) {
-      // Convergencia: en los últimos `blendX` la línea se curva hasta coincidir con la de destino.
-      const k = smoothstep((x - (plan.merge.x - plan.merge.blendX)) / plan.merge.blendX);
-      if (k > 0) {
-        const to = this.pointOnBranch(plan.merge.target, x);
-        y += (to.y - y) * k;
-        z += (to.z - z) * k;
+      const a = stations[lo];
+      const b = stations[hi];
+      if (b - a <= o.nodeStep * 1.01) out = 0;
+      else {
+        const r = Math.min(ramp, (b - a) / 2);
+        out = Math.min(smoothstep((x - a) / r), smoothstep((b - x) / r));
       }
     }
-    return { x: round(x), y: round(y), z: round(z) };
+    return { x: round(x), y: round(plan.laneY * out), z: round(plan.laneZ * out) };
   }
 
+  /** Muestrea la línea: paso regular más los bordes exactos de cada curva (estaciones y rampas). */
   private sample(plan: BranchPlan, fromX: number, toX: number): Vec3[] {
-    const steps = Math.max(1, Math.ceil((toX - fromX) / this.options.sampleStep));
-    const points: Vec3[] = [];
-    for (let i = 0; i <= steps; i += 1) points.push(this.pointOnBranch(plan, fromX + ((toX - fromX) * i) / steps));
-    return points;
+    const o = this.options;
+    const ramp = o.ramp * o.nodeStep;
+    const xs = new Set<number>();
+    const steps = Math.max(1, Math.ceil((toX - fromX) / o.sampleStep));
+    for (let i = 0; i <= steps; i += 1) xs.add(round(fromX + ((toX - fromX) * i) / steps));
+    for (const s of plan.stations) for (const x of [s, s - ramp, s + ramp]) if (x > fromX && x < toX) xs.add(round(x));
+    return [...xs].sort((a, b) => a - b).map((x) => this.pointOnBranch(plan, x));
   }
 }

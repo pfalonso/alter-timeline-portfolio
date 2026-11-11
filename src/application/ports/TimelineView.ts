@@ -12,6 +12,8 @@ export interface FilterViewState {
   readonly activeCategoryIds: ReadonlySet<string>;
   readonly visibleEventIds: ReadonlySet<string>;
   readonly totalEvents: number;
+  /** Disposición de los eventos visibles (eje ordinal): cambia con los filtros. */
+  readonly layout?: TimelineLayoutResult;
 }
 
 /** Estado del modo historia (recorrido guiado por `story.path`). */
