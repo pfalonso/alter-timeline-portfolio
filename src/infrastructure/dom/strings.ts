@@ -25,7 +25,7 @@ export const STRINGS = {
   with: 'Con',
   today: 'hoy',
   privateEvent: 'Privado',
-  helpKeys: 'clic en un nodo para abrirlo · ← → saltar · Enter abrir · Esc cerrar · arrastra o desplaza para viajar',
+  helpKeys: 'clic en un nodo para abrirlo · ← → saltar · Mayús+← → nodo a nodo · H historia · Esc cerrar · arrastra o desplaza para viajar',
   helpTouch: 'toca un nodo para abrirlo · desliza para viajar · pellizca para acercar',
   stageLabel:
     'Línea temporal 3D interactiva. Usa las flechas izquierda y derecha para saltar entre eventos y Enter para abrir el detalle. El índice de eventos ofrece el mismo contenido en forma de lista.',
@@ -42,4 +42,21 @@ export const STRINGS = {
   latent: 'latente',
   closedLine: 'cerrada',
   mergesInto: (label: string): string => `se une a ${label}`,
+  storyStart: 'Ver la historia',
+  storyStartHint: 'Recorre la vida de nodo en nodo (tecla H)',
+  storyExit: 'Salir de la historia',
+  storyProgress: (index: number, total: number): string => `${index + 1} / ${total}`,
+  storyProgressLabel: (index: number, total: number): string => `Paso ${index + 1} de ${total}`,
+  storyNext: 'Siguiente en la historia',
+  storyContinue: 'Continuar',
+  storyEscHint: 'Esc para salir',
+  chapter: 'Capítulo',
+  chapterOf: (index: number, total: number): string => `Capítulo ${index + 1} de ${total}`,
+  arcOf: (title: string): string => `Capítulo: ${title}`,
+  outsideArcs: 'Otros momentos',
+  storyAnnounce: (step: string, arc: string | null, bridge: string | undefined): string =>
+    [step, arc ? `Capítulo: ${arc}` : null, bridge]
+      .filter((part): part is string => Boolean(part))
+      .map((part) => part.replace(/[.\s]+$/, ''))
+      .join('. '),
 } as const;

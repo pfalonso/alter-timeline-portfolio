@@ -1,6 +1,6 @@
-import { Group, LineSegments, Mesh, Scene, Sprite, type MeshBasicMaterial } from 'three';
+import { Group, LineSegments, Mesh, Scene, Sprite, type LineBasicMaterial, type MeshBasicMaterial } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { DIMMED_PRESENCE, NODE_RADIUS, NodeAssets, NodeMesh, type NodeSpec } from '../../../src/infrastructure/three/NodeMesh';
+import { DIMMED_PRESENCE, NODE_RADIUS, NODE_TIERS, NodeAssets, NodeMesh, type NodeSpec } from '../../../src/infrastructure/three/NodeMesh';
 import { createGlowTexture, createRingTexture } from '../../../src/infrastructure/three/textures';
 import { frameContext } from '../../helpers/three';
 
@@ -78,7 +78,7 @@ describe('NodeMesh: construcción', () => {
   });
 
   it('solo los nodos de importancia 3 muestran anillo en reposo', () => {
-    expect(parts(make({ importance: 3 })).ring.material.opacity).toBeCloseTo(0.3, 5);
+    expect(parts(make({ importance: 3 })).ring.material.opacity).toBeCloseTo(NODE_TIERS[3].ring, 5);
     expect(parts(make({ importance: 2 })).ring.material.opacity).toBe(0);
   });
 });
@@ -238,5 +238,25 @@ describe('NodeMesh / NodeAssets: liberación', () => {
     );
     shared.dispose();
     for (const spy of spies) expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('jerarquía: el menor es un punto sin halo, jaula ni satélites salvo al señalarlo; el mayor lleva halo y anillo', () => {
+    const minor = make({ importance: 1, secondaryColors: ['#00ff00'] });
+    const major = make({ importance: 3, secondaryColors: ['#00ff00'] });
+    minor.update(frameContext({ reducedMotion: true }));
+    major.update(frameContext({ reducedMotion: true }));
+    const m = parts(minor);
+    expect(m.halo.material.opacity).toBe(0);
+    expect((m.shell.material as LineBasicMaterial).opacity).toBe(0);
+    expect(m.ring.material.opacity).toBe(0);
+    expect(m.satellites).toHaveLength(0);
+    expect(parts(major).halo.material.opacity).toBeGreaterThan(0.2);
+    expect(parts(major).satellites).toHaveLength(1);
+    expect(major.radius / minor.radius).toBeGreaterThan(4);
+    minor.setHovered(true);
+    minor.update(frameContext({ reducedMotion: true }));
+    expect(m.halo.material.opacity).toBeGreaterThan(0);
+    expect((m.shell.material as LineBasicMaterial).opacity).toBeGreaterThan(0.5);
+    expect(minor.scale).toBeCloseTo(1.9, 5);
   });
 });

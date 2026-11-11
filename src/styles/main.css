@@ -159,13 +159,19 @@ a {
   max-width: 230px;
   text-align: center;
   opacity: 0;
-  transition: opacity 0.35s ease;
+  /* Al ocultarse se va deprisa: un rótulo saliente nunca se cruza con el que entra en su sitio. */
+  transition: opacity 0.12s ease;
   will-change: transform;
   text-shadow: 0 0 12px rgba(4, 5, 13, 0.95), 0 1px 2px rgba(4, 5, 13, 0.9);
 }
 
 .node-label--shown {
   opacity: 1;
+  transition-duration: 0.45s;
+}
+
+.node-label--i3 {
+  max-width: 280px;
 }
 
 .node-label__title {
@@ -181,7 +187,7 @@ a {
 
 .node-label--i3 .node-label__title {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 400;
   letter-spacing: 0;
   color: var(--ink);
@@ -1441,5 +1447,356 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
+  }
+}
+
+/* ───────── Arcos temporales (franja de capítulos sobre la regla) ───────── */
+
+.arc-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--pad) + 22px);
+  height: 18px;
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 1s ease 0.9s;
+}
+
+.app--loading .arc-strip {
+  opacity: 0;
+}
+
+.arc-strip__segment {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-left: 1px solid var(--line);
+  will-change: transform;
+}
+
+/* Corchete fino: línea de base del capítulo. */
+.arc-strip__segment::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), var(--line) 40%, transparent);
+  transition: background 0.6s;
+}
+
+.arc-strip__caption {
+  position: absolute;
+  left: 8px;
+  right: 6px;
+  bottom: 4px;
+  display: flex;
+  gap: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.7;
+  transition: color 0.6s, opacity 0.6s;
+}
+
+.arc-strip__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.arc-strip__years {
+  flex: none;
+  opacity: 0.7;
+}
+
+.arc-strip__segment--active {
+  border-left-color: var(--glow);
+}
+
+.arc-strip__segment--active::after {
+  background: linear-gradient(90deg, var(--glow), color-mix(in srgb, var(--glow) 40%, transparent) 60%, transparent);
+}
+
+.arc-strip__segment--active .arc-strip__caption {
+  color: var(--ink);
+  opacity: 1;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--glow) 60%, transparent);
+}
+
+/* ───────── Modo historia ───────── */
+
+.controls__button--story {
+  border-color: color-mix(in srgb, var(--glow) 55%, transparent);
+  color: var(--ink);
+  box-shadow: 0 0 22px -8px var(--glow);
+}
+
+.controls__button--story[aria-pressed='true'] {
+  border-color: var(--glow);
+  background: color-mix(in srgb, var(--glow) 14%, transparent);
+}
+
+/* Durante el recorrido la interfaz se recoge: la escena y el relato mandan. */
+.app--story .hud,
+.app--story .filters,
+.app--story .help {
+  opacity: 0.12;
+  transition: opacity 0.6s ease;
+}
+
+.app--story .hud:hover,
+.app--story .filters:hover,
+.app--story .filters:focus-within {
+  opacity: 1;
+}
+
+.chapter {
+  /* Arriba a la izquierda, sobre la cabecera (recogida en modo historia): el nodo queda libre. */
+  position: absolute;
+  left: var(--pad);
+  top: var(--pad);
+  z-index: 18;
+  width: min(420px, calc(100vw - 2 * var(--pad)));
+  padding: 26px 30px 22px;
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--glow);
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--glow) 14%, transparent), transparent 70%),
+    var(--panel);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+
+.chapter--enter {
+  animation: chapter-in 0.9s var(--ease) both;
+}
+
+@keyframes chapter-in {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+    filter: blur(6px);
+  }
+}
+
+.chapter__kicker {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--glow);
+}
+
+.chapter__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 3.4vw, 2.9rem);
+  line-height: 1.02;
+}
+
+.chapter__subtitle {
+  margin: 6px 0 0;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.chapter__summary {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+}
+
+.chapter__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.chapter__continue {
+  padding: 8px 14px;
+  border: 1px solid var(--glow);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #fff;
+  transition: background 0.2s;
+}
+
+.chapter__continue:hover,
+.chapter__continue:focus-visible {
+  background: color-mix(in srgb, var(--glow) 18%, transparent);
+}
+
+.chapter__hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+/* Pop-up en modo historia: progreso, capítulo y frase puente arriba. */
+.popup__bar {
+  align-items: center;
+  gap: 12px;
+}
+
+.popup__exit-story {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.popup__exit-story:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+.popup__story {
+  padding: 2px 30px 10px 32px;
+}
+
+.popup__progress {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.popup__step {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.popup__arc::before {
+  content: '·';
+  margin-right: 12px;
+}
+
+.popup__bridge {
+  margin: 10px 0 0;
+  padding-left: 14px;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.popup--enter .popup__bridge {
+  animation: rise-in 0.8s var(--ease) both;
+}
+
+.popup__story-next {
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--glow) 55%, transparent);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.popup__story-next:hover {
+  border-color: #fff;
+}
+
+.badge--arc {
+  border-color: color-mix(in srgb, var(--glow) 45%, transparent);
+  color: var(--glow);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+/* Índice agrupado por capítulos. */
+.index__group {
+  list-style: none;
+  margin-top: 18px;
+}
+
+.index__group:first-child {
+  margin-top: 0;
+}
+
+.index__group-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+}
+
+.index__group-years {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  align-self: flex-end;
+}
+
+.index__group-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.index__item--i1 .index__name {
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.index__item--i3 .index__name {
+  font-family: var(--font-display);
+  font-size: 1.15em;
+}
+
+@media (max-width: 720px) {
+  .arc-strip__caption {
+    font-size: 8.5px;
+    letter-spacing: 0.16em;
+  }
+
+  .chapter {
+    top: auto;
+    bottom: calc(var(--pad) + 40px + env(safe-area-inset-bottom));
+    z-index: 25;
+  }
+
+  .app--story .hud,
+  .app--story .filters,
+  .app--story .help {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter--enter,
+  .popup--enter .popup__bridge {
+    animation: none;
   }
 }

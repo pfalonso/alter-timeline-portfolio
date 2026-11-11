@@ -4,6 +4,7 @@ import type {
   TimelineViewHandlers,
   TimelineViewModel,
 } from '../../application/ports';
+import { arcYears } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
 import { STRINGS } from './strings';
@@ -69,7 +70,25 @@ export class EventList implements TimelineViewPart {
     clear(this.list);
     this.items.clear();
     const { timeline } = model;
+    // Con arcos, los eventos se agrupan por capítulo (en orden cronológico): un encabezado por grupo.
+    let group: HTMLElement = this.list;
+    let groupKey: string | null | undefined;
     for (const event of timeline.events) {
+      if (timeline.arcs.length > 0) {
+        const arc = timeline.arcOf(event);
+        const key = arc?.id ?? null;
+        if (key !== groupKey) {
+          groupKey = key;
+          group = el('ol', { class: 'index__group-list' });
+          const heading = el('h3', { class: 'index__group-title' }, [
+            el('span', { text: arc ? arc.title : STRINGS.outsideArcs }),
+            arc ? el('span', { class: 'index__group-years', text: arcYears(arc, STRINGS.today) }) : null,
+          ]);
+          const groupItem = el('li', { class: 'index__group' }, [heading, group]);
+          if (arc) groupItem.dataset.arc = arc.id;
+          this.list.append(groupItem);
+        }
+      }
       const category = timeline.primaryCategoryOf(event);
       const line = timeline.getLine(event.branch);
       const button = el('button', { class: 'index__button', attrs: { type: 'button' } }, [
@@ -81,9 +100,9 @@ export class EventList implements TimelineViewPart {
       ]);
       button.style.setProperty('--accent', category?.color ?? '#ffffff');
       button.addEventListener('click', () => this.handlers?.onEventActivated(event.id));
-      const item = el('li', { class: 'index__item' }, [button]);
+      const item = el('li', { class: `index__item index__item--i${event.importance}` }, [button]);
       this.items.set(event.id, { item, button });
-      this.list.append(item);
+      group.append(item);
     }
   }
 

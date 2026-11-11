@@ -21,8 +21,11 @@ export class LiveAnnouncer implements TimelineViewPart {
     if (state.focusedEventId === this.lastId) return;
     this.lastId = state.focusedEventId;
     const event = state.focusedEventId ? this.timeline?.getEvent(state.focusedEventId) : undefined;
+    const story = state.story;
+    const arc = story?.arcId ? this.timeline?.getArc(story.arcId)?.title ?? null : null;
+    const prefix = story ? `${STRINGS.storyAnnounce(STRINGS.storyProgressLabel(story.index, story.total), arc, event?.bridge)}. ` : '';
     this.root.textContent = event
-      ? `${event.title}. ${event.formatDateRange(this.timeline?.meta.locale, STRINGS.present)}. ${event.summary}`
+      ? `${prefix}${event.title}. ${event.formatDateRange(this.timeline?.meta.locale, STRINGS.present)}. ${event.summary}`
       : '';
   }
 }

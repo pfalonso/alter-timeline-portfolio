@@ -50,7 +50,31 @@ export class NodeAssets {
   }
 }
 
-export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.3, 2: 0.44, 3: 0.64 };
+/** Jerarquía: mayor = nodo grande; medio = mediano; menor = punto pequeño. */
+export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.17, 2: 0.4, 3: 0.74 };
+
+/**
+ * Cómo se presenta cada nivel de importancia. Los menores son puntos sin halo, sin jaula ni
+ * satélites (solo aparecen al pasar por encima o al enfocarlos); los mayores llevan halo amplio
+ * y un anillo siempre visible.
+ */
+export interface NodeTier {
+  /** Opacidad del halo en reposo (se suma el realce por hover/foco). */
+  readonly halo: number;
+  /** Escala del halo respecto al radio. */
+  readonly haloScale: number;
+  /** Opacidad del anillo en reposo. */
+  readonly ring: number;
+  /** Opacidad de la jaula giratoria en reposo. */
+  readonly shell: number;
+  readonly satellites: boolean;
+}
+
+export const NODE_TIERS: Record<1 | 2 | 3, NodeTier> = {
+  1: { halo: 0, haloScale: 6, ring: 0, shell: 0, satellites: false },
+  2: { halo: 0.2, haloScale: 6.5, ring: 0, shell: 0.6, satellites: true },
+  3: { halo: 0.36, haloScale: 8.5, ring: 0.42, shell: 0.85, satellites: true },
+};
 /** Presencia de un nodo filtrado: se atenúa, no desaparece. */
 export const DIMMED_PRESENCE = 0.1;
 
@@ -81,6 +105,7 @@ export class NodeMesh {
   private readonly satellites: Mesh[] = [];
   private readonly phase: number;
   private nearFade = 1;
+  private readonly tier: NodeTier;
 
   constructor(spec: NodeSpec, assets: NodeAssets) {
     this.eventId = spec.eventId;
@@ -123,7 +148,8 @@ export class NodeMesh {
     this.ring = new Sprite(this.ringMaterial);
 
     this.body.add(core, this.shell);
-    spec.secondaryColors.forEach((hex) => {
+    this.tier = NODE_TIERS[spec.importance];
+    (this.tier.satellites ? spec.secondaryColors : []).forEach((hex) => {
       const material = new MeshBasicMaterial({ color: new Color(hex).lerp(new Color('#ffffff'), 0.25), transparent: true });
       const satellite = new Mesh(assets.satellite, material);
       satellite.scale.setScalar(this.radius * 0.24);
@@ -191,19 +217,25 @@ export class NodeMesh {
     const p = this.presenceValue;
     const beat = Math.sin(time * 1.25 + this.phase);
     const r = this.radius;
+    const tier = this.tier;
+    // Un nodo menor crece bastante al señalarlo: si no, es difícil de ver dónde está el cursor.
+    const lift = this.importance === 1 ? 0.9 : 0.22;
+    const focusLift = this.importance === 1 ? 0.7 : 0.16;
+    const attention = Math.max(this.hover, this.focus);
 
-    this.body.scale.setScalar((0.6 + 0.4 * p) * (1 + 0.22 * this.hover + 0.16 * this.focus));
+    this.body.scale.setScalar((0.6 + 0.4 * p) * (1 + lift * this.hover + focusLift * this.focus));
     this.coreMaterial.opacity = 0.12 + 0.88 * p;
-    this.shellMaterial.opacity = 0.75 * p * p;
+    this.shellMaterial.opacity = Math.min(1, tier.shell + 0.75 * attention) * p * p;
     this.shell.rotation.set(time * 0.23 + this.phase, time * 0.41 + this.phase * 2, 0);
 
-    const haloScale = r * (6.5 + this.importance * 1.4) * (1 + 0.1 * beat + 0.3 * this.hover + 0.25 * this.focus);
+    const haloScale = r * tier.haloScale * (1 + 0.1 * beat + 0.3 * this.hover + 0.25 * this.focus);
     this.halo.scale.set(haloScale, haloScale, 1);
-    this.haloMaterial.opacity = (0.3 + 0.08 * beat + 0.22 * this.hover + 0.18 * this.focus) * p * p * this.nearFade;
+    const haloBase = tier.halo > 0 ? tier.halo + 0.08 * beat : 0;
+    this.haloMaterial.opacity = (haloBase + 0.22 * this.hover + 0.18 * this.focus) * p * p * this.nearFade;
 
     const ringScale = r * (5.2 + 0.25 * beat + 1.2 * this.focus);
     this.ring.scale.set(ringScale, ringScale, 1);
-    this.ringMaterial.opacity = Math.min(1, (this.importance === 3 ? 0.3 : 0) + 0.85 * this.focus + 0.35 * this.hover) * p;
+    this.ringMaterial.opacity = Math.min(1, tier.ring + 0.85 * this.focus + 0.35 * this.hover) * p;
 
     this.satellites.forEach((satellite, index) => {
       const angle = time * 0.7 + this.phase + (index * Math.PI * 2) / this.satellites.length;

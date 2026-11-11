@@ -20,6 +20,7 @@
       <header id="hud" class="hud"></header>
 
       <div class="toolbar" data-keep-popup>
+        <button id="story-toggle" class="controls__button controls__button--text controls__button--story" type="button" hidden></button>
         <button id="index-toggle" class="controls__button controls__button--text" type="button" aria-controls="index">Índice</button>
         <div id="controls" class="controls" role="group" aria-label="Controles de cámara"></div>
       </div>
@@ -28,7 +29,9 @@
         <div id="lines" class="lines" hidden></div>
         <div id="filter-bar"></div>
       </section>
+      <div id="arc-strip" class="arc-strip" hidden></div>
       <div id="ruler" class="ruler"></div>
+      <section id="chapter" class="chapter" data-keep-popup hidden></section>
       <p id="help" class="help" aria-hidden="true"></p>
 
       <nav id="index" class="index" hidden data-keep-popup></nav>

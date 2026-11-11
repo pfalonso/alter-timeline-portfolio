@@ -2,15 +2,18 @@ import type { SelectionViewState, TimelineViewModel } from '../../application/po
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
-import { clampLabelX, labelDistanceLimit, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
+import { clampLabelX, labelDistanceLimit, labelPriority, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
 
 interface Label {
   readonly element: HTMLElement;
-  readonly width: number;
+  /** Tamaño en píxeles: estimado al crear y medido de verdad en cuanto el DOM tiene layout. */
+  width: number;
+  height: number;
   shown: boolean;
 }
 
-const LABEL_HEIGHT = 34;
+/** Alto estimado por nivel (título + año); se sustituye por el medido. */
+const LABEL_HEIGHT: Record<number, number> = { 1: 30, 2: 32, 3: 40 };
 
 /** Rótulos DOM (tipografía nítida) que siguen a los nodos de la escena. Decorativos: aria-hidden. */
 export class NodeLabels implements TimelineViewPart, ProjectionListener {
@@ -40,6 +43,16 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         top: rect.top - origin.top,
         bottom: rect.bottom - origin.top,
       }));
+    // Medida real de los rótulos (la fuente display es más ancha que la estimación); a la vez que
+    // las zonas reservadas, para no forzar el layout en cada fotograma.
+    for (const label of this.labels.values()) {
+      const width = label.element.offsetWidth;
+      const height = label.element.offsetHeight;
+      if (width > 0 && height > 0) {
+        label.width = width;
+        label.height = height;
+      }
+    }
   }
 
   render(model: TimelineViewModel): void {
@@ -53,8 +66,13 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       element.style.setProperty('--accent', model.timeline.primaryCategoryOf(event)?.color ?? '#ffffff');
       this.root.append(element);
       // Estimación de ancho (evita medir el DOM cada fotograma); el CSS limita el máximo.
-      const perChar = event.importance === 3 ? 8.6 : 7;
-      this.labels.set(event.id, { element, width: Math.min(230, event.labelTitle.length * perChar + 18), shown: false });
+      const perChar = event.importance === 3 ? 9.2 : 7.2;
+      this.labels.set(event.id, {
+        element,
+        width: Math.min(event.importance === 3 ? 280 : 230, event.labelTitle.length * perChar + 18),
+        height: LABEL_HEIGHT[event.importance] ?? 32,
+        shown: false,
+      });
     }
   }
 
@@ -80,10 +98,10 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       candidates.push({
         id: node.eventId,
         x: clampLabelX(node.x, label.width, frame.viewport.width),
-        ys: [node.y + gap, node.y - gap - LABEL_HEIGHT],
+        ys: [node.y + gap, node.y - gap - label.height],
         width: label.width,
-        height: LABEL_HEIGHT,
-        priority: (pinned ? 100 : 0) + node.importance * 10 + node.radius * 0.01,
+        height: label.height,
+        priority: labelPriority(node.importance, pinned, label.shown, node.radius),
       });
     }
     const placed = layoutLabels(candidates, frame.viewport, obstacles, this.reserved);

@@ -1,5 +1,5 @@
 import type { PerspectiveCamera } from 'three';
-import { clamp, damp } from './math';
+import { clamp, damp, easeInOutCubic, pointOnRoute } from './math';
 
 export interface RigBounds {
   readonly minX: number;
@@ -40,6 +40,16 @@ interface RigPose {
   pointerY: number;
 }
 
+/** Vuelo guiado en curso (modo historia). */
+interface Flight {
+  readonly route: readonly { x: number; y: number }[];
+  readonly duration: number;
+  readonly distance: number;
+  /** Cuánto se aleja la cámara a mitad de vuelo para dar contexto. */
+  readonly lift: number;
+  elapsed: number;
+}
+
 /**
  * Cámara "sobre raíles": un punto de interés sobre el plano de la línea temporal y una distancia.
  * Todo movimiento fija un objetivo y `update` lo persigue con amortiguación exponencial.
@@ -49,6 +59,7 @@ export class CameraRig {
   private readonly pose: RigPose = { x: 0, y: 0, distance: 40, bias: 0, pointerX: 0, pointerY: 0 };
   private readonly goal: RigPose = { ...this.pose };
   private bounds: RigBounds = { minX: -Infinity, maxX: Infinity, minY: -Infinity, maxY: Infinity };
+  private flight: Flight | null = null;
 
   constructor(
     private readonly camera: PerspectiveCamera,
@@ -59,6 +70,16 @@ export class CameraRig {
 
   get distance(): number {
     return this.pose.distance;
+  }
+
+  /** `true` mientras dura un vuelo guiado. */
+  get flying(): boolean {
+    return this.flight !== null;
+  }
+
+  /** X del mundo a la que mira la cámara (incluye el desplazamiento por el pop-up lateral). */
+  get lookX(): number {
+    return this.pose.x + this.pose.bias * this.halfHeightAt(this.pose.distance) * this.camera.aspect;
   }
 
   get target(): { x: number; y: number; distance: number } {
@@ -87,6 +108,7 @@ export class CameraRig {
 
   /** Arrastre: desplaza el punto de interés según píxeles de pantalla. */
   panByPixels(dx: number, dy: number, viewportHeight: number): void {
+    this.flight = null;
     const worldPerPixel = (2 * this.halfHeightAt(this.goal.distance)) / Math.max(1, viewportHeight);
     this.goal.x -= dx * worldPerPixel;
     this.goal.y += dy * worldPerPixel;
@@ -94,15 +116,32 @@ export class CameraRig {
   }
 
   zoomBy(factor: number): void {
+    this.flight = null;
     this.goal.distance *= factor;
     this.clampGoal();
   }
 
   flyTo(point: { x: number; y: number }, distance?: number): void {
+    this.flight = null;
     this.goal.x = point.x;
     this.goal.y = point.y;
     if (distance !== undefined) this.goal.distance = distance;
     this.clampGoal();
+  }
+
+  /**
+   * Vuelo guiado por una ruta (modo historia): el punto de interés recorre `route` en `duration`
+   * segundos con aceleración suave, alejándose `lift` a mitad de camino. Cualquier gesto lo corta.
+   */
+  flyAlong(route: readonly { x: number; y: number }[], distance: number, duration: number, lift = 0): void {
+    if (route.length === 0) return;
+    const end = route[route.length - 1];
+    if (route.length === 1 || duration <= 0) {
+      this.flyTo(end, distance);
+      return;
+    }
+    this.flyTo(end, distance);
+    this.flight = { route, duration, distance: this.goal.distance, lift, elapsed: 0 };
   }
 
   setDistance(distance: number): void {
@@ -112,6 +151,7 @@ export class CameraRig {
 
   /** Coloca la cámara en el objetivo sin transición. */
   snap(): void {
+    this.flight = null;
     Object.assign(this.pose, this.goal);
     this.apply();
   }
@@ -127,6 +167,24 @@ export class CameraRig {
   }
 
   update(delta: number, reducedMotion = false): void {
+    if (this.flight && reducedMotion) this.flight = null;
+    if (this.flight) {
+      // Durante el vuelo el punto de interés va sobre la ruta; la distancia se amortigua igual.
+      const flight = this.flight;
+      flight.elapsed += delta;
+      const t = Math.min(1, flight.elapsed / flight.duration);
+      const point = pointOnRoute(flight.route, easeInOutCubic(t));
+      this.pose.x = clamp(point.x, this.bounds.minX, this.bounds.maxX);
+      this.pose.y = clamp(point.y, this.bounds.minY, this.bounds.maxY);
+      const k = this.options.damping;
+      this.pose.distance = damp(this.pose.distance, flight.distance + flight.lift * Math.sin(Math.PI * t), k, delta);
+      this.pose.bias = damp(this.pose.bias, this.goal.bias, k, delta);
+      this.pose.pointerX = damp(this.pose.pointerX, this.goal.pointerX, 2, delta);
+      this.pose.pointerY = damp(this.pose.pointerY, this.goal.pointerY, 2, delta);
+      if (t >= 1) this.flight = null;
+      this.apply();
+      return;
+    }
     if (reducedMotion) {
       // Sin vuelos ni parallax: corte directo al objetivo.
       Object.assign(this.pose, this.goal, { pointerX: 0, pointerY: 0 });
@@ -154,8 +212,7 @@ export class CameraRig {
   private apply(): void {
     const { pitch, yaw, parallax } = this.options;
     const p = this.pose;
-    const halfWidth = this.halfHeightAt(p.distance) * this.camera.aspect;
-    const lookX = p.x + p.bias * halfWidth;
+    const lookX = this.lookX;
     const swayX = p.pointerX * parallax * p.distance;
     const swayY = -p.pointerY * parallax * p.distance;
     this.camera.position.set(

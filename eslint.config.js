@@ -15,7 +15,8 @@ const noBrowserGlobals = ['window', 'document', 'fetch', 'localStorage', 'naviga
 );
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules', 'out'] },
+  // data/ y hr/ son privados (nunca en git): no se analizan.
+  { ignores: ['dist', 'coverage', 'node_modules', 'out', 'data', 'hr'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

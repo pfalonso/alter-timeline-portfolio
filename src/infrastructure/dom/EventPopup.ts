@@ -29,6 +29,18 @@ export class EventPopup implements TimelineViewPart {
   });
   private readonly prevButton = el('button', { class: 'popup__nav', attrs: { type: 'button' }, text: `← ${STRINGS.previous}` });
   private readonly nextButton = el('button', { class: 'popup__nav', attrs: { type: 'button' }, text: `${STRINGS.next} →` });
+  /** Cabecera del modo historia: progreso, capítulo y frase puente. */
+  private readonly storySlot = el('div', { class: 'popup__story' });
+  private readonly exitStoryButton = el('button', {
+    class: 'popup__exit-story',
+    attrs: { type: 'button' },
+    text: STRINGS.storyExit,
+  });
+  private readonly storyNextButton = el('button', {
+    class: 'popup__story-next',
+    attrs: { type: 'button' },
+    text: `${STRINGS.storyNext} →`,
+  });
 
   constructor(
     private readonly root: HTMLElement,
@@ -39,12 +51,18 @@ export class EventPopup implements TimelineViewPart {
     root.setAttribute('aria-labelledby', 'popup-title');
     root.tabIndex = -1;
     root.hidden = true;
+    this.storySlot.hidden = true;
+    this.exitStoryButton.hidden = true;
+    this.storyNextButton.hidden = true;
     root.append(
-      el('div', { class: 'popup__bar' }, [this.closeButton]),
+      el('div', { class: 'popup__bar' }, [this.exitStoryButton, this.closeButton]),
+      this.storySlot,
       this.body,
-      el('div', { class: 'popup__footer' }, [this.prevButton, this.nextButton]),
+      el('div', { class: 'popup__footer' }, [this.prevButton, this.storyNextButton, this.nextButton]),
     );
     this.closeButton.addEventListener('click', () => this.handlers?.onDetailClosed());
+    this.exitStoryButton.addEventListener('click', () => this.handlers?.onStoryExit());
+    this.storyNextButton.addEventListener('click', () => this.handlers?.onStoryStep('next'));
     this.prevButton.addEventListener('click', () => this.handlers?.onNavigate('previous'));
     this.nextButton.addEventListener('click', () => this.handlers?.onNavigate('next'));
     document.addEventListener('pointerdown', (event) => this.onOutsidePointer(event));
@@ -67,6 +85,8 @@ export class EventPopup implements TimelineViewPart {
     }
     this.prevButton.disabled = !state.hasPrevious;
     this.nextButton.disabled = !state.hasNext;
+    this.root.classList.toggle('popup--story', state.story !== undefined);
+    this.fillStory(event, state);
     if (this.openEventId === event.id) return;
 
     const wasOpen = this.openEventId !== null;
@@ -99,6 +119,29 @@ export class EventPopup implements TimelineViewPart {
     if (target && target.isConnected && !focusIsElsewhere) target.focus({ preventScroll: true });
   }
 
+  /** Cabecera del modo historia y enlace «Siguiente en la historia». Se refresca en cada estado. */
+  private fillStory(event: LifeEvent, state: SelectionViewState): void {
+    const timeline = this.timeline as Timeline;
+    const story = state.story;
+    this.exitStoryButton.hidden = !story;
+    this.storyNextButton.hidden = story !== undefined || state.storyNextId === undefined;
+    clear(this.storySlot);
+    this.storySlot.hidden = !story;
+    if (!story) return;
+    const arc = story.arcId ? timeline.getArc(story.arcId) : undefined;
+    this.storySlot.append(
+      el('p', { class: 'popup__progress' }, [
+        el('span', {
+          class: 'popup__step',
+          text: STRINGS.storyProgress(story.index, story.total),
+          attrs: { 'aria-label': STRINGS.storyProgressLabel(story.index, story.total) },
+        }),
+        arc ? el('span', { class: 'popup__arc', text: arc.title }) : null,
+      ]),
+    );
+    if (event.bridge) this.storySlot.append(el('p', { class: 'popup__bridge', text: event.bridge }));
+  }
+
   private fill(event: LifeEvent): void {
     const timeline = this.timeline as Timeline;
     const categories = timeline.categoriesOf(event);
@@ -123,6 +166,7 @@ export class EventPopup implements TimelineViewPart {
 
     const origin = event.branchFrom ? timeline.getEvent(event.branchFrom) : undefined;
     const line = timeline.getLine(event.branch);
+    const arc = timeline.arcOf(event);
 
     append(
       this.body,
@@ -130,6 +174,7 @@ export class EventPopup implements TimelineViewPart {
       el('h2', { class: 'popup__title', text: event.title, attrs: { id: 'popup-title' } }),
       event.subtitle ? el('p', { class: 'popup__subtitle', text: event.subtitle }) : null,
       el('div', { class: 'popup__badges' }, [
+        arc ? el('span', { class: 'badge badge--arc', text: STRINGS.arcOf(arc.title) }) : null,
         event.ongoing ? el('span', { class: 'badge badge--live', text: STRINGS.ongoing }) : null,
         event.isPrivate ? el('span', { class: 'badge', text: STRINGS.privateEvent }) : null,
         line ? el('span', { class: 'badge badge--branch badge--line', text: STRINGS.lineOf(line.label) }) : null,

@@ -9,7 +9,8 @@ import type { TimelineLayoutResult } from '../../domain/services';
 import type { TimelineViewPart } from '../dom/CompositeTimelineView';
 import type { NodeHoverListener } from '../dom/Tooltip';
 import { CameraRig } from './CameraRig';
-import { bandFraction, bandOffset, pickNode, verticalExtent, type SafeInsets } from './math';
+import { activeArcAt } from './ArcBands';
+import { bandFraction, bandOffset, clamp, pickNode, storyRoute, verticalExtent, type SafeInsets } from './math';
 import type { NodeMesh } from './NodeMesh';
 import { PointerInput } from './PointerInput';
 import type { PostProcessing } from './PostFX';
@@ -174,11 +175,26 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.rig.setBias(sidePanel ? 0.34 : 0);
     if (!node || (!changed && !opened)) return;
 
-    // Vuelo de cámara + pulso: el momento de la selección.
+    // Vuelo de cámara + pulso: el momento de la selección. En la historia, el vuelo sigue las líneas.
     const distance = state.detailOpen ? DETAIL_DISTANCE : Math.min(this.rig.target.distance, this.defaultDistance());
-    this.rig.flyTo(node.group.position, distance);
+    const from = state.story?.fromEventId ? this.nodesById.get(state.story.fromEventId) : undefined;
+    if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance);
+    else this.rig.flyTo(node.group.position, distance);
     this.built?.pulse.trigger(node.group.position, node.color, node.radius);
     if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.9 : 0.45);
+  }
+
+  /** Vuelo del modo historia: avanza por el tiempo siguiendo la línea de salida y la de llegada. */
+  private flyAlongLines(from: NodeMesh, to: NodeMesh, distance: number): void {
+    const lineOf = (id: string) => {
+      const branch = this.layout?.nodes.find((item) => item.eventId === id)?.branch;
+      return this.layout?.branches.find((item) => item.id === branch)?.points;
+    };
+    const a = from.group.position;
+    const b = to.group.position;
+    const route = storyRoute(a, b, lineOf(from.eventId), lineOf(to.eventId));
+    const span = Math.abs(b.x - a.x);
+    this.rig.flyAlong(route, distance, clamp(1.3 + span / 30, 1.5, 3.4), Math.min(26, 4 + span * 0.35));
   }
 
   zoomBy(factor: number): void {
@@ -273,6 +289,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const reducedMotion = this.deps.reducedMotion();
     this.rig.update(delta, reducedMotion);
     this.camera.updateMatrixWorld();
+    this.built.arcs.setActive(this.layout ? activeArcAt(this.layout.arcs, this.rig.lookX) : null);
     const fogDensity = FOG_DENSITY * Math.min(1, FOG_REFERENCE_DISTANCE / Math.max(1, this.rig.distance));
     if (this.scene.fog instanceof FogExp2) this.scene.fog.density = fogDensity;
     const context: FrameContext = { time, delta, camera: this.camera, viewport: this.viewport, reducedMotion, fogDensity };
@@ -313,7 +330,21 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       return { year: mark.year, x: screen.x, inFront: screen.inFront };
     });
     const now = this.layout ? toScreen(this.layout.nowX, 0, 0) : null;
-    return { nodes, years, nowX: now && now.inFront ? now.x : null, cameraDistance: this.rig.distance, viewport: this.viewport };
+    const active = this.built?.arcs.active ?? null;
+    const arcs = (this.layout?.arcs ?? []).map((arc) => ({
+      id: arc.id,
+      startX: toScreen(arc.startX, 0, 0).x,
+      endX: toScreen(arc.endX, 0, 0).x,
+      active: arc.id === active,
+    }));
+    return {
+      nodes,
+      years,
+      nowX: now && now.inFront ? now.x : null,
+      cameraDistance: this.rig.distance,
+      viewport: this.viewport,
+      arcs,
+    };
   }
 
   private updateHover(): void {
