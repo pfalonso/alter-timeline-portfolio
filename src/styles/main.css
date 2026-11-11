@@ -967,6 +967,7 @@ a {
 
 .popup__nav {
   padding: 6px 2px;
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.16em;
@@ -1516,6 +1517,10 @@ a {
   opacity: 0.7;
 }
 
+.arc-strip__segment--narrow .arc-strip__years {
+  display: none;
+}
+
 .arc-strip__segment--active {
   border-left-color: var(--glow);
 }
@@ -1707,8 +1712,15 @@ a {
   animation: rise-in 0.8s var(--ease) both;
 }
 
+.popup__footer {
+  flex-wrap: wrap;
+}
+
+/* «Siguiente en la historia» ocupa su propia fila sobre Anterior / Siguiente. */
 .popup__story-next {
-  padding: 6px 10px;
+  order: -1;
+  flex-basis: 100%;
+  padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--glow) 55%, transparent);
   font-family: var(--font-mono);
   font-size: 10.5px;
@@ -1775,6 +1787,12 @@ a {
 }
 
 @media (max-width: 720px) {
+  .controls__button--story {
+    padding: 0 10px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+  }
+
   .arc-strip__caption {
     font-size: 8.5px;
     letter-spacing: 0.16em;

@@ -81,6 +81,8 @@ async function bootstrap(): Promise<void> {
     byId('arc-strip'),
     byId('chapter'),
     byId('story-toggle'),
+    byId('popup'),
+    byId('index'),
   ]);
   const ruler = new YearRuler(byId('ruler'));
   const arcStrip = new ArcStrip(byId('arc-strip'));

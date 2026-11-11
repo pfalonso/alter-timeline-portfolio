@@ -636,6 +636,21 @@ describe('ThreeTimelineView: arcos y modo historia', () => {
     expect(h.built.at(-1)?.arcs.active).toBe('aprender');
   });
 
+  it('de muy cerca, los extremos de arco detrás de la cámara se mandan fuera de pantalla por su lado', () => {
+    const h = harness();
+    h.view.render(storyModel);
+    h.view.applySelection(selection('e-side-two', true));
+    h.view.zoomBy(0.01);
+    h.step();
+    const arcs = h.last().arcs ?? [];
+    // Orden conservado: cada arco empieza donde (o después de donde) acaba el anterior en pantalla.
+    for (let i = 0; i < arcs.length; i += 1) {
+      expect(arcs[i].endX).toBeGreaterThanOrEqual(arcs[i].startX);
+      if (i > 0) expect(arcs[i].startX).toBeGreaterThanOrEqual(arcs[i - 1].startX);
+    }
+    expect(arcs[0].startX).toBeLessThan(0);
+  });
+
   it('en la historia, el paso siguiente es un vuelo a lo largo del tiempo (no un corte)', () => {
     const h = harness({ reduced: false });
     h.view.render(storyModel);

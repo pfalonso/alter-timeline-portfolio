@@ -331,10 +331,16 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     });
     const now = this.layout ? toScreen(this.layout.nowX, 0, 0) : null;
     const active = this.built?.arcs.active ?? null;
+    // Un extremo detrás de la cámara se proyecta «reflejado»: se manda fuera de pantalla por su lado.
+    const lookX = this.rig.lookX;
+    const screenX = (x: number): number => {
+      const p = toScreen(x, 0, 0);
+      return p.inFront ? p.x : x < lookX ? -1e5 : 1e5;
+    };
     const arcs = (this.layout?.arcs ?? []).map((arc) => ({
       id: arc.id,
-      startX: toScreen(arc.startX, 0, 0).x,
-      endX: toScreen(arc.endX, 0, 0).x,
+      startX: screenX(arc.startX),
+      endX: screenX(arc.endX),
       active: arc.id === active,
     }));
     return {

@@ -59,6 +59,9 @@ describe('ArcStrip', () => {
     expect(second.querySelector<HTMLElement>('.arc-strip__caption')?.hidden).toBe(true);
     expect(first.querySelector<HTMLElement>('.arc-strip__caption')?.hidden).toBe(false);
     expect(third.hidden).toBe(true);
+    expect(first.classList.contains('arc-strip__segment--narrow')).toBe(true);
+    strip.onProjected(frame([{ id: 'aprender', startX: 0, endX: 600, active: false }]));
+    expect(first.classList.contains('arc-strip__segment--narrow')).toBe(false);
     strip.onProjected({ ...frame([]), arcs: undefined });
   });
 });

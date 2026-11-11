@@ -19,6 +19,8 @@ const LABEL_HEIGHT: Record<number, number> = { 1: 30, 2: 32, 3: 40 };
 export class NodeLabels implements TimelineViewPart, ProjectionListener {
   private readonly labels = new Map<string, Label>();
   private focusedId: string | null = null;
+  private detailOpen = false;
+  private storyStep: string | undefined;
 
   private reserved: Box[] = [];
   private frames = 0;
@@ -78,6 +80,11 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
 
   applySelection(state: SelectionViewState): void {
     this.focusedId = state.focusedEventId;
+    // Abrir o cerrar el pop-up (o la tarjeta de capítulo) cambia las zonas reservadas: se vuelven
+    // a medir en el próximo fotograma en vez de esperar al ciclo de 20.
+    if (state.detailOpen !== this.detailOpen || state.story?.eventId !== this.storyStep) this.frames = 0;
+    this.detailOpen = state.detailOpen;
+    this.storyStep = state.story?.eventId;
   }
 
   onProjected(frame: ProjectedFrame): void {
@@ -88,8 +95,11 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
     for (const node of frame.nodes) {
       const label = this.labels.get(node.eventId);
       if (!label || !node.inFront) continue;
-      if (node.presence > 0.5) obstacles.push({ id: node.eventId, x: node.x, y: node.y, radius: node.radius * 1.5 });
       const pinned = node.highlighted || node.eventId === this.focusedId;
+      // Un rótulo puede pasar por encima de un punto menor, pero nunca tapa un nodo medio o mayor.
+      if (node.presence > 0.5 && (node.importance >= 2 || pinned)) {
+        obstacles.push({ id: node.eventId, x: node.x, y: node.y, radius: node.radius * 1.5 });
+      }
       const eligible = node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(node.importance));
       // Un rótulo cuyo nodo está fuera de pantalla no se pinta; si el nodo está dentro, el rótulo
       // se desplaza lo necesario para no quedar cortado por el borde.
@@ -98,7 +108,8 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       candidates.push({
         id: node.eventId,
         x: clampLabelX(node.x, label.width, frame.viewport.width),
-        ys: [node.y + gap, node.y - gap - label.height],
+        // Debajo, encima y, si no, un poco más abajo (sigue leyéndose como suyo).
+        ys: [node.y + gap, node.y - gap - label.height, node.y + gap + label.height * 0.75],
         width: label.width,
         height: label.height,
         priority: labelPriority(node.importance, pinned, label.shown, node.radius),

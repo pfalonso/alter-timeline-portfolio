@@ -119,6 +119,17 @@ describe('NodeLabels', () => {
     // Un nodo atenuado no cuenta como obstáculo.
     labels.onProjected(frame([node('a-school', 300, 20), node('b-job', 300, 60, { presence: 0.1 })], 20));
     expect(shown(label('Escuela'))).toBe(true);
+    // Un punto menor tampoco: el rótulo puede pasarle por encima.
+    labels.onProjected(frame([node('a-school', 300, 20), node('c-side', 300, 60)], 20));
+    expect(shown(label('Escuela'))).toBe(true);
+  });
+
+  it('si debajo y encima están ocupados, prueba un poco más abajo', () => {
+    const { labels, label } = setup();
+    // El disco de e-side-two (medio) tapa la posición de debajo; arriba no cabe (borde superior).
+    labels.onProjected(frame([node('a-school', 300, 10), node('e-side-two', 300, 45)], 20));
+    expect(shown(label('Escuela'))).toBe(true);
+    expect(translation(label('Escuela'))[1]).toBeCloseTo(10 + 31 + 32 * 0.75, 5);
   });
 
   it('evita las zonas de interfaz reservadas (cabecera, filtros), medidas respecto a su contenedor', () => {
@@ -216,5 +227,26 @@ describe('NodeLabels', () => {
     labels.onProjected(frame([node('a-school', 500, 300), node('b-job', 505, 300), node('e-side-two', 510, 300)], 30));
     expect(shown(label('Primer trabajo'))).toBe(true);
     expect([shown(label('Escuela')), shown(label('Segunda parte'))].filter(Boolean)).toHaveLength(1);
+  });
+
+  it('abrir el pop-up o cambiar de paso en la historia vuelve a medir las zonas reservadas enseguida', () => {
+    const blocker = mount('div');
+    let calls = 0;
+    blocker.getBoundingClientRect = () => {
+      calls += 1;
+      return { left: 0, right: 10, top: 0, bottom: 10, width: 10, height: 10, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    const root = mount('div');
+    const labels = new NodeLabels(root, [blocker]);
+    labels.render(buildModel());
+    labels.onProjected(frame([]));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(1);
+    labels.applySelection(selection('a-school', true));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(2);
+    labels.applySelection(selection('a-school', true));
+    labels.onProjected(frame([]));
+    expect(calls).toBe(2);
   });
 });

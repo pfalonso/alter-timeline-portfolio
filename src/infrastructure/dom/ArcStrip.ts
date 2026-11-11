@@ -12,6 +12,8 @@ interface Segment {
 
 /** Ancho mínimo (px) del tramo visible de un capítulo para rotular su título. */
 export const ARC_CAPTION_MIN_WIDTH = 96;
+/** Por debajo de este ancho se omiten los años y queda solo el título. */
+export const ARC_YEARS_MIN_WIDTH = 200;
 const EDGE = 8;
 
 /**
@@ -59,6 +61,7 @@ export class ArcStrip implements TimelineViewPart, ProjectionListener {
       segment.element.classList.toggle('arc-strip__segment--active', arc.active);
       // El título se queda en la parte visible del capítulo; si no cabe, solo queda el corchete.
       segment.caption.hidden = right - left < ARC_CAPTION_MIN_WIDTH;
+      segment.element.classList.toggle('arc-strip__segment--narrow', right - left < ARC_YEARS_MIN_WIDTH);
     }
   }
 }
