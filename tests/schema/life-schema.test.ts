@@ -79,7 +79,34 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
       ].sort(),
     );
     expect(Object.keys(defs.category.properties ?? {}).sort()).toEqual(['color', 'description', 'icon', 'id', 'label']);
-    expect(Object.keys(schema.properties?.meta.properties ?? {}).sort()).toEqual(['contact', 'locale', 'owner', 'tagline', 'title']);
+    expect(Object.keys(schema.properties?.meta.properties ?? {}).sort()).toEqual([
+      'contact', 'locale', 'mainBranch', 'owner', 'tagline', 'title',
+    ]);
+    expect(Object.keys(defs.branch.properties ?? {}).sort()).toEqual(
+      ['color', 'description', 'focus', 'id', 'label', 'mergeInto', 'origin', 'until'].sort(),
+    );
+    expect(Object.keys(defs.focusPeriod.properties ?? {}).sort()).toEqual(['end', 'level', 'start']);
+  });
+
+  it('líneas vitales: lo obligatorio y las enumeraciones del schema son lo que exige el dominio', () => {
+    const line = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({ id: 'side', label: 'Paralela', ...extra });
+    expect(domainAccepts((data) => ((data as unknown as { branches: unknown[] }).branches = [line()]))).toBe(true);
+    for (const key of defs.branch.required ?? []) {
+      expect(domainAccepts((data) => {
+        const item = line();
+        delete item[key];
+        (data as unknown as { branches: unknown[] }).branches = [item];
+      })).toBe(false);
+    }
+    expect(defs.branch.properties?.until.const).toBe('present');
+    expect(domainAccepts((data) => ((data as unknown as { branches: unknown[] }).branches = [line({ until: 'siempre' })]))).toBe(false);
+    expect(defs.focusPeriod.properties?.level.enum).toEqual([1, 2, 3]);
+    for (const level of [1, 2, 3]) {
+      expect(domainAccepts((data) => ((data as unknown as { branches: unknown[] }).branches = [line({ focus: [{ start: '2016', level }] })]))).toBe(true);
+    }
+    expect(domainAccepts((data) => ((data as unknown as { branches: unknown[] }).branches = [line({ focus: [{ start: '2016', level: 4 }] })]))).toBe(false);
+    expect(defs.focusPeriod.required).toEqual(['start']);
+    expect(domainAccepts((data) => ((data as unknown as { branches: unknown[] }).branches = [line({ focus: [{ end: '2016' }] })]))).toBe(false);
   });
 
   it('las enumeraciones coinciden', () => {

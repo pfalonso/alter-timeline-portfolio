@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { LifeData, LifeEventData } from '../../src/domain/model';
 import { LifeDataValidator } from '../../src/domain/services/LifeDataValidator';
 import { toPublicData } from '../../scripts/build-public-data';
-import { makeData, makeEvent } from '../helpers/fixtures';
+import { makeData, makeEvent, makeLifeLinesData } from '../helpers/fixtures';
 
 type Raw = Parameters<typeof toPublicData>[0];
 const asRaw = (data: LifeData): Raw => data as unknown as Raw;
@@ -93,6 +93,47 @@ describe('toPublicData()', () => {
   });
 });
 
+describe('toPublicData con líneas vitales', () => {
+  const validator = new LifeDataValidator();
+  const hide = (data: LifeData, ...hidden: string[]): LifeData => {
+    for (const event of data.events) if (hidden.includes(event.id)) event.visibility = 'private';
+    return data;
+  };
+
+  it('sin privados que afecten a las líneas, las conserva tal cual', () => {
+    const data = makeLifeLinesData();
+    expect(toPublicData(asRaw(data)).branches).toEqual(data.branches);
+  });
+
+  it('quita las líneas sin eventos públicos, el origin privado y la fusión en un evento privado', () => {
+    const data = hide(makeLifeLinesData(), 'bread', 'birth', 'master');
+    const output = toPublicData(asRaw(data));
+    const lines = output.branches ?? [];
+    expect(lines.map((line) => line.id)).toEqual(['core', 'art', 'teach']);
+    expect(lines.find((line) => line.id === 'art')?.mergeInto).toBeUndefined();
+    expect(lines.find((line) => line.id === 'art')?.origin).toBeUndefined();
+    expect(validator.validate(output).issues).toEqual([]);
+  });
+
+  it('reengancha un origin privado a su ancestro público si existe (y no si cae en la propia línea)', () => {
+    const data = makeLifeLinesData((d) => {
+      d.events.push(makeEvent({ id: 'secret', date: { start: '2008' }, branch: 'teach', branchFrom: 'degree', visibility: 'private' }));
+      d.events.push(makeEvent({ id: 'own', date: { start: '2009' }, branch: 'food', branchFrom: 'degree', visibility: 'private' }));
+      (d.branches ?? [])[3].origin = 'secret';
+      (d.branches ?? [])[2].origin = 'own';
+    });
+    const output = toPublicData(asRaw(data));
+    expect(output.branches?.find((line) => line.id === 'teach')?.origin).toBe('degree');
+    expect(validator.validate(output).issues).toEqual([]);
+    const selfAnchored = makeLifeLinesData((d) => {
+      d.events.push(makeEvent({ id: 'self', date: { start: '2008' }, branch: 'teach', branchFrom: 'bread', visibility: 'private' }));
+      (d.branches ?? [])[2].origin = 'self';
+    });
+    expect(validator.validate(selfAnchored).issues).toEqual([]);
+    expect(toPublicData(asRaw(selfAnchored)).branches?.find((line) => line.id === 'food')?.origin).toBeUndefined();
+  });
+});
+
 const dir = mkdtempSync(join(tmpdir(), 'build-public-data-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -110,7 +151,7 @@ describe('scripts/build-public-data.ts', () => {
     const result = run('public/data/life.example.json', target);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/21 eventos públicos \(1 privados eliminados\)/);
+    expect(result.stdout).toMatch(/26 eventos públicos \(1 privados eliminados\)/);
     const written = JSON.parse(readFileSync(target, 'utf8')) as Raw;
     expect(written.events.some((event) => event.visibility === 'private')).toBe(false);
   }, 90_000);

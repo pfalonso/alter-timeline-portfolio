@@ -8,9 +8,11 @@ export { DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
 export type {
   LayoutBounds,
   LayoutBranch,
+  LayoutMerge,
   LayoutNode,
   LayoutOptions,
   TimelineLayoutResult,
   Vec3,
   YearMark,
 } from './TimelineLayout';
+export { FOCUS_LEVEL_INTENSITY, FOCUS_OUT, FOCUS_TRANSITION_YEARS, focusIntensityAt, sampleFocus } from './LineFocus';

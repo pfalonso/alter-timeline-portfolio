@@ -19,9 +19,17 @@ interface RawEvent {
   categories?: string[];
   [key: string]: unknown;
 }
+interface RawLine {
+  id: string;
+  origin?: string;
+  mergeInto?: { branch: string; event: string };
+  [key: string]: unknown;
+}
 interface RawData {
+  meta?: { mainBranch?: string; [key: string]: unknown };
   categories: { id: string }[];
   events: RawEvent[];
+  branches?: RawLine[];
   [key: string]: unknown;
 }
 
@@ -55,7 +63,39 @@ export function toPublicData(data: RawData): RawData {
 
   const used = new Set(events.flatMap((event) => event.categories ?? []));
   const categories = data.categories.filter((category) => used.has(category.id));
-  return { ...data, categories, events };
+  const result: RawData = { ...data, categories, events };
+  if (data.branches) result.branches = publicLines(data.branches, events, byId, publicAncestor, data.meta?.mainBranch ?? 'main');
+  return result;
+}
+
+/**
+ * Líneas sin rastro de eventos privados: desaparecen las que se quedan sin eventos públicos; un
+ * `origin` privado se reengancha al ancestro público (o se quita) y una fusión en un evento privado
+ * se quita (la línea se disuelve en vez de converger).
+ */
+function publicLines(
+  lines: RawLine[],
+  events: RawEvent[],
+  byId: Map<string, RawEvent>,
+  publicAncestor: (id: string | undefined) => string | undefined,
+  mainBranch: string,
+): RawLine[] {
+  const alive = new Set(events.map((event) => (typeof event.branch === 'string' ? event.branch : mainBranch)));
+  alive.add(mainBranch);
+  return lines
+    .filter((line) => alive.has(line.id))
+    .map((line) => {
+      const copy: RawLine = { ...line };
+      if (line.origin !== undefined) {
+        const anchor = publicAncestor(line.origin);
+        const anchorBranch = anchor === undefined ? undefined : (byId.get(anchor)?.branch ?? mainBranch);
+        if (anchor === undefined || anchorBranch === line.id) delete copy.origin;
+        else copy.origin = anchor;
+      }
+      const merge = line.mergeInto;
+      if (merge && (byId.get(merge.event)?.visibility === 'private' || !alive.has(merge.branch))) delete copy.mergeInto;
+      return copy;
+    });
 }
 
 function main(): number {

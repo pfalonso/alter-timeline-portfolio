@@ -34,8 +34,8 @@ function main(): number {
     for (const issue of result.issues) console.error(`  - ${formatIssue(issue)}`);
     return 1;
   }
-  const { events, categories } = result.data;
-  const branches = new Set(events.map((event) => event.branch ?? 'main'));
+  const { events, categories, meta } = result.data;
+  const branches = new Set(events.map((event) => event.branch ?? meta.mainBranch ?? 'main'));
   const hidden = events.filter((event) => event.visibility === 'private').length;
   console.log(
     `✔ ${file}: válido — ${events.length} eventos (${hidden} privados), ${categories.length} categorías, ${branches.size} ramas`,
