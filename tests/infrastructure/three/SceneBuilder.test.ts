@@ -79,7 +79,7 @@ describe('SceneBuilder', () => {
     const built = new SceneBuilder().build(model);
     const flow = built.effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow);
     const total = built.branches.reduce((sum, branch) => sum + branch.path.length, 0);
-    expect(flow?.count).toBe(Math.round(total * 2.6));
+    expect(flow?.count).toBe(Math.round(total * 1.9));
   });
 
   it('particleBudget reduce las motas de pigmento (movimiento reducido / móvil)', () => {

@@ -122,7 +122,7 @@ export interface WatercolorOptions {
   readonly parallax: number;
 }
 
-export const DEFAULT_WATERCOLOR: WatercolorOptions = { paper: '#140e26', strength: 0.13, parallax: 0.0035 };
+export const DEFAULT_WATERCOLOR: WatercolorOptions = { paper: '#140e26', strength: 0.115, parallax: 0.0035 };
 
 /**
  * Fondo de acuarela en movimiento. Es un `SceneEffect` (se actualiza con cada fotograma: tiempo,

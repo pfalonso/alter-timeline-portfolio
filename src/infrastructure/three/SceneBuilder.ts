@@ -95,7 +95,7 @@ export class SceneBuilder {
       const style: BranchStyle = {
         color: colorOfLine(branch.id, isTrunk),
         radius: isTrunk ? 0.075 : 0.055,
-        intensity: isTrunk ? 0.95 : 0.72,
+        intensity: isTrunk ? 0.82 : 0.68,
         fadeIn: isTrunk ? 0.06 : 0.02,
         fadeOut: isTrunk ? 0.05 : branch.open ? 0.04 : merges ? 0.015 : 0.3,
         flowSpeed: 0.11,
@@ -130,8 +130,8 @@ export class SceneBuilder {
         new BranchCurve(`link:${link.from}>${link.to}`, link.points, {
           color: lineColorById.get(link.fromBranch) ?? palette.trunk,
           colorEnd: lineColorById.get(link.toBranch) ?? palette.trunk,
-          radius: 0.045,
-          intensity: 0.62,
+          radius: 0.06,
+          intensity: 0.78,
           fadeIn: 0.04,
           fadeOut: 0.04,
           flowSpeed: 0.18,
@@ -147,7 +147,7 @@ export class SceneBuilder {
           target,
           lineColorById.get(link.fromBranch) ?? palette.trunk,
           lineColorById.get(link.toBranch) ?? palette.trunk,
-          { count: 70, radius: 0.9 },
+          { count: 40, radius: 0.8, core: 0 },
         );
       });
 
@@ -196,7 +196,7 @@ export class SceneBuilder {
 
     const pulse = new SelectionPulse(assets.ring);
     const arcs = new ArcBands(layout.arcs, layout.bounds);
-    const flow = new ParticleFlow(flowPaths, { density: 2.6 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
+    const flow = new ParticleFlow(flowPaths, { density: 1.9 * particleBudget, maxParticles: Math.round(2400 * particleBudget) });
     const effects: SceneEffect[] = [
       backdrop,
       new YearMarkers(layout.years, layout.bounds),

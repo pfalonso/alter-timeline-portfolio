@@ -19,9 +19,11 @@ export interface MergeSeamOptions {
   /** Radio del remolino (unidades de mundo). */
   readonly radius: number;
   readonly seed: number;
+  /** Tamaño del destello central (0 = sin destello: remolino de pigmento de las hebras causales). */
+  readonly core: number;
 }
 
-export const DEFAULT_SEAM_OPTIONS: MergeSeamOptions = { count: 90, radius: 1.5, seed: 11 };
+export const DEFAULT_SEAM_OPTIONS: MergeSeamOptions = { count: 90, radius: 1.5, seed: 11, core: 2.6 };
 
 interface Mote {
   readonly angle: number;
@@ -61,8 +63,8 @@ export class MergeSeam implements SceneEffect {
     const b = new Color(intoColor);
     const white = new Color('#ffffff');
     // Mota 0: el destello central.
-    white.toArray(colors, 0);
-    sizes[0] = 2.6;
+    (this.options.core > 0 ? white : a.clone().lerp(b, 0.5)).toArray(colors, 0);
+    sizes[0] = this.options.core;
     for (let i = 1; i < count; i += 1) {
       this.motes.push({
         angle: random() * Math.PI * 2,
