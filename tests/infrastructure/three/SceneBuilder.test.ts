@@ -1,6 +1,7 @@
 import { Scene } from 'three';
 import { describe, expect, it } from 'vitest';
 import { BranchCurve } from '../../../src/infrastructure/three/BranchCurve';
+import { MergeSeam } from '../../../src/infrastructure/three/MergeSeam';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
 import { bandFade, DEFAULT_PALETTE, SceneBuilder } from '../../../src/infrastructure/three/SceneBuilder';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
@@ -86,6 +87,18 @@ describe('SceneBuilder', () => {
       new SceneBuilder({ particleBudget: budget }).build(model).effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow)?.count ?? -1;
     expect(motes(0.3)).toBeLessThan(motes(1) * 0.35);
     expect(motes(0.3)).toBeGreaterThan(0);
+  });
+
+  it('una hebra causal por enlace, del color de la línea origen al de la destino, con remolino si cambian de línea', () => {
+    const data = makeData();
+    data.events[0].ledTo = ['b-job', 'c-side'];
+    const built = new SceneBuilder().build(buildModel(data));
+    expect(built.strands.map((strand) => strand.id)).toEqual(['link:a-school>b-job', 'link:a-school>c-side']);
+    for (const strand of built.strands) expect(built.effects).toContain(strand);
+    const uniforms = built.strands[1].mesh.material.uniforms;
+    expect(uniforms.uColor.value.getHexString()).not.toBe(uniforms.uColorEnd.value.getHexString());
+    const swirls = built.effects.filter((effect) => effect instanceof MergeSeam && effect.id.startsWith('swirl:'));
+    expect(swirls).toHaveLength(1);
   });
 
   it('las líneas se desvanecen un poco fuera de la banda de nodos', () => {

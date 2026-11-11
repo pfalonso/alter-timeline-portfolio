@@ -47,6 +47,8 @@ export interface BuiltScene {
   readonly branches: readonly BranchCurve[];
   /** Costuras de las líneas que se fusionan. */
   readonly seams: readonly MergeSeam[];
+  /** Hebras causales («esto llevó a esto»), del nodo origen al destino. */
+  readonly strands: readonly BranchCurve[];
   /** Resalta una línea (y atenúa las demás); `null` vuelve al estado normal. */
   highlightBranch(id: string | null): void;
   /** Todo lo que se actualiza por fotograma (ramas incluidas). */
@@ -120,6 +122,35 @@ export class SceneBuilder {
         return new MergeSeam(branch.id, merge.position, color, colorOfLine(merge.into, target?.main ?? false));
       });
 
+    // Hebras causales: tinta que va del color de la línea origen al de la destino. Si cambian de
+    // línea, un remolino de pigmento marca dónde se unen.
+    const lineColorById = new Map(branches.map(({ branch, color }) => [branch.id, color]));
+    const strands = layout.links.map(
+      (link) =>
+        new BranchCurve(`link:${link.from}>${link.to}`, link.points, {
+          color: lineColorById.get(link.fromBranch) ?? palette.trunk,
+          colorEnd: lineColorById.get(link.toBranch) ?? palette.trunk,
+          radius: 0.045,
+          intensity: 0.62,
+          fadeIn: 0.04,
+          fadeOut: 0.04,
+          flowSpeed: 0.18,
+          fogDensity,
+        }),
+    );
+    const swirls = layout.links
+      .filter((link) => link.fromBranch !== link.toBranch)
+      .map((link) => {
+        const target = link.points[link.points.length - 1];
+        return new MergeSeam(
+          `swirl:${link.from}>${link.to}`,
+          target,
+          lineColorById.get(link.fromBranch) ?? palette.trunk,
+          lineColorById.get(link.toBranch) ?? palette.trunk,
+          { count: 70, radius: 0.9 },
+        );
+      });
+
     // Tramos de duración: un filamento más grueso y tenue del color de la categoría.
     const spans = layout.nodes
       .filter((node) => node.span && node.span.length >= 2)
@@ -172,8 +203,10 @@ export class SceneBuilder {
       arcs,
       ...branches.map(({ curve }) => curve),
       ...spans,
+      ...strands,
       flow,
       ...seams,
+      ...swirls,
       pulse,
     ];
 
@@ -181,6 +214,7 @@ export class SceneBuilder {
       nodes,
       branches: branches.map(({ curve }) => curve),
       seams,
+      strands,
       highlightBranch: (id) => {
         for (const { curve } of branches) curve.setEmphasis(id === null ? 'none' : curve.id === id ? 'on' : 'off');
         flow.highlight(id);

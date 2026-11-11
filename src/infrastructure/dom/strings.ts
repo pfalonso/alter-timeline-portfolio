@@ -53,6 +53,9 @@ export const STRINGS = {
   chapter: 'Capítulo',
   chapterOf: (index: number, total: number): string => `Capítulo ${index + 1} de ${total}`,
   arcOf: (title: string): string => `Capítulo: ${title}`,
+  ledTo: 'Esto llevó a…',
+  cameFrom: 'Viene de…',
+  goTo: (title: string): string => `Ir a «${title}»`,
   outsideArcs: 'Otros momentos',
   storyAnnounce: (step: string, arc: string | null, bridge: string | undefined): string =>
     [step, arc ? `Capítulo: ${arc}` : null, bridge]

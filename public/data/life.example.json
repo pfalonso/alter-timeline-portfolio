@@ -134,7 +134,10 @@
       "location": "Gandia",
       "importance": 1,
       "branch": "creacion",
-      "bridge": "Del coro al circuito: con el primer sueldo de verano compra un sintetizador de segunda mano."
+      "bridge": "Del coro al circuito: con el primer sueldo de verano compra un sintetizador de segunda mano.",
+      "ledTo": [
+        "hackathon-ruido-blanco"
+      ]
     },
     {
       "id": "grado-sonido-imagen",
@@ -163,7 +166,10 @@
         "Becaria del laboratorio de acústica de salas durante dos cursos"
       ],
       "importance": 3,
-      "bridge": "La curiosidad pide método. Elige una ingeniería para entender lo que ya hacía de oído."
+      "bridge": "La curiosidad pide método. Elige una ingeniería para entender lo que ya hacía de oído.",
+      "ledTo": [
+        "estudios-albufera"
+      ]
     },
     {
       "id": "erasmus-tampere",
@@ -186,7 +192,10 @@
         "Audio interactivo"
       ],
       "importance": 2,
-      "bridge": "A mitad de carrera, el frío de Tampere le enseña que el silencio también se diseña."
+      "bridge": "A mitad de carrera, el frío de Tampere le enseña que el silencio también se diseña.",
+      "ledTo": [
+        "hackathon-ruido-blanco"
+      ]
     },
     {
       "id": "obrador-masa-lenta",
@@ -213,7 +222,10 @@
       ],
       "importance": 2,
       "branch": "cocina",
-      "bridge": "De vuelta, necesita las manos ocupadas: las madrugadas de obrador equilibran la teoría."
+      "bridge": "De vuelta, necesita las manos ocupadas: las madrugadas de obrador equilibran la teoría.",
+      "ledTo": [
+        "cenas-sonoras"
+      ]
     },
     {
       "id": "estudios-albufera",
@@ -240,7 +252,10 @@
         "Rediseño del flujo de copias de seguridad del estudio"
       ],
       "importance": 2,
-      "bridge": "Con el título en la mano, el oficio empieza de verdad: cables, sesiones y mucha escucha."
+      "bridge": "Con el título en la mano, el oficio empieza de verdad: cables, sesiones y mucha escucha.",
+      "ledTo": [
+        "lumen-atelier"
+      ]
     },
     {
       "id": "hackathon-ruido-blanco",
@@ -292,7 +307,10 @@
         "Reseña en la prensa gastronómica local"
       ],
       "importance": 2,
-      "branch": "cocina"
+      "branch": "cocina",
+      "ledTo": [
+        "lumen-atelier"
+      ]
     },
     {
       "id": "luz-de-barrio",
@@ -364,7 +382,10 @@
         }
       ],
       "importance": 3,
-      "bridge": "En Lisboa el sonido se cruza con la interacción: diseña espacios que responden."
+      "bridge": "En Lisboa el sonido se cruza con la interacción: diseña espacios que responden.",
+      "ledTo": [
+        "estudio-penumbra"
+      ]
     },
     {
       "id": "recetario-autoeditado",
@@ -400,7 +421,10 @@
       "description": "Allí entendió que el lenguaje visual y el sonoro se estaban acercando: sus piezas ya no se podían describir solo con una de las dos palabras. Un año después, ambos caminos se unieron en el máster.",
       "location": "Oporto",
       "branch": "artes-visuales",
-      "importance": 1
+      "importance": 1,
+      "ledTo": [
+        "master-artes-digitales"
+      ]
     },
     {
       "id": "estudio-penumbra",
@@ -499,7 +523,11 @@
         "Beca de producción para la pieza final"
       ],
       "importance": 2,
-      "bridge": "Vuelve con una pregunta clara y un máster para responderla."
+      "bridge": "Vuelve con una pregunta clara y un máster para responderla.",
+      "ledTo": [
+        "museo-mareas",
+        "docencia-universidad"
+      ]
     },
     {
       "id": "faro-interior",
@@ -582,7 +610,10 @@
         }
       ],
       "importance": 3,
-      "bridge": "Todas las líneas convergen en un encargo: dirigir la técnica de un museo que escucha."
+      "bridge": "Todas las líneas convergen en un encargo: dirigir la técnica de un museo que escucha.",
+      "ledTo": [
+        "sala-de-los-ecos"
+      ]
     },
     {
       "id": "escuela-circuitos-blandos",
@@ -632,7 +663,10 @@
         }
       ],
       "importance": 2,
-      "branch": "creacion"
+      "branch": "creacion",
+      "ledTo": [
+        "gira-mareografo"
+      ]
     },
     {
       "id": "sala-de-los-ecos",
@@ -733,7 +767,8 @@
           "end": "present",
           "level": 3
         }
-      ]
+      ],
+      "style": "geometric"
     },
     {
       "id": "creacion",
@@ -757,7 +792,8 @@
           "end": "present",
           "level": 2
         }
-      ]
+      ],
+      "style": "organic"
     },
     {
       "id": "artes-visuales",
@@ -780,7 +816,8 @@
           "end": "2018-06",
           "level": 3
         }
-      ]
+      ],
+      "style": "organic"
     },
     {
       "id": "cocina",
@@ -800,7 +837,8 @@
           "end": "2017-06",
           "level": 1
         }
-      ]
+      ],
+      "style": "organic"
     },
     {
       "id": "ensenar",
@@ -814,7 +852,8 @@
           "end": "2023-06",
           "level": 2
         }
-      ]
+      ],
+      "style": "neutral"
     }
   ],
   "arcs": [

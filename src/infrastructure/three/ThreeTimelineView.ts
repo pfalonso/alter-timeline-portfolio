@@ -10,7 +10,7 @@ import type { TimelineViewPart } from '../dom/CompositeTimelineView';
 import type { NodeHoverListener } from '../dom/Tooltip';
 import { CameraRig } from './CameraRig';
 import { activeArcAt } from './ArcBands';
-import { bandFraction, bandOffset, clamp, pickNode, storyRoute, verticalExtent, type SafeInsets } from './math';
+import { bandFraction, bandOffset, clamp, pickNode, routeAlong, storyRoute, verticalExtent, type SafeInsets } from './math';
 import type { NodeMesh } from './NodeMesh';
 import { PointerInput } from './PointerInput';
 import type { PostProcessing } from './PostFX';
@@ -185,18 +185,18 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance);
     else this.rig.flyTo(node.group.position, distance);
     this.built?.pulse.trigger(node.group.position, node.color, node.radius);
-    if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.9 : 0.45);
+    if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.45 : 0.25);
   }
 
-  /** Vuelo del modo historia: avanza por el tiempo siguiendo la línea de salida y la de llegada. */
+  /**
+   * Vuelo del modo historia. Los nodos viven en la banda, así que el vuelo la recorre en línea recta;
+   * si el paso siguiente es consecuencia del actual (`ledTo`), la cámara sigue la hebra causal.
+   */
   private flyAlongLines(from: NodeMesh, to: NodeMesh, distance: number): void {
-    const lineOf = (id: string) => {
-      const branch = this.layout?.nodes.find((item) => item.eventId === id)?.branch;
-      return this.layout?.branches.find((item) => item.id === branch)?.points;
-    };
     const a = from.group.position;
     const b = to.group.position;
-    const route = storyRoute(a, b, lineOf(from.eventId), lineOf(to.eventId));
+    const link = this.layout?.links?.find((item) => item.from === from.eventId && item.to === to.eventId);
+    const route = link ? routeAlong(link.points) : storyRoute(a, b);
     const span = Math.abs(b.x - a.x);
     this.rig.flyAlong(route, distance, clamp(1.3 + span / 30, 1.5, 3.4), Math.min(26, 4 + span * 0.35));
   }

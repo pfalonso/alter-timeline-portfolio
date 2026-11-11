@@ -240,3 +240,20 @@ export function pointOnRoute(route: readonly { x: number; y: number }[], t: numb
 
 /** Curva de aceleración suave (entrada y salida). */
 export const easeInOutCubic = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+
+/**
+ * Ruta de cámara que sigue una hebra causal (polilínea del layout), remuestreada a `samples` tramos
+ * uniformes en el índice. Empieza y termina exactamente en sus extremos.
+ */
+export function routeAlong(points: readonly Vec3[], samples = 24): { x: number; y: number }[] {
+  if (points.length === 0) return [];
+  const route: { x: number; y: number }[] = [];
+  for (let i = 0; i <= samples; i += 1) {
+    const f = (i / samples) * (points.length - 1);
+    const j = Math.min(points.length - 2, Math.floor(f));
+    if (j < 0) return [{ x: points[0].x, y: points[0].y }];
+    const k = f - j;
+    route.push({ x: lerp(points[j].x, points[j + 1].x, k), y: lerp(points[j].y, points[j + 1].y, k) });
+  }
+  return route;
+}

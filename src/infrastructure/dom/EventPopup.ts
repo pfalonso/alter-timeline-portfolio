@@ -183,6 +183,8 @@ export class EventPopup implements TimelineViewPart {
       facts,
       el('p', { class: 'popup__summary', text: event.summary }),
       ...event.paragraphs.map((paragraph) => el('p', { class: 'popup__paragraph', text: paragraph })),
+      this.causalSection(STRINGS.cameFrom, timeline.causesOf(event.id), 'popup__causes'),
+      this.causalSection(STRINGS.ledTo, timeline.consequencesOf(event.id), 'popup__consequences'),
       this.mediaSection(event),
       this.listSection(STRINGS.highlights, event.highlights, 'popup__highlights'),
       this.listSection(STRINGS.skills, event.skills, 'popup__skills'),
@@ -196,6 +198,26 @@ export class EventPopup implements TimelineViewPart {
       el('h3', { text: title }),
       el('ul', { class: className }, items.map((item) => el('li', { text: item }))),
     ]);
+  }
+
+  /** «Esto llevó a…» / «Viene de…»: botones que abren el evento enlazado (con su fecha y color). */
+  private causalSection(title: string, events: readonly LifeEvent[], className: string): HTMLElement | null {
+    if (events.length === 0) return null;
+    const timeline = this.timeline as Timeline;
+    const items = events.map((target) => {
+      const button = el(
+        'button',
+        { class: 'popup__causal', attrs: { type: 'button', 'data-event': target.id, 'aria-label': STRINGS.goTo(target.title) } },
+        [
+          el('span', { class: 'popup__causal-title', text: target.title }),
+          el('span', { class: 'popup__causal-date', text: target.formatDateRange(timeline.meta.locale, STRINGS.present) }),
+        ],
+      );
+      button.style.setProperty('--chip-color', timeline.primaryCategoryOf(target)?.color ?? '#9fd8ff');
+      button.addEventListener('click', () => this.handlers?.onEventActivated(target.id));
+      return el('li', {}, [button]);
+    });
+    return el('section', { class: `popup__section ${className}` }, [el('h3', { text: title }), el('ul', { class: 'popup__causal-list' }, items)]);
   }
 
   private linksSection(event: LifeEvent): HTMLElement | null {

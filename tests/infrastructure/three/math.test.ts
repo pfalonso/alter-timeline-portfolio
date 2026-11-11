@@ -11,6 +11,7 @@ import {
   smoothstep,
   verticalExtent,
   type Pickable,
+  routeAlong,
 } from '../../../src/infrastructure/three/math';
 
 describe('clamp / lerp / smoothstep', () => {
@@ -220,5 +221,22 @@ describe('encuadre: franja libre y extensión vertical', () => {
     expect(verticalExtent(branches, 0, 10)).toEqual({ minY: -3, maxY: 5 });
     expect(verticalExtent(branches, 15, 25)).toEqual({ minY: -9, maxY: -9 });
     expect(verticalExtent(branches, 30, 40)).toBeNull();
+  });
+});
+
+describe('routeAlong (vuelo por una hebra causal)', () => {
+  it('remuestrea la polilínea y empieza y acaba en sus extremos', () => {
+    const points = [
+      { x: 0, y: 0, z: 0 },
+      { x: 5, y: 2, z: 1 },
+      { x: 10, y: 0, z: 0 },
+    ];
+    const route = routeAlong(points, 4);
+    expect(route).toHaveLength(5);
+    expect(route[0]).toEqual({ x: 0, y: 0 });
+    expect(route[2]).toEqual({ x: 5, y: 2 });
+    expect(route[4]).toEqual({ x: 10, y: 0 });
+    expect(routeAlong([])).toEqual([]);
+    expect(routeAlong([{ x: 1, y: 2, z: 3 }])).toEqual([{ x: 1, y: 2 }]);
   });
 });

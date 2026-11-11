@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TimelineViewModel } from '../../../src/application/ports';
 import type { NodeHoverListener } from '../../../src/infrastructure/dom/Tooltip';
 import type { PostProcessing } from '../../../src/infrastructure/three/PostFX';
+import { CameraRig } from '../../../src/infrastructure/three/CameraRig';
+import { routeAlong } from '../../../src/infrastructure/three/math';
 import { RenderLoop } from '../../../src/infrastructure/three/RenderLoop';
 import { SceneBuilder, type BuiltScene } from '../../../src/infrastructure/three/SceneBuilder';
 import { ThreeTimelineView } from '../../../src/infrastructure/three/ThreeTimelineView';
@@ -374,9 +376,9 @@ describe('ThreeTimelineView: filtro y selección', () => {
   it('el bloom da un golpe al seleccionar (más fuerte al abrir); con movimiento reducido, no', () => {
     const h = harness({ reduced: false });
     h.view.applySelection(selection('a-school'));
-    expect(h.post.kick).toHaveBeenLastCalledWith(0.45);
+    expect(h.post.kick).toHaveBeenLastCalledWith(0.25);
     h.view.applySelection(selection('a-school', true));
-    expect(h.post.kick).toHaveBeenLastCalledWith(0.9);
+    expect(h.post.kick).toHaveBeenLastCalledWith(0.45);
     expect(h.built[0].pulse.isActive).toBe(true);
 
     const calm = harness({ reduced: true });
@@ -666,6 +668,25 @@ describe('ThreeTimelineView: arcos y modo historia', () => {
     // Con el panel lateral el nodo queda desplazado a la izquierda del centro.
     expect(end).toBeLessThan(600);
     expect(h.node('b-job').highlighted).toBe(true);
+  });
+
+  it('si el paso siguiente es consecuencia del actual (ledTo), la cámara sigue la hebra causal', () => {
+    const data = makeStoryData();
+    const from = data.events.find((event) => event.id === 'a-school');
+    if (from) from.ledTo = ['b-job'];
+    const causalModel = buildModel(data);
+    const fly = vi.spyOn(CameraRig.prototype, 'flyAlong');
+    const h = harness({ reduced: false });
+    h.view.render(causalModel);
+    h.view.applySelection({ ...selection('a-school', true), story: story('a-school', null) });
+    h.step(10);
+    h.view.applySelection({ ...selection('b-job', true), story: story('b-job', 'a-school') });
+    const link = causalModel.layout.links.find((item) => item.from === 'a-school' && item.to === 'b-job');
+    expect(fly.mock.calls.at(-1)?.[0]).toEqual(routeAlong(link?.points ?? []));
+    // Sin enlace, la ruta va recta por la banda.
+    h.view.applySelection({ ...selection('c-side', true), story: story('c-side', 'b-job') });
+    const straight = fly.mock.calls.at(-1)?.[0] ?? [];
+    expect(straight[0]).toEqual({ x: h.built.at(-1)?.nodes.find((n) => n.eventId === 'b-job')?.group.position.x, y: expect.any(Number) });
   });
 
   it('con movimiento reducido el paso de la historia es un corte', () => {

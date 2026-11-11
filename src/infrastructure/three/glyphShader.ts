@@ -27,6 +27,7 @@ export const GLYPH_FRAGMENT = /* glsl */ `
   uniform float uAttention;
   uniform float uTime;
   uniform float uSeed;
+  uniform float uExtent;
   varying vec2 vQ;
 
   float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -149,10 +150,12 @@ export const GLYPH_FRAGMENT = /* glsl */ `
     // Aura de pigmento (solo el mayor en reposo; todos al señalarlos): se expande con la atención.
     float auraBase = tier > 2.5 ? 0.3 : 0.0;
     float aura = auraBase + 0.32 * uAttention;
-    float spread = (tier > 2.5 ? 2.4 : 1.4) * (1.0 + 0.55 * uAttention);
+    float spread = (tier > 2.5 ? 1.9 : 1.0) * (1.0 + 0.4 * uAttention);
     float n = noise(q * 1.3 + uSeed + uTime * 0.06);
     float cloud = exp(-pow(length(q) / spread, 2.0) * (1.6 - 0.8 * n));
-    vec4 o = vec4(uColor * 0.9, cloud * aura * (0.6 + 0.4 * n));
+    // El aura se apaga antes del borde del cuadro (nunca se ve su silueta).
+    float edge = 1.0 - smoothstep(uExtent * 0.55, uExtent * 0.95, length(q));
+    vec4 o = vec4(uColor * 0.9, cloud * aura * (0.6 + 0.4 * n) * edge);
     o = over(o, glyph.rgb, glyph.a);
     gl_FragColor = vec4(o.rgb, o.a * uPresence);
   }

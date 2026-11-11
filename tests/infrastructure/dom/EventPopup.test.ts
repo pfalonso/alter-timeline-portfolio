@@ -360,3 +360,50 @@ describe('EventPopup: gestión del foco', () => {
     expect(document.activeElement).toBe(nextButton(root));
   });
 });
+
+describe('EventPopup: enlaces causales', () => {
+  const causal = (): ReturnType<typeof makeData> => {
+    const data = makeData();
+    data.events[0].ledTo = ['b-job', 'd-secret'];
+    data.events[1].ledTo = ['c-side'];
+    return data;
+  };
+
+  it('«Esto llevó a…» lista los destinos visibles y abre el elegido', () => {
+    const { root, handlers, popup } = setup(causal());
+    popup.applySelection(selection('a-school', true));
+    const section = root.querySelector('.popup__consequences');
+    expect(section?.querySelector('h3')?.textContent).toBe(STRINGS.ledTo);
+    const items = [...root.querySelectorAll<HTMLButtonElement>('.popup__consequences .popup__causal')];
+    // El destino privado no aparece si no se muestran los privados.
+    expect(items.map((item) => item.dataset.event)).toEqual(['b-job']);
+    expect(items[0].getAttribute('aria-label')).toBe(STRINGS.goTo('Primer trabajo'));
+    expect(items[0].style.getPropertyValue('--chip-color')).not.toBe('');
+    click(items[0]);
+    expect(handlers.onEventActivated).toHaveBeenCalledWith('b-job');
+    expect(root.querySelector('.popup__causes')).toBeNull();
+  });
+
+  it('«Viene de…» lista los orígenes; un evento con ambos muestra las dos secciones', () => {
+    const { root, handlers, popup } = setup(causal());
+    popup.applySelection(selection('b-job', true));
+    expect(root.querySelector('.popup__causes h3')?.textContent).toBe(STRINGS.cameFrom);
+    const origin = button(root, '.popup__causes .popup__causal');
+    expect(origin.dataset.event).toBe('a-school');
+    expect(button(root, '.popup__consequences .popup__causal').dataset.event).toBe('c-side');
+    click(origin);
+    expect(handlers.onEventActivated).toHaveBeenCalledWith('a-school');
+  });
+
+  it('con privados visibles, también enlaza a ellos; sin ledTo no hay secciones', () => {
+    const { root, popup } = setup(causal(), true);
+    popup.applySelection(selection('a-school', true));
+    expect([...root.querySelectorAll<HTMLButtonElement>('.popup__consequences .popup__causal')].map((item) => item.dataset.event)).toEqual([
+      'b-job',
+      'd-secret',
+    ]);
+    const plain = setup();
+    plain.popup.applySelection(selection('a-school', true));
+    expect(plain.root.querySelector('.popup__consequences, .popup__causes')).toBeNull();
+  });
+});
