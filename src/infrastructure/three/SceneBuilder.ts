@@ -1,7 +1,7 @@
 import type { TimelineViewModel } from '../../application/ports';
 import { ArcBands } from './ArcBands';
 import { BranchCurve, type BranchStyle } from './BranchCurve';
-import { sampleAlongPath, smoothstep, valueAtX } from './math';
+import { sampleAlongPath } from './math';
 import { MergeSeam } from './MergeSeam';
 import { NodeAssets, NodeMesh } from './NodeMesh';
 import { ParticleFlow, type FlowPath } from './ParticleFlow';
@@ -14,23 +14,38 @@ import { YearMarkers } from './YearMarkers';
 export interface ScenePalette {
   /** Papel: índigo/ciruela muy oscuro (no negro), también color de la niebla. */
   readonly background: string;
+  /** Color de una línea que no declara color ni tiene categoría de la que tomarlo. */
   readonly trunk: string;
-  readonly fallbackNode: string;
 }
 
 export const DEFAULT_PALETTE: ScenePalette = {
   background: DEFAULT_WATERCOLOR.paper,
   trunk: '#a9d4ff',
-  fallbackNode: '#cfe4ff',
 };
 
-/** En su carril (fuera de la banda) las líneas van tenues: el ojo sigue los nodos, no las hebras. */
-export function bandFade(y: number, bandHalf = 0.3, far = 2): number {
-  return 1 - 0.5 * smoothstep(bandHalf, far, Math.abs(y));
-}
+
+/**
+ * La trenza: grosor, brillo y hélice. `outer` y `outerWidth` son el brillo y el grosor relativos de
+ * una línea en su carril exterior (fuera de foco: fina y tenue).
+ */
+export const BRAID_STYLE = {
+  radius: 0.085,
+  intensity: 0.95,
+  outer: 0.3,
+  outerWidth: 0.5,
+  helix: 0.16,
+  frequency: 0.55,
+  speed: 0.35,
+} as const;
+
+/** Fibras extra de cada línea dentro de la trenza: más finas, con otra fase, radio y paso. */
+export const BRAID_FIBERS = [
+  { radius: 0.028, intensity: 0.75, helix: 0.3, phase: 2.1, frequency: 1.3, speed: -0.8 },
+  { radius: 0.022, intensity: 0.6, helix: 0.42, phase: 4.2, frequency: 0.8, speed: 1.25 },
+] as const;
 
 /** Realce de las hebras causales: discretas por defecto, encendidas al señalar uno de sus nodos. */
-export const STRAND_EMPHASIS = { rest: 0.22, lit: 1.6, other: 0.1 } as const;
+export const STRAND_EMPHASIS = { rest: 0.14, lit: 1.6, other: 0.1 } as const;
 
 export interface SceneBuildOptions {
   readonly palette: ScenePalette;
@@ -81,53 +96,66 @@ export class SceneBuilder {
     const { palette, fogDensity, particleBudget } = this.options;
     const assets = new NodeAssets(createRingTexture());
 
-    const colorOfEvent = (eventId: string): string => {
-      const event = timeline.getEvent(eventId);
-      return (event && timeline.primaryCategoryOf(event)?.color) ?? palette.fallbackNode;
-    };
+    // Un solo código de color: el de la línea vital. Nodos, tramos, motas y chispas lo comparten.
+    const colorOfLine = (id: string): string => timeline.lineColorOf(id) ?? palette.trunk;
+    const lineCount = Math.max(1, layout.branches.length);
 
-    // Líneas: la central es pálida salvo que declare color; las demás usan el suyo o el de la
-    // categoría principal de su primer evento. El foco modula brillo, grosor y partículas.
-    const colorOfLine = (id: string, main: boolean): string =>
-      (main ? timeline.getLine(id)?.color : timeline.lineColorOf(id)) ?? palette.trunk;
-    const branches = layout.branches.map((branch) => {
-      const isTrunk = branch.main;
+    // Cada línea: filamento principal (grueso y brillante en la trenza, fino y tenue en su carril)
+    // y, dentro de la trenza, dos fibras más finas que se entrelazan con las de las demás líneas.
+    const branches = layout.branches.map((branch, order) => {
       const merges = branch.merge !== null;
-      const hasFocus = (timeline.getLine(branch.id)?.focus.length ?? 0) > 0;
-      // La central engorda un poco al acercarse a hoy: es la línea en foco actual.
-      const widths = branch.points.map((point, i) => {
-        const focusWidth = hasFocus ? 0.75 + 0.35 * branch.focus[i] : 1;
-        return focusWidth * (isTrunk ? 1 + 0.5 * smoothstep(layout.nowX - 22, layout.nowX, point.x) : 1);
-      });
+      const color = colorOfLine(branch.id);
+      const braid = branch.braid;
+      const phase = (order / lineCount) * Math.PI * 2;
       const style: BranchStyle = {
-        color: colorOfLine(branch.id, isTrunk),
-        radius: isTrunk ? 0.075 : 0.055,
-        intensity: isTrunk ? 0.82 : 0.68,
-        fadeIn: isTrunk ? 0.06 : 0.02,
-        fadeOut: isTrunk ? 0.05 : branch.open ? 0.04 : merges ? 0.015 : 0.3,
+        color,
+        radius: BRAID_STYLE.radius,
+        intensity: BRAID_STYLE.intensity,
+        fadeIn: 0.04,
+        fadeOut: branch.open ? 0.04 : merges ? 0.015 : 0.3,
         flowSpeed: 0.11,
         fogDensity,
-        focus: branch.focus.map((value, i) => value * bandFade(branch.points[i].y)),
-        widths,
+        focus: braid.map((w) => BRAID_STYLE.outer + (1 - BRAID_STYLE.outer) * w),
+        widths: braid.map((w) => BRAID_STYLE.outerWidth + (1 - BRAID_STYLE.outerWidth) * w),
+        braid,
+        helix: { radius: BRAID_STYLE.helix, phase, frequency: BRAID_STYLE.frequency, speed: BRAID_STYLE.speed },
       };
+      const curve = new BranchCurve(branch.id, branch.points, style);
+      const inBraid = braid.some((w) => w > 0.5);
+      const fibers = inBraid
+        ? BRAID_FIBERS.map(
+            (fiber, k) =>
+              new BranchCurve(`fiber:${branch.id}:${k}`, branch.points, {
+                ...style,
+                radius: fiber.radius,
+                intensity: fiber.intensity,
+                widths: undefined,
+                focus: undefined,
+                braidOnly: true,
+                helix: { radius: fiber.helix, phase: phase + fiber.phase, frequency: BRAID_STYLE.frequency * fiber.frequency, speed: BRAID_STYLE.speed * fiber.speed },
+              }),
+          )
+        : [];
       // Una rama que no llega al presente (ni converge en otra) se deshace en polvo al final.
-      const dissolve = !isTrunk && !branch.open && !merges ? style.fadeOut : 0;
-      return { branch, curve: new BranchCurve(branch.id, branch.points, style), color: style.color, dissolve };
+      const dissolve = !branch.open && !merges ? style.fadeOut : 0;
+      return { branch, curve, fibers, color, dissolve };
     });
     const branchById = new Map(layout.branches.map((branch) => [branch.id, branch]));
-    const focusAtNode = (branchId: string, x: number): number => {
-      const branch = branchById.get(branchId);
-      return branch ? valueAtX(branch.points, branch.focus, x) : 1;
-    };
 
-    // Costuras: donde una línea converge en otra.
-    const seams = branches
-      .filter(({ branch }) => branch.merge !== null)
-      .map(({ branch, color }) => {
-        const merge = branch.merge as NonNullable<typeof branch.merge>;
-        const target = branchById.get(merge.into);
-        return new MergeSeam(branch.id, merge.position, color, colorOfLine(merge.into, target?.main ?? false));
+    // Chispas: uniones y separaciones con la trenza (pequeñas) y fusiones (costura completa).
+    const seams = layout.junctions.map((junction) => {
+      const color = colorOfLine(junction.branch);
+      if (junction.kind === 'merge') {
+        const into = branchById.get(junction.branch)?.merge?.into ?? junction.branch;
+        return new MergeSeam(junction.branch, junction.position, color, colorOfLine(into), { count: 26, radius: 0.9, core: 0.9 });
+      }
+      return new MergeSeam(`${junction.kind}:${junction.branch}@${junction.position.x}`, junction.position, color, '#ffffff', {
+        count: 16,
+        radius: 0.6,
+        core: 0.45,
+        seed: Math.round(junction.position.x * 10) + 3,
       });
+    });
 
     // Hebras causales: tinta que va del color de la línea origen al de la destino. Si cambian de
     // línea, un remolino de pigmento marca dónde se unen.
@@ -158,15 +186,16 @@ export class SceneBuilder {
         );
       });
 
-    // Tramos de duración: un filamento más grueso y tenue del color de la categoría.
+    // Tramos de duración: un filamento más grueso y tenue del color de su línea (fuera de la trenza:
+    // dentro, la trenza ya es lo bastante densa).
     const spans = layout.nodes
-      .filter((node) => node.span && node.span.length >= 2)
+      .filter((node) => node.span && node.span.length >= 2 && node.position.y !== 0)
       .map(
         (node) =>
           new BranchCurve(`span:${node.eventId}`, node.span ?? [], {
-            color: colorOfEvent(node.eventId),
+            color: colorOfLine(node.branch),
             radius: 0.1,
-            intensity: 0.18 * focusAtNode(node.branch, node.position.x),
+            intensity: 0.12,
             fadeIn: 0.03,
             fadeOut: 0.12,
             flowSpeed: 0.05,
@@ -180,7 +209,7 @@ export class SceneBuilder {
         {
           eventId: node.eventId,
           position: node.position,
-          color: colorOfEvent(node.eventId),
+          color: colorOfLine(node.branch),
           style: timeline.lineStyleOf(node.branch),
           importance: event?.importance ?? 2,
           phase: index * 1.37,
@@ -189,21 +218,53 @@ export class SceneBuilder {
       );
     });
 
-    const flowPaths: FlowPath[] = branches.map(({ branch, curve, color, dissolve }) => ({
+    // Motas: la trenza es la protagonista (flujo denso que la recorre girando a su alrededor); en
+    // las ramas exteriores, apenas unas pocas.
+    const braidPaths: FlowPath[] = branches.map(({ branch, curve, color }) => ({
+      id: branch.id,
+      path: curve.path,
+      color,
+      focus: sampleAlongPath(curve.path, branch.points, branch.braid),
+    }));
+    const outerPaths: FlowPath[] = branches.map(({ branch, curve, color, dissolve }) => ({
       id: branch.id,
       path: curve.path,
       color,
       dissolve,
-      focus: sampleAlongPath(curve.path, branch.points, branch.focus),
+      focus: sampleAlongPath(
+        curve.path,
+        branch.points,
+        branch.braid.map((w) => 1 - w),
+      ),
     }));
     const backdrop = new WatercolorWash(
-      branches.map(({ branch, color }) => ({ color, points: branch.points, focus: branch.focus, main: branch.main })),
+      branches.map(({ branch, color }) => ({
+        color,
+        points: branch.points,
+        focus: branch.braid.map((w) => 0.25 + 0.75 * w),
+        main: branch.main,
+      })),
       { ...DEFAULT_WATERCOLOR, paper: palette.background },
     );
 
     const pulse = new SelectionPulse(assets.ring);
     const arcs = new ArcBands(layout.arcs, layout.bounds);
-    const flow = new ParticleFlow(flowPaths, { density: 0.7 * particleBudget, maxParticles: Math.round(900 * particleBudget) });
+    const flow = new ParticleFlow(braidPaths, {
+      density: 2.4 * particleBudget,
+      maxParticles: Math.round(1400 * particleBudget),
+      clearBand: false,
+      orbitScale: 0.55,
+      floor: 0,
+      weighted: true,
+      seed: 7,
+    });
+    const outerFlow = new ParticleFlow(outerPaths, {
+      density: 0.06 * particleBudget,
+      maxParticles: Math.round(120 * particleBudget),
+      floor: 0,
+      orbitScale: 0.6,
+      seed: 19,
+    });
     for (const strand of strands) strand.setEmphasisValue(STRAND_EMPHASIS.rest);
     const effects: SceneEffect[] = [
       backdrop,
@@ -213,10 +274,11 @@ export class SceneBuilder {
         layout.bounds,
       ),
       arcs,
-      ...branches.map(({ curve }) => curve),
+      ...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]),
       ...spans,
       ...strands,
       flow,
+      outerFlow,
       ...seams,
       ...swirls,
       pulse,
@@ -228,8 +290,12 @@ export class SceneBuilder {
       seams,
       strands,
       highlightBranch: (id) => {
-        for (const { curve } of branches) curve.setEmphasis(id === null ? 'none' : curve.id === id ? 'on' : 'off');
+        for (const { branch, curve, fibers } of branches) {
+          const emphasis = id === null ? 'none' : branch.id === id ? 'on' : 'off';
+          for (const item of [curve, ...fibers]) item.setEmphasis(emphasis);
+        }
         flow.highlight(id);
+        outerFlow.highlight(id);
       },
       highlightLinks: (eventIds) => {
         const lit = new Set(eventIds);
@@ -239,7 +305,7 @@ export class SceneBuilder {
         });
       },
       fadeIn: () => {
-        for (const curve of [...branches.map(({ curve }) => curve), ...strands, ...spans]) curve.fadeIn();
+        for (const curve of [...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]), ...strands, ...spans]) curve.fadeIn();
       },
       effects,
       pulse,

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { NEUTRAL_CHIP } from '../../../src/infrastructure/dom/dom';
 import { FilterBar } from '../../../src/infrastructure/dom/FilterBar';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, click, mount, unsafeModel } from '../../helpers/dom';
@@ -37,7 +38,8 @@ describe('FilterBar', () => {
     expect(chips.map((node) => node.querySelector('.chip__label')?.textContent)).toEqual(['Trabajo', 'Estudios', 'Juego']);
     // El evento privado (play) no cuenta mientras está oculto.
     expect(chips.map((node) => node.querySelector('.chip__count')?.textContent)).toEqual(['2', '2', '2']);
-    expect(chips.map((node) => node.style.getPropertyValue('--chip-color'))).toEqual(['#FFB454', '#6EA8FF', '#B48CFF']);
+    // Las categorías filtran pero no colorean: el color es de las líneas vitales.
+    expect(chips.map((node) => node.style.getPropertyValue('--chip-color'))).toEqual([NEUTRAL_CHIP, NEUTRAL_CHIP, NEUTRAL_CHIP]);
     expect(chips.map((node) => node.querySelector('.chip__icon')?.textContent ?? null)).toEqual(['▲', null, '✦']);
     for (const node of chips) {
       expect(node.type).toBe('button');

@@ -21,7 +21,7 @@ const item = (root: HTMLElement, id: string): HTMLButtonElement =>
   root.querySelector<HTMLButtonElement>(`[data-branch="${id}"]`) as HTMLButtonElement;
 
 describe('LineLegend', () => {
-  it('lista las líneas con su color y nombre; la central primero y marcada como foco actual', () => {
+  it('lista las líneas con su color, nombre y estado; la central primero', () => {
     const { root } = setup();
     expect(root.hidden).toBe(false);
     expect(root.getAttribute('role')).toBe('group');
@@ -31,13 +31,40 @@ describe('LineLegend', () => {
     expect(buttons.map((button) => button.querySelector('.line__label')?.textContent)).toEqual(['Oficio', 'Arte', 'Cocina', 'Enseñar']);
     expect(buttons[0].classList.contains('line--main')).toBe(true);
     expect(buttons.map((button) => button.querySelector('.line__status')?.textContent ?? null)).toEqual([
-      STRINGS.currentFocus,
+      null,
       STRINGS.mergesInto('Oficio'),
       STRINGS.latent,
       STRINGS.closedLine,
     ]);
-    expect(buttons[0].style.getPropertyValue('--line-color')).toBe('#a9d4ff');
+    expect(buttons[2].querySelector('.line__status--latent')).not.toBeNull();
+    expect(buttons[3].querySelector('.line__status--closed')).not.toBeNull();
+    expect(buttons[1].querySelector('.line__status')?.className).toBe('line__status');
+    // Sin color declarado, el de su primer evento (como en la escena).
+    expect(buttons[0].style.getPropertyValue('--line-color')).toBe('#FFB454');
     expect(buttons[2].style.getPropertyValue('--line-color')).toBe('#7BE0A4');
+  });
+
+  it('marca «en foco ahora» las líneas que van por la trenza donde mira la cámara', () => {
+    const { root, legend } = setup();
+    const badge = (id: string): boolean => !(item(root, id).querySelector<HTMLElement>('.line__now')?.hidden ?? true);
+    for (const branch of model.layout.branches) expect(badge(branch.id)).toBe(false);
+    const frameAt = (lookX?: number) => ({ nodes: [], years: [], nowX: null, cameraDistance: 30, viewport: { width: 800, height: 600 }, lookX });
+    const spans = model.layout.braidSpans;
+    const last = spans[spans.length - 1];
+    legend.onProjected(frameAt((last.startX + last.endX) / 2));
+    expect(legend.braidedLines).toEqual(last.members);
+    for (const branch of model.layout.branches) {
+      expect(badge(branch.id)).toBe(last.members.includes(branch.id));
+      expect(item(root, branch.id).classList.contains('line--braided')).toBe(last.members.includes(branch.id));
+    }
+    expect(item(root, 'core').querySelector('.line__now')?.textContent).toBe(STRINGS.inBraidNow);
+    // Fuera de los extremos, el tramo más cercano; sin lookX no cambia nada.
+    legend.onProjected(frameAt(spans[0].startX - 100));
+    expect(legend.braidedLines).toEqual(spans[0].members);
+    legend.onProjected(frameAt(1e6));
+    expect(legend.braidedLines).toEqual(last.members);
+    legend.onProjected(frameAt(undefined));
+    expect(legend.braidedLines).toEqual(last.members);
   });
 
   it('cada línea muestra su lenguaje de forma (style o el de por defecto)', () => {

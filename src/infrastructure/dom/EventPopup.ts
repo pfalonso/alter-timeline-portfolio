@@ -5,7 +5,7 @@ import type {
 } from '../../application/ports';
 import type { LifeEvent, Timeline } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
-import { append, clear, el, safeLink } from './dom';
+import { append, clear, el, NEUTRAL_CHIP, safeLink } from './dom';
 import { STRINGS } from './strings';
 
 /**
@@ -145,14 +145,15 @@ export class EventPopup implements TimelineViewPart {
   private fill(event: LifeEvent): void {
     const timeline = this.timeline as Timeline;
     const categories = timeline.categoriesOf(event);
-    const accent = categories[0]?.color ?? '#9fd8ff';
+    // Un solo código de color: el de la línea vital del evento (las categorías van en neutro).
+    const accent = timeline.lineColorOf(event.branch) ?? '#9fd8ff';
     this.root.style.setProperty('--accent', accent);
     clear(this.body);
 
     const tags = el('ul', { class: 'popup__categories' });
     for (const category of categories) {
       const tag = el('li', { class: 'tag', text: `${category.icon ? `${category.icon} ` : ''}${category.label}` });
-      tag.style.setProperty('--chip-color', category.color);
+      tag.style.setProperty('--chip-color', NEUTRAL_CHIP);
       tags.append(tag);
     }
 
@@ -177,7 +178,7 @@ export class EventPopup implements TimelineViewPart {
         arc ? el('span', { class: 'badge badge--arc', text: STRINGS.arcOf(arc.title) }) : null,
         event.ongoing ? el('span', { class: 'badge badge--live', text: STRINGS.ongoing }) : null,
         event.isPrivate ? el('span', { class: 'badge', text: STRINGS.privateEvent }) : null,
-        line ? el('span', { class: 'badge badge--branch badge--line', text: STRINGS.lineOf(line.label) }) : null,
+        line ? this.lineBadge(STRINGS.lineOf(line.label), accent) : null,
         origin && !line ? el('span', { class: 'badge badge--branch', text: STRINGS.branchFrom(origin.title) }) : null,
       ]),
       facts,
@@ -190,6 +191,12 @@ export class EventPopup implements TimelineViewPart {
       this.listSection(STRINGS.skills, event.skills, 'popup__skills'),
       this.linksSection(event),
     );
+  }
+
+  private lineBadge(text: string, color: string): HTMLElement {
+    const badge = el('span', { class: 'badge badge--branch badge--line', text });
+    badge.style.setProperty('--chip-color', color);
+    return badge;
   }
 
   private listSection(title: string, items: readonly string[], className: string): HTMLElement | null {
@@ -213,7 +220,7 @@ export class EventPopup implements TimelineViewPart {
           el('span', { class: 'popup__causal-date', text: target.formatDateRange(timeline.meta.locale, STRINGS.present) }),
         ],
       );
-      button.style.setProperty('--chip-color', timeline.primaryCategoryOf(target)?.color ?? '#9fd8ff');
+      button.style.setProperty('--chip-color', timeline.lineColorOf(target.branch) ?? '#9fd8ff');
       button.addEventListener('click', () => this.handlers?.onEventActivated(target.id));
       return el('li', {}, [button]);
     });

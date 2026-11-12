@@ -1,63 +1,119 @@
-import { Color, Group, Mesh, NormalBlending, PlaneGeometry, ShaderMaterial, type BufferGeometry, type Texture } from 'three';
+import {
+  AdditiveBlending,
+  Color,
+  Group,
+  LineBasicMaterial,
+  LineSegments,
+  Mesh,
+  MeshBasicMaterial,
+  NormalBlending,
+  PlaneGeometry,
+  ShaderMaterial,
+  type BufferGeometry,
+  type Texture,
+} from 'three';
 import type { LineStyle } from '../../domain/model';
 import type { Vec3 } from '../../domain/services';
-import { GLYPH_FRAGMENT, GLYPH_VERTEX } from './glyphShader';
 import { damp } from './math';
+import { createNodeShape, type NodeShape } from './NodeShapes';
 import type { FrameContext } from './types';
 
 export interface NodeSpec {
   readonly eventId: string;
   readonly position: Vec3;
+  /** Color de SU línea vital (no de la categoría): el nodo se lee como parte de la línea. */
   readonly color: string;
-  /** Colores de las categorías secundarias (ya no se dibujan; se conservan por compatibilidad). */
-  readonly secondaryColors?: readonly string[];
   readonly importance: 1 | 2 | 3;
   /** Lenguaje de forma de la línea a la que pertenece (por defecto, neutro). */
   readonly style?: LineStyle;
-  /** Desfase para que los nodos no respiren al unísono (y semilla de la forma orgánica). */
+  /** Desfase para que los nodos no giren al unísono. */
   readonly phase: number;
 }
 
-/** Recursos compartidos por todos los nodos: el cuadro del glifo y la textura de anillo del pulso. */
+/**
+ * Recursos compartidos por todos los nodos: el cuadro del aura, la textura de anillo del pulso y
+ * las geometrías de cada forma (una por estilo y peso, creadas al pedirlas).
+ */
 export class NodeAssets {
   readonly quad: BufferGeometry = new PlaneGeometry(2, 2);
+  private readonly shapes = new Map<string, NodeShape>();
 
   constructor(readonly ring: Texture) {}
+
+  shape(style: LineStyle, importance: 1 | 2 | 3): NodeShape {
+    const key = `${style}:${importance}`;
+    let shape = this.shapes.get(key);
+    if (!shape) {
+      shape = createNodeShape(style, importance);
+      this.shapes.set(key, shape);
+    }
+    return shape;
+  }
 
   dispose(): void {
     this.quad.dispose();
     this.ring.dispose();
+    for (const shape of this.shapes.values()) {
+      shape.wire.dispose();
+      shape.inner?.dispose();
+      shape.fill.dispose();
+    }
+    this.shapes.clear();
   }
 }
 
-/** Jerarquía: mayor = glifo grande; medio = forma mediana; menor = marca pequeña. */
-export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.2, 2: 0.42, 3: 0.7 };
+/** Jerarquía: mayor = sólido grande; medio = mediano; menor = pequeño. */
+export const NODE_RADIUS: Record<1 | 2 | 3, number> = { 1: 0.26, 2: 0.46, 3: 0.78 };
 
 /** Cómo se presenta cada peso. */
 export interface NodeTier {
-  /** Media anchura del cuadro del glifo, en radios (deja sitio al aura y a los trazos exteriores). */
-  readonly extent: number;
-  /** Aura de pigmento en reposo. */
+  /** Aura de luz en reposo (las demás solo al señalarlas). */
   readonly aura: boolean;
-  /** Cuánto crece el glifo al señalarlo (los menores, más: si no, cuesta ver dónde está el cursor). */
+  /** Cuánto crece el sólido al señalarlo (los menores, más: si no, cuesta ver dónde está el cursor). */
   readonly lift: number;
+  /** Brillo de las aristas en reposo. */
+  readonly glow: number;
 }
 
 export const NODE_TIERS: Record<1 | 2 | 3, NodeTier> = {
-  1: { extent: 2.2, aura: false, lift: 0.9 },
-  2: { extent: 2.6, aura: false, lift: 0.22 },
-  3: { extent: 4.4, aura: true, lift: 0.16 },
+  1: { aura: false, lift: 0.7, glow: 0.62 },
+  2: { aura: false, lift: 0.24, glow: 0.8 },
+  3: { aura: true, lift: 0.16, glow: 0.95 },
 };
-export const STYLE_CODE: Record<LineStyle, number> = { geometric: 0, organic: 1, neutral: 2 };
 /** Presencia de un nodo filtrado: se atenúa, no desaparece. */
 export const DIMMED_PRESENCE = 0.1;
 /** Duración del deslizamiento de un nodo tras cambiar los filtros. */
 export const SLIDE_SECONDS = 0.75;
+/** Giro sobre sí mismos (radianes por segundo); con movimiento reducido, quietos. */
+export const SPIN_SPEED = 0.32;
 const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
-/** Color del papel (para rellenos suaves y marcas interiores). */
+/** Color del papel: el relleno interior es papel apenas teñido del color de la línea. */
 export const GLYPH_PAPER = '#171029';
+/** Tinte del relleno interior (0 = papel, 1 = color de la línea). */
+export const FILL_TINT = 0.2;
 
-/** Un evento en la escena: glifo procedural que mira a la cámara; su pigmento se expande al señalarlo. */
+const AURA_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const AURA_FRAGMENT = /* glsl */ `
+  uniform vec3 uColor;
+  uniform float uStrength;
+  varying vec2 vUv;
+  void main() {
+    float d = length(vUv - 0.5) * 2.0;
+    float glow = exp(-d * d * 4.5) * (1.0 - smoothstep(0.8, 1.0, d));
+    gl_FragColor = vec4(uColor * glow * uStrength, glow * uStrength);
+  }
+`;
+
+/**
+ * Un evento en la escena: sólido 3D en *wireframe* (aristas luminosas del color de su línea, relleno
+ * interior tenue) que gira despacio sobre sí mismo. Al señalarlo se expande y brilla un poco.
+ */
 export class NodeMesh {
   readonly group = new Group();
   readonly eventId: string;
@@ -65,7 +121,12 @@ export class NodeMesh {
   readonly importance: 1 | 2 | 3;
   readonly color: string;
   readonly style: LineStyle;
-  readonly glyph: Mesh<BufferGeometry, ShaderMaterial>;
+  /** Lo que gira: aristas, estructura interior y relleno. */
+  readonly spinner = new Group();
+  readonly wire: LineSegments<BufferGeometry, LineBasicMaterial>;
+  readonly inner: LineSegments<BufferGeometry, LineBasicMaterial> | null;
+  readonly fill: Mesh<BufferGeometry, MeshBasicMaterial>;
+  readonly aura: Mesh<BufferGeometry, ShaderMaterial>;
 
   private presenceValue = 1;
   private presenceTarget = 1;
@@ -73,7 +134,6 @@ export class NodeMesh {
   private hoverTarget = 0;
   private focus = 0;
   private focusTarget = 0;
-  private readonly material: ShaderMaterial;
   private readonly tier: NodeTier;
   private readonly phase: number;
   /** Deslizamiento tras un re-layout: de `slide.from` a la posición final, en `SLIDE_SECONDS`. */
@@ -90,30 +150,48 @@ export class NodeMesh {
     this.group.name = `node:${spec.eventId}`;
     this.group.position.set(spec.position.x, spec.position.y, spec.position.z);
 
-    this.material = new ShaderMaterial({
-      vertexShader: GLYPH_VERTEX,
-      fragmentShader: GLYPH_FRAGMENT,
-      transparent: true,
-      depthWrite: false,
-      blending: NormalBlending,
-      uniforms: {
-        uColor: { value: new Color(spec.color) },
-        uPaper: { value: new Color(GLYPH_PAPER) },
-        uStyle: { value: STYLE_CODE[this.style] },
-        uTier: { value: spec.importance },
-        uExtent: { value: this.tier.extent },
-        uPresence: { value: 1 },
-        uAttention: { value: 0 },
-        uTime: { value: 0 },
-        uSeed: { value: spec.phase % 97 },
-      },
-    });
-    this.glyph = new Mesh(assets.quad, this.material);
-    this.glyph.name = `glyph:${spec.eventId}`;
-    // Después de las líneas: el relleno del glifo las tapa al pasar por el nodo.
-    this.glyph.renderOrder = 5;
-    this.group.add(this.glyph);
-    this.apply(0);
+    const shape = assets.shape(this.style, spec.importance);
+    const lineColor = new Color(spec.color).lerp(new Color('#ffffff'), 0.12);
+    const lineMaterial = (): LineBasicMaterial =>
+      new LineBasicMaterial({ color: lineColor, transparent: true, depthWrite: false, blending: AdditiveBlending });
+    this.wire = new LineSegments(shape.wire, lineMaterial());
+    this.wire.name = `wire:${spec.eventId}`;
+    this.wire.renderOrder = 6;
+    this.inner = shape.inner ? new LineSegments(shape.inner, lineMaterial()) : null;
+    if (this.inner) {
+      this.inner.name = `inner:${spec.eventId}`;
+      this.inner.renderOrder = 6;
+    }
+    // Relleno: papel apenas teñido. Va después de las líneas y las tapa al pasar por detrás.
+    this.fill = new Mesh(
+      shape.fill,
+      new MeshBasicMaterial({
+        color: new Color(GLYPH_PAPER).lerp(new Color(spec.color), FILL_TINT),
+        transparent: true,
+        depthWrite: false,
+        blending: NormalBlending,
+      }),
+    );
+    this.fill.name = `fill:${spec.eventId}`;
+    this.fill.renderOrder = 5;
+    this.aura = new Mesh(
+      assets.quad,
+      new ShaderMaterial({
+        vertexShader: AURA_VERTEX,
+        fragmentShader: AURA_FRAGMENT,
+        transparent: true,
+        depthWrite: false,
+        blending: AdditiveBlending,
+        uniforms: { uColor: { value: new Color(spec.color) }, uStrength: { value: 0 } },
+      }),
+    );
+    this.aura.name = `aura:${spec.eventId}`;
+    this.aura.renderOrder = 4;
+    this.spinner.add(this.fill, this.wire, ...(this.inner ? [this.inner] : []));
+    // Inclinación inicial distinta por nodo: no se ven todos de la misma cara.
+    this.spinner.rotation.set(0.45 + (spec.phase % 0.6), spec.phase % (Math.PI * 2), 0.2);
+    this.group.add(this.aura, this.spinner);
+    this.apply(0, 0);
   }
 
   /** 0 (atenuado) … 1 (visible), ya interpolado. */
@@ -125,12 +203,12 @@ export class NodeMesh {
     return this.hoverTarget > 0 || this.focusTarget > 0;
   }
 
-  /** Escala actual del glifo respecto a su tamaño en reposo (para el radio aparente). */
+  /** Escala actual del sólido respecto a su tamaño en reposo (para el radio aparente). */
   get scale(): number {
-    return this.glyph.scale.x / (this.radius * this.tier.extent);
+    return this.spinner.scale.x / this.radius;
   }
 
-  /** Atención actual (0..1): cuánto se ha expandido el pigmento por hover/foco. */
+  /** Atención actual (0..1): cuánto se ha expandido por hover/foco. */
   get attention(): number {
     return Math.max(this.hover, this.focus);
   }
@@ -186,24 +264,34 @@ export class NodeMesh {
       );
       if (slide.t >= 1) this.slide = null;
     }
-    // El glifo siempre mira a la cámara.
-    this.glyph.quaternion.copy(frame.camera.quaternion);
-    this.apply(frame.reducedMotion ? 0 : frame.time);
+    // El aura siempre mira a la cámara.
+    this.aura.quaternion.copy(frame.camera.quaternion);
+    this.apply(frame.reducedMotion ? 0 : frame.delta, frame.reducedMotion ? 0 : frame.time);
   }
 
   dispose(): void {
     this.group.removeFromParent();
-    this.material.dispose();
+    this.wire.material.dispose();
+    this.inner?.material.dispose();
+    this.fill.material.dispose();
+    this.aura.material.dispose();
   }
 
-  private apply(time: number): void {
+  private apply(delta: number, time: number): void {
     const p = this.presenceValue;
-    const breath = 1 + 0.025 * Math.sin(time * 0.9 + this.phase);
+    const a = this.attention;
+    // Giro lento; el señalado gira algo más deprisa. La estructura interior gira al revés.
+    const spin = SPIN_SPEED * (1 + 0.8 * a) * (0.85 + 0.3 * Math.sin(this.phase));
+    this.spinner.rotation.y += spin * delta;
+    if (this.inner) this.inner.rotation.x -= spin * 1.4 * delta;
+    const breath = 1 + 0.02 * Math.sin(time * 0.9 + this.phase);
     const grow = (0.6 + 0.4 * p) * (1 + this.tier.lift * this.hover + this.tier.lift * 0.8 * this.focus) * breath;
-    this.glyph.scale.setScalar(this.radius * this.tier.extent * grow);
-    const uniforms = this.material.uniforms;
-    uniforms.uPresence.value = 0.12 + 0.88 * p;
-    uniforms.uAttention.value = this.attention;
-    uniforms.uTime.value = time + this.phase;
+    this.spinner.scale.setScalar(this.radius * grow);
+    const glow = Math.min(1, (this.tier.glow + 0.35 * a) * (0.12 + 0.88 * p));
+    this.wire.material.opacity = glow;
+    if (this.inner) this.inner.material.opacity = glow * 0.7;
+    this.fill.material.opacity = (0.7 + 0.15 * a) * (0.15 + 0.85 * p);
+    this.aura.scale.setScalar(this.radius * (2.4 + 0.8 * a));
+    this.aura.material.uniforms.uStrength.value = ((this.tier.aura ? 0.22 : 0) + 0.3 * a) * p;
   }
 }

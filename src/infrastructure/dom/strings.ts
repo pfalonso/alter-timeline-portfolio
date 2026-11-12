@@ -38,7 +38,7 @@ export const STRINGS = {
   linesToggle: (count: number): string => `Líneas vitales (${count})`,
   lineHint: 'Pasa por encima para resaltarla; clic para fijarla',
   mainLine: 'Línea principal',
-  currentFocus: 'foco actual',
+  inBraidNow: 'en foco ahora',
   latent: 'latente',
   closedLine: 'cerrada',
   mergesInto: (label: string): string => `se une a ${label}`,
