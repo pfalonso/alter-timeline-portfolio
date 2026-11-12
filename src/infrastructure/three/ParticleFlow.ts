@@ -40,12 +40,33 @@ export interface ParticleFlowOptions {
   /** Unidades de mundo por segundo. */
   readonly speed: number;
   readonly seed: number;
+  /** Apaga las motas en la banda de los nodos (y ≈ 0). La trenza lo desactiva: allí es donde van. */
+  readonly clearBand: boolean;
+  /** Multiplica la órbita de las motas alrededor de su línea. */
+  readonly orbitScale: number;
+  /** Fracción de motas visibles con foco 0 (0 = ninguna). */
+  readonly floor: number;
+  /** Reparte el presupuesto según la longitud × foco medio de cada ruta (no solo la longitud). */
+  readonly weighted: boolean;
 }
 
 /** Opacidad mínima de las motas dentro de la banda de nodos. */
 export const BAND_CLEAR_MIN = 0.12;
 
-export const DEFAULT_FLOW_OPTIONS: ParticleFlowOptions = { density: 2.6, maxParticles: 2400, speed: 2.4, seed: 7 };
+export const DEFAULT_FLOW_OPTIONS: ParticleFlowOptions = {
+  density: 2.6,
+  maxParticles: 2400,
+  speed: 2.4,
+  seed: 7,
+  clearBand: true,
+  orbitScale: 1,
+  floor: 0.15,
+  weighted: false,
+};
+
+/** Media de una tabla de foco (1 sin tabla). */
+const meanOf = (table: Float32Array | undefined): number =>
+  table && table.length > 0 ? table.reduce((sum, value) => sum + value, 0) / table.length : 1;
 
 export const POINTS_VERTEX = /* glsl */ `
   attribute float aSize;
@@ -110,13 +131,14 @@ export class ParticleFlow implements SceneEffect {
     this.emphasis = paths.map(() => 1);
     this.emphasisTarget = paths.map(() => 1);
     const random = createRandom(this.options.seed);
-    const totalLength = paths.reduce((sum, item) => sum + item.path.length, 0);
+    const weightOf = (item: FlowPath): number => item.path.length * (this.options.weighted ? meanOf(item.focus) : 1);
+    const totalLength = paths.reduce((sum, item) => sum + weightOf(item), 0);
     const budget = Math.min(this.options.maxParticles, Math.round(totalLength * this.options.density));
     const colors: number[] = [];
     const sizes: number[] = [];
     const white = new Color('#ffffff');
     paths.forEach((item, pathIndex) => {
-      const share = totalLength > 0 ? Math.round((budget * item.path.length) / totalLength) : 0;
+      const share = totalLength > 0 ? Math.round((budget * weightOf(item)) / totalLength) : 0;
       const base = new Color(item.color);
       for (let i = 0; i < share; i += 1) {
         const bright = random() < 0.18;
@@ -127,7 +149,7 @@ export class ParticleFlow implements SceneEffect {
           speed: (0.55 + random() * 0.9) * (bright ? 1.6 : 1),
           angle: random() * Math.PI * 2,
           spin: (random() - 0.5) * 1.4,
-          orbit: bright ? 0.05 + random() * 0.12 : 0.12 + Math.pow(random(), 2) * 0.75,
+          orbit: (bright ? 0.05 + random() * 0.12 : 0.12 + Math.pow(random(), 2) * 0.75) * this.options.orbitScale,
         });
         // Pigmento, no chispa: las motas conservan el color de su línea (apenas se aclaran).
         const color = base.clone().lerp(white, bright ? 0.3 : 0.08 + random() * 0.15);
@@ -213,10 +235,13 @@ export class ParticleFlow implements SceneEffect {
       positions[i * 3 + 1] += Math.cos(angle) * orbit + scatter * DISSOLVE_RISE * (0.4 + particle.orbit);
       positions[i * 3 + 2] += Math.sin(angle) * orbit;
       const fadeOut = dissolve > 0 ? 1 - smoothstep(0.45, 1, k) : 1 - smoothstep(0.9, 1, particle.t);
-      const density = 0.15 + 0.95 * f;
+      const { floor } = this.options;
+      const density = floor + (1.1 - floor) * f;
       const shown = 1 - smoothstep(density - 0.08, density + 0.08, particle.rank);
       // En la banda de los nodos (y ≈ 0) las motas se apagan: no ensucian los símbolos.
-      const clearBand = BAND_CLEAR_MIN + (1 - BAND_CLEAR_MIN) * smoothstep(0.5, 1.8, Math.abs(positions[i * 3 + 1]));
+      const clearBand = this.options.clearBand
+        ? BAND_CLEAR_MIN + (1 - BAND_CLEAR_MIN) * smoothstep(0.5, 1.8, Math.abs(positions[i * 3 + 1]))
+        : 1;
       alphas[i] =
         smoothstep(0, 0.04, particle.t) * fadeOut * shown * (0.45 + 0.55 * f) * clearBand * this.emphasis[particle.pathIndex];
     }

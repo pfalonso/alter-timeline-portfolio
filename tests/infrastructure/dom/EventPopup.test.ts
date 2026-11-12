@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { NEUTRAL_CHIP } from '../../../src/infrastructure/dom/dom';
 import { EventPopup } from '../../../src/infrastructure/dom/EventPopup';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, click, mount, press, texts } from '../../helpers/dom';
@@ -107,8 +108,9 @@ describe('EventPopup: contenido', () => {
       ['Con', 'Acme'],
     ]);
     expect(texts(root, '.popup__badges .badge')).toEqual([STRINGS.ongoing]);
-    expect(root.style.getPropertyValue('--accent')).toBe('#FFB454');
-    expect(root.querySelector<HTMLElement>('.tag')?.style.getPropertyValue('--chip-color')).toBe('#FFB454');
+    // El acento es el color de la línea del evento (main: el de su primer evento); las categorías, neutras.
+    expect(root.style.getPropertyValue('--accent')).toBe('#6EA8FF');
+    expect(root.querySelector<HTMLElement>('.tag')?.style.getPropertyValue('--chip-color')).toBe(NEUTRAL_CHIP);
   });
 
   it('los enlaces se abren en otra pestaña con rel="noopener noreferrer"', () => {

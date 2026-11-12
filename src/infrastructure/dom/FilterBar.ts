@@ -1,7 +1,7 @@
 import type { FilterViewState, TimelineViewHandlers, TimelineViewModel } from '../../application/ports';
 import type { LineStyle, Timeline } from '../../domain/model';
 import type { TimelineViewPart } from './CompositeTimelineView';
-import { clear, el } from './dom';
+import { clear, el, NEUTRAL_CHIP } from './dom';
 import { STRINGS } from './strings';
 
 /** Chips de categoría (multi-selección) + "Todas / Ninguna". */
@@ -45,7 +45,8 @@ export class FilterBar implements TimelineViewPart {
           el('span', { class: 'chip__count', text: String(counts.get(category.id) ?? 0) }),
         ],
       );
-      chip.style.setProperty('--chip-color', category.color);
+      // Las categorías filtran pero no colorean: el color es de las líneas vitales.
+      chip.style.setProperty('--chip-color', NEUTRAL_CHIP);
       chip.addEventListener('click', (event) => {
         if (event.altKey || event.detail === 2) this.handlers?.onCategorySoloed(category.id);
         else this.handlers?.onCategoryToggled(category.id);

@@ -138,27 +138,32 @@ describe('MergeSeam', () => {
 describe('SceneBuilder con líneas vitales', () => {
   const model = buildModel(makeLifeLinesData());
 
-  it('una costura por cada línea que se fusiona; la cerrada se disuelve, la fusionada no', () => {
+  it('una costura por cada fusión y una chispa por cada unión o separación de la trenza', () => {
     const built = new SceneBuilder().build(model);
-    expect(built.seams.map((seam) => seam.id)).toEqual(['art']);
-    expect(built.effects).toContain(built.seams[0]);
+    expect(built.seams.filter((seam) => !/^(join|split):/.test(seam.id)).map((seam) => seam.id)).toEqual(['art']);
+    expect(built.seams).toHaveLength(model.layout.junctions.length);
+    for (const seam of built.seams) expect(built.effects).toContain(seam);
     built.dispose();
   });
 
-  it('usa el color declarado de cada línea; la central sin color usa el del tronco', () => {
+  it('usa el color declarado de cada línea; sin él, el de su primer evento (también la central)', () => {
     const built = new SceneBuilder().build(model);
     const color = (id: string): string =>
       `#${built.branches.find((curve) => curve.id === id)?.mesh.material.uniforms.uColor.value.getHexString()}`;
     expect(color('food')).toBe('#7be0a4');
-    expect(color('core')).toBe(DEFAULT_PALETTE.trunk);
+    expect(color('core')).toBe('#ffb454');
+    expect(DEFAULT_PALETTE.trunk).toMatch(/^#/);
+    // Los nodos llevan el color de su línea.
+    const food = built.nodes.find((node) => node.eventId === 'bread');
+    expect(food?.color).toBe('#7BE0A4');
     built.dispose();
   });
 
-  it('la central engorda hacia el presente', () => {
+  it('la central engorda al entrar en la trenza (en foco hoy) respecto a su carril', () => {
     const built = new SceneBuilder().build(model);
     const core = built.branches.find((curve) => curve.id === 'core');
     const widths = [...(core?.mesh.geometry.getAttribute('aWidth').array as Float32Array)];
-    expect(widths[widths.length - 1]).toBeGreaterThan(widths[0] * 1.3);
+    expect(widths[widths.length - 1]).toBeGreaterThan(Math.min(...widths) * 1.5);
     built.dispose();
   });
 

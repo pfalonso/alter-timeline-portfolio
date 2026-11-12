@@ -45,7 +45,7 @@ export class Tooltip implements TimelineViewPart, NodeHoverListener {
       this.title.textContent = event.title;
       this.dates.textContent = event.formatDateRange(this.timeline.meta.locale, STRINGS.present);
       this.category.textContent = category?.label ?? '';
-      this.root.style.setProperty('--accent', category?.color ?? '#ffffff');
+      this.root.style.setProperty('--accent', this.timeline.lineColorOf(event.branch) ?? '#ffffff');
     }
     this.root.hidden = false;
     const flip = at.x > window.innerWidth - 300;

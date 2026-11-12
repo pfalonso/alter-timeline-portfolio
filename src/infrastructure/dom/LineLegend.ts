@@ -1,8 +1,16 @@
 import type { TimelineViewModel } from '../../application/ports';
 import type { LineStyle, Timeline } from '../../domain/model';
+import type { BraidSpan } from '../../domain/services';
+import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
 import { STRINGS } from './strings';
+
+/** Estados que se ocultan mientras la línea va por la trenza (no aplican en ese tramo). */
+const STATUS_CLASS = new Map<string, string>([
+  [STRINGS.latent, ' line__status--latent'],
+  [STRINGS.closedLine, ' line__status--closed'],
+]);
 
 /** Quien resalta la línea en la escena (la vista three). */
 export interface BranchHighlighter {
@@ -25,13 +33,15 @@ interface LegendLine {
 }
 
 /**
- * Leyenda de líneas vitales: color y nombre de cada línea, con la central marcada como «foco
- * actual». Pasar el ratón (o el foco de teclado) por una línea la resalta en la escena; un clic la
+ * Leyenda de líneas vitales: color y nombre de cada línea. Las que viajan por la trenza en la zona
+ * que mira la cámara se marcan «en foco ahora» (se actualiza al recorrer el tiempo). Pasar el ratón (o el foco de teclado) por una línea la resalta en la escena; un clic la
  * deja fijada (`aria-pressed`). En móvil se pliega tras un botón. Solo aparece si los datos declaran
  * `branches`.
  */
-export class LineLegend implements TimelineViewPart {
+export class LineLegend implements TimelineViewPart, ProjectionListener {
   private readonly buttons = new Map<string, HTMLButtonElement>();
+  private spans: readonly BraidSpan[] = [];
+  private braided = '';
   private pinned: string | null = null;
   private hovered: string | null = null;
   private toggle: HTMLButtonElement | null = null;
@@ -45,6 +55,8 @@ export class LineLegend implements TimelineViewPart {
   render(model: TimelineViewModel): void {
     clear(this.root);
     this.buttons.clear();
+    this.spans = model.layout.braidSpans;
+    this.braided = '';
     this.pinned = null;
     this.hovered = null;
     const lines = this.linesOf(model);
@@ -79,7 +91,10 @@ export class LineLegend implements TimelineViewPart {
           el('span', { class: `line__mark line__mark--${line.style}`, attrs: { 'aria-hidden': 'true' } }),
           el('span', { class: 'line__swatch', attrs: { 'aria-hidden': 'true' } }),
           el('span', { class: 'line__label', text: line.label }),
-          line.status ? el('span', { class: 'line__status', text: line.status }) : null,
+          line.status
+            ? el('span', { class: `line__status${STATUS_CLASS.get(line.status) ?? ''}`, text: line.status })
+            : null,
+          el('span', { class: 'line__now', text: STRINGS.inBraidNow, attrs: { hidden: '' } }),
         ],
       );
       button.style.setProperty('--line-color', line.color);
@@ -92,6 +107,33 @@ export class LineLegend implements TimelineViewPart {
       list.append(el('li', { class: 'lines__item' }, [button]));
     }
     this.root.append(el('span', { class: 'lines__title', text: STRINGS.linesLabel }), this.toggle, list);
+  }
+
+  /** Marca las líneas que van por la trenza donde mira la cámara. */
+  onProjected(frame: ProjectedFrame): void {
+    if (frame.lookX === undefined || this.spans.length === 0) return;
+    const x = frame.lookX;
+    const span =
+      this.spans.find((item) => x >= item.startX && x <= item.endX) ??
+      (x < this.spans[0].startX ? this.spans[0] : this.spans[this.spans.length - 1]);
+    this.setBraided(span.members);
+  }
+
+  /** Líneas en la trenza ahora mismo (según la última proyección). */
+  get braidedLines(): string[] {
+    return this.braided === '' ? [] : this.braided.split('|');
+  }
+
+  private setBraided(members: readonly string[]): void {
+    const key = members.join('|');
+    if (key === this.braided) return;
+    this.braided = key;
+    for (const [lineId, button] of this.buttons) {
+      const on = members.includes(lineId);
+      button.classList.toggle('line--braided', on);
+      const badge = button.querySelector<HTMLElement>('.line__now');
+      if (badge) badge.hidden = !on;
+    }
   }
 
   /** Despliega o pliega la lista (solo tiene efecto visual en móvil). */
@@ -128,7 +170,7 @@ export class LineLegend implements TimelineViewPart {
     if (timeline.lines.length === 0) return [];
     return layout.branches.map((branch) => {
       const line = timeline.getLine(branch.id);
-      const color = (branch.main ? line?.color : timeline.lineColorOf(branch.id)) ?? this.options.fallbackColor;
+      const color = timeline.lineColorOf(branch.id) ?? this.options.fallbackColor;
       return {
         id: branch.id,
         label: line?.label ?? (branch.main ? STRINGS.mainLine : branch.id),
@@ -142,7 +184,6 @@ export class LineLegend implements TimelineViewPart {
   }
 
   private statusOf(timeline: Timeline, branch: TimelineViewModel['layout']['branches'][number]): string | null {
-    if (branch.main) return STRINGS.currentFocus;
     if (branch.merge) return STRINGS.mergesInto(timeline.getLine(branch.merge.into)?.label ?? branch.merge.into);
     if (timeline.getLine(branch.id)?.untilPresent) return STRINGS.latent;
     return branch.open ? null : STRINGS.closedLine;

@@ -27,7 +27,7 @@ Una web estática que lee un fichero JSON con los eventos de una vida (estudios,
 
 No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela por la banda (o sigue la hebra causal cuando un paso llevó al siguiente) y cada paso trae una frase que lo enlaza con el anterior. Todo sobre un fondo de acuarela en movimiento, no un cielo estrellado.
 
-**Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: qué línea brilla en cada momento. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
+**Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: las líneas en foco viajan juntas por el centro formando una **trenza** (varias hebras de sus colores entrelazándose) y las demás siguen como ramas exteriores, finas y tenues; cada línea se une a la trenza o se separa de ella cuando entra o sale de foco. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
 
 Está hecha con Vite, TypeScript estricto y three.js, sin framework de interfaz, con arquitectura hexagonal y servida por nginx dentro de Docker. Tus datos personales nunca entran en el repositorio ni en la imagen: se montan como volumen.
 
@@ -185,7 +185,7 @@ Raíz del documento:
 | `locale` | texto no vacío | Sí | Idioma BCP 47 (`"es"`, `"en"`…). Se usa para formatear fechas y para el atributo `lang` de la página |
 | `tagline` | texto | No | Frase bajo el nombre |
 | `contact` | lista de `{ label, url }` | No | Enlaces de contacto en la cabecera. `url` debe ser http(s) absoluta |
-| `mainBranch` | texto kebab-case | No (por defecto `"main"`) | Línea vital central: va en el carril del centro y es la más brillante y gruesa en el presente. Los eventos sin `branch` pertenecen a ella |
+| `mainBranch` | texto kebab-case | No (por defecto `"main"`) | Línea vital central: forma la trenza cuando ninguna línea está en foco (y siempre, si no hay `focus`). Los eventos sin `branch` pertenecen a ella |
 
 #### `categories[]`
 
@@ -193,7 +193,7 @@ Raíz del documento:
 | --- | --- | --- | --- |
 | `id` | texto kebab-case | Sí | Identificador único (`a-z`, `0-9` y guiones) |
 | `label` | texto no vacío | Sí | Nombre visible en el chip de filtro y en el pop-up |
-| `color` | texto `#RRGGBB` | Sí | Color del chip, de los nodos y de las ramas de esa categoría |
+| `color` | texto `#RRGGBB` | Sí | Color de las líneas que no declaran el suyo (el de la categoría principal de su primer evento). Los chips de filtro y las etiquetas de categoría del pop-up son neutros: el color en la interfaz es de las líneas vitales |
 | `icon` | texto | No | Emoji o carácter que acompaña a la etiqueta |
 | `description` | texto | No | Aparece como `title` del chip al pasar el ratón |
 
@@ -215,7 +215,7 @@ Raíz del documento:
 | `highlights` | lista de textos no vacíos | No | Sección «Hitos» |
 | `links` | lista de `{ label, url }` | No | Sección «Enlaces». Solo http(s) |
 | `media` | lista de `{ type: "image", url, alt }` | No | Imágenes del pop-up. `url` http(s); `alt` obligatorio (puede ser vacío) |
-| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Jerarquía del nodo (ver 4.1): `3` mayor (glifo compuesto con aura y rótulo siempre), `2` medio (forma con contorno; rótulo al acercarse), `1` menor (marca pequeña; rótulo solo al señalarlo). ←/→ saltan entre los de importancia ≥ 2 |
+| `importance` | `1`, `2` o `3` | No (por defecto `2`) | Jerarquía del nodo (ver 4.1): `3` mayor (sólido 3D compuesto con aura y rótulo siempre), `2` medio (sólido sencillo; rótulo al acercarse), `1` menor (sólido pequeño; rótulo solo al señalarlo). ←/→ saltan entre los de importancia ≥ 2 |
 | `branch` | texto kebab-case | No (por defecto la línea central: `meta.mainBranch`, o `"main"`) | Línea (rama) a la que pertenece el evento |
 | `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama (modelo clásico; `branches[].origin` prevalece) |
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
@@ -230,7 +230,7 @@ Describe las líneas vitales. Una línea existe porque algún evento la usa en `
 | --- | --- | --- | --- |
 | `id` | texto kebab-case | Sí | Único. Debe usarlo algún `event.branch` (o ser `meta.mainBranch`) |
 | `label` | texto no vacío | Sí | Nombre visible de la línea: leyenda, pop-up («Línea: …») e índice |
-| `color` | texto `#RRGGBB` | No | Color del filamento y de la leyenda. Si falta, el de la categoría principal de su primer evento (la central, si no lo declara, es pálida) |
+| `color` | texto `#RRGGBB` | No | Color de la línea: filamento, hebras de la trenza, nodos, rótulos, pop-up y leyenda. Si falta, el de la categoría principal de su primer evento (también para la central) |
 | `description` | texto | No | `title` de la entrada de la leyenda |
 | `origin` | id de evento | No | Evento donde nace la línea (p. ej. `"nacimiento"`). Prevalece sobre `event.branchFrom`. Las líneas con el mismo `origin` salen del mismo punto y se abren como un haz |
 | `mergeInto` | `{ branch, event }` | No | La línea converge en la línea `branch` a la altura de `event` (que debe pertenecer a `branch`) y termina ahí, con una «costura» de partículas |
@@ -326,13 +326,16 @@ Cómo se ve:
 
 - **Eje ordinal.** Los nodos visibles se colocan en orden cronológico con **paso constante**: el mismo espacio entre cada par de nodos consecutivos, sea un mes o diez años. Misma fecha: primero el más importante, después la línea central y por último el id. Al cambiar los filtros los nodos se deslizan a su nuevo sitio.
 - **Banda narrativa.** Todos los **nodos** están en una sola fila (y = 0), así que la historia se lee de izquierda a derecha. Los rótulos alternan arriba y abajo de forma regular.
-- **Carriles.** Cada línea pasa por sus nodos. Entre dos nodos suyos contiguos va recta por la banda; si en medio hay nodos de otras líneas, sube con una curva corta y suave a su carril (cerca y tenue, siempre a la misma altura), lo recorre recto y vuelve a bajar. Nunca tapa ni cruza un símbolo ajeno y no oscila.
+- **La trenza.** En cada fecha, las líneas en foco (`focus`) viajan juntas por el centro (y = 0) y se entrelazan en una hélice lenta: es lo más destacado (más grosor, más brillo y un flujo de motas que la recorre). Si en una fecha ninguna línea está en foco, la trenza es la central (`mainBranch`). Sin `focus` en ningún sitio, la central es la trenza siempre (el modelo clásico).
+- **Ramas exteriores.** Fuera de foco, cada línea va recta por su carril fijo, arriba o abajo, cerca de la trenza, fina y tenue y casi sin motas. Al entrar en foco se **une** a la trenza con una curva corta y suave; al salir se **separa** hacia su carril. Las curvas caen entre dos nodos de la línea (lo más cerca posible de la fecha del cambio), nunca sobre un nodo y sin rebasar el carril; una chispa marca cada unión y separación.
+- **Nodos en su línea.** Cada nodo está en la trenza si su línea estaba en foco en su fecha y, si no, en el carril de su línea. Su color (sólido, aura, rótulo, chip del pop-up) es el de su línea; las categorías solo filtran.
 - **Enlaces causales.** Cada `ledTo` es un arco fino por encima de la banda (como en un diagrama de arcos), del color de una línea al de la otra. Por defecto son discretos; se iluminan al señalar o seleccionar uno de sus nodos y en el modo historia.
-- **Forma de los nodos.** El peso (`importance`) decide la complejidad del glifo y la línea (`style`) su lenguaje de forma (ver 4.1).
-- **Foco.** El brillo y el bloom del filamento, la densidad, velocidad y brillo de sus partículas y su opacidad dependen de si ese momento cae dentro de un periodo de `focus`: fuera de foco la línea queda a ≈ 0,3; `level` 1, 2 y 3 suben a ≈ 0,55, 0,78 y 1. Las transiciones son suaves a lo largo de la curva (rampas de ~0,8 años centradas en cada borde), no saltos. Una línea sin `focus` brilla a pleno, como antes. La central además engorda un poco al acercarse a hoy.
+- **Forma de los nodos.** El peso (`importance`) decide la complejidad del sólido 3D y la línea (`style`) su lenguaje de forma (ver 4.1).
+- **Foco.** Estar en foco es estar en la trenza (cualquier `level`). El `level` se conserva en los datos para la intensidad (`focusIntensityAt`), pero lo que se ve es la pertenencia a la trenza.
 - **Fusión.** Con `mergeInto`, la línea se curva en sus últimos ~2 años hasta unirse a la línea destino en la posición del evento indicado y termina ahí, con una «costura»: un destello que late y un remolino de motas con los colores de las dos líneas.
-- **Final.** Una línea con `until: "present"` llega hasta hoy (atenuada según su foco). Sin `until` ni `mergeInto`, una línea cuyos eventos han terminado se disuelve en polvo como las ramas clásicas.
-- **Leyenda.** Encima de los filtros aparece la lista de líneas con su color y nombre (la central marcada como «foco actual»; las demás, «se une a …», «latente» o «cerrada»). Ver [4.2](#42-filtros-por-categoría).
+- **Fusión.** Con `mergeInto`, la línea termina dentro de la trenza, en el nodo destino, y ya no sale: si su último periodo de foco llega hasta la fusión (o no tiene eventos entre su final y la fusión), sigue en la trenza desde que empezó; si no, vuelve a su carril y se une justo antes de la fusión.
+- **Final.** Una línea con `until: "present"` llega hasta hoy (atenuada si está fuera de foco). Sin `until` ni `mergeInto`, una línea cuyos eventos han terminado se disuelve en polvo como las ramas clásicas.
+- **Leyenda.** Encima de los filtros aparece la lista de líneas con su color y nombre; las que van por la trenza en la zona que mira la cámara se marcan «en foco ahora» (cambia al recorrer el tiempo) y las demás llevan su estado: «se une a …», «latente» o «cerrada». Ver [4.2](#42-filtros-por-categoría).
 
 Mini ejemplo:
 
@@ -474,9 +477,9 @@ La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cá
 | `2` medio | La forma sola, con contorno y relleno suave, sin aura | Al acercarse (cámara a ≤ 72 unidades) y si cabe |
 | `1` menor | Marca pequeña (punto, rombo o gota), sin aura | Solo al pasar el ratón, al enfocarlo con el teclado o al seleccionarlo (y entonces crece y su pigmento se expande) |
 
-Los tres niveles se distinguen a primera vista incluso en escala de grises (tamaño y estructura). La **forma** depende de la línea (`branches[].style`): las líneas racionales usan geometría rectilínea (rombo, hexágono, marco con esquinas y trazos de circuito en el glifo mayor); las creativas, formas orgánicas (manchas de acuarela con borde acumulado, pétalo/gota, trazo de pincel abierto y espiral); las neutras, círculo y anillos. Los glifos son SDF en el shader: nítidos a cualquier zoom. Chips y leyenda repiten el mismo lenguaje (rombo / mancha / círculo).
+Los nodos son **sólidos 3D en wireframe** (aristas luminosas del color de su línea y un relleno interior tenue que tapa lo que pasa por detrás) que giran despacio sobre sí mismos (quietos con movimiento reducido). Los tres niveles se distinguen a primera vista por tamaño y complejidad. La **forma** depende de la línea (`branches[].style`): las racionales (`geometric`) son poliedros rectilíneos (icosaedro con un cubo inscrito que gira al revés, octaedro, tetraedro); las creativas (`organic`), formas curvas (nudo toroidal, esfera deformada, esfera pequeña); las neutras, anillos (giroscopio de tres anillos, toro fino, un anillo). Al señalar o seleccionar un nodo se expande, gira algo más deprisa y brilla un poco. Chips y leyenda repiten el lenguaje (rombo / mancha / círculo).
 
-Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: alternan arriba y abajo de la banda de nodos (de forma regular entre los nodos que se rotulan solos); si no caben en su lado se prueba el otro y después un escalón más lejos; si no, se ocultan los de menor prioridad. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
+Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: los de la trenza alternan arriba y abajo (de forma regular entre los nodos que se rotulan solos; si no caben en su lado se prueba el otro y después un escalón más lejos) y los de las ramas exteriores se rotulan siempre hacia fuera, nunca sobre la trenza; si no caben, se ocultan los de menor prioridad. Cada rótulo lleva un halo oscuro: las ramas que pasan por detrás no cortan la lectura. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
 
 **Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo, abarcando sus nodos; el actual se ilumina (en tramos estrechos se omiten los años o el título).
 
@@ -506,7 +509,7 @@ Fuera del modo historia, el pop-up de un evento que forma parte del recorrido of
 - Si el evento enfocado deja de ser visible, la selección se suelta y el pop-up se cierra.
 - El filtro se guarda en la URL (`?cat=`), así que un enlace conserva la vista.
 
-**Leyenda de líneas vitales** (solo si los datos declaran `branches`). Fila compacta encima de los filtros con el color y el nombre de cada línea; la central lleva «foco actual». Pasar el ratón o el foco de teclado por una línea la resalta en la escena (filamento y partículas) y atenúa las demás; un clic la deja fijada (`aria-pressed`) hasta otro clic. En móvil se pliega tras el botón «Líneas vitales (n)».
+**Leyenda de líneas vitales** (solo si los datos declaran `branches`). Fila compacta encima de los filtros con el color y el nombre de cada línea; las que van por la trenza donde mira la cámara llevan «en foco ahora». Pasar el ratón o el foco de teclado por una línea la resalta en la escena (filamento y partículas) y atenúa las demás; un clic la deja fijada (`aria-pressed`) hasta otro clic. En móvil se pliega tras el botón «Líneas vitales (n)».
 
 ### 4.3 Pop-up de detalle
 

@@ -209,6 +209,27 @@ describe('ParticleFlow', () => {
     expect(max(lane)).toBe(1);
   });
 
+  it('la trenza: sin limpiar la banda, órbita escalable, sin motas donde el foco es 0 y reparto por foco', () => {
+    const max = (flow: ParticleFlow): number => Math.max(...flow.points.geometry.attributes.aAlpha.array);
+    const braid = new ParticleFlow([path()], { density: 40, clearBand: false });
+    expect(max(braid)).toBeGreaterThan(0.9);
+    const spread = (flow: ParticleFlow): number => {
+      const position = flow.points.geometry.attributes.position.array;
+      return Math.max(...Array.from({ length: flow.count }, (_, i) => Math.abs(position[i * 3 + 1])));
+    };
+    expect(spread(new ParticleFlow([lanePath()], { density: 40, orbitScale: 0.3 }))).toBeLessThan(
+      spread(new ParticleFlow([lanePath()], { density: 40 })),
+    );
+    const off = new Float32Array(16);
+    const on = new Float32Array(16).fill(1);
+    const silent = new ParticleFlow([{ ...lanePath(), focus: off }], { density: 40, floor: 0 });
+    const lit = Array.from(silent.points.geometry.attributes.aAlpha.array).filter((alpha) => alpha > 0.01).length;
+    expect(lit / silent.count).toBeLessThan(0.1);
+    const weighted = new ParticleFlow([{ ...path(), focus: on }, { ...path(), focus: off }], { density: 4, weighted: true });
+    expect(weighted.count).toBe(40);
+    expect(new ParticleFlow([{ ...path(), focus: on }, { ...path(), focus: off }], { density: 4 }).count).toBe(80);
+  });
+
   it('se desvanecen en los extremos de la rama', () => {
     const flow = new ParticleFlow([lanePath()], { density: 40 });
     const alpha = flow.points.geometry.attributes.aAlpha.array;
@@ -280,6 +301,20 @@ describe('BranchCurve', () => {
     expect(uniforms.uFadeOut.value).toBe(0.3);
     expect(uniforms.uFlowSpeed.value).toBe(0.2);
     expect(uniforms.uFogDensity.value).toBe(0.01);
+  });
+
+  it('trenza: hélice y pertenencia por anillo del tubo; las fibras solo existen dentro', () => {
+    const helix = { radius: 0.2, phase: 1, frequency: 0.5, speed: 0.3 };
+    const curve = new BranchCurve('b', points, { ...style, braid: [1, 1, 0], helix, braidOnly: true });
+    const { uniforms } = curve.mesh.material;
+    expect(uniforms.uHelix.value.toArray()).toEqual([0.2, 1, 0.5, 0.3]);
+    expect(uniforms.uBraidOnly.value).toBe(1);
+    const braid = curve.mesh.geometry.getAttribute('aBraid').array as Float32Array;
+    expect(Math.max(...braid)).toBe(1);
+    expect(Math.min(...braid)).toBe(0);
+    const plain = new BranchCurve('p', points, style).mesh;
+    expect(Math.max(...(plain.geometry.getAttribute('aBraid').array as Float32Array))).toBe(0);
+    expect(plain.material.uniforms.uBraidOnly.value).toBe(0);
   });
 
   it('fadeIn nunca es 0 (evita smoothstep(0, 0, x) en el shader)', () => {

@@ -55,6 +55,8 @@ export interface ProjectedFrame {
   readonly viewport: Viewport;
   /** Arcos temporales (si los datos los declaran). */
   readonly arcs?: readonly ProjectedArc[];
+  /** X de mundo al que mira la cámara (centro de la zona visible). */
+  readonly lookX?: number;
 }
 
 /** Capas DOM que se colocan siguiendo la proyección de la escena (etiquetas, regla de años). */

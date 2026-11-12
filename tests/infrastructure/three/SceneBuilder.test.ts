@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { BranchCurve } from '../../../src/infrastructure/three/BranchCurve';
 import { MergeSeam } from '../../../src/infrastructure/three/MergeSeam';
 import { ParticleFlow } from '../../../src/infrastructure/three/ParticleFlow';
-import { bandFade, DEFAULT_PALETTE, SceneBuilder, STRAND_EMPHASIS } from '../../../src/infrastructure/three/SceneBuilder';
+import { BRAID_FIBERS, BRAID_STYLE, DEFAULT_PALETTE, SceneBuilder, STRAND_EMPHASIS } from '../../../src/infrastructure/three/SceneBuilder';
 import { SelectionPulse } from '../../../src/infrastructure/three/SelectionPulse';
 import { WatercolorWash } from '../../../src/infrastructure/three/Watercolor';
 import { YearMarkers } from '../../../src/infrastructure/three/YearMarkers';
@@ -16,10 +16,11 @@ const count = <T>(items: readonly unknown[], type: new (...args: never[]) => T):
   items.filter((item) => item instanceof type).length;
 
 describe('SceneBuilder', () => {
-  it('crea un nodo por evento, en la posición del layout y con el color de su categoría principal', () => {
+  it('crea un nodo por evento, en la posición del layout y con el color de SU línea (no de la categoría)', () => {
     const built = new SceneBuilder().build(model);
     expect(built.nodes.map((node) => node.eventId)).toEqual(['a-school', 'b-job', 'c-side', 'e-side-two']);
-    expect(built.nodes.map((node) => node.color)).toEqual(['#6EA8FF', '#FFB454', '#B48CFF', '#B48CFF']);
+    // main → color de la categoría de su primer evento (#6EA8FF); side → #B48CFF. b-job es de main.
+    expect(built.nodes.map((node) => node.color)).toEqual(['#6EA8FF', '#6EA8FF', '#B48CFF', '#B48CFF']);
     expect(built.nodes.map((node) => node.importance)).toEqual([2, 3, 1, 2]);
     built.nodes.forEach((node, index) => {
       const { x, y, z } = model.layout.nodes[index].position;
@@ -36,11 +37,11 @@ describe('SceneBuilder', () => {
     );
   });
 
-  it('crea una curva por rama: el tronco pálido, cada bifurcación con el color de su primer evento', () => {
+  it('crea una curva por línea, del color de la línea (el de su primer evento si no declara uno)', () => {
     const built = new SceneBuilder().build(model);
     expect(built.branches.map((branch) => branch.id)).toEqual(['main', 'side']);
     const color = (index: number): string => built.branches[index].mesh.material.uniforms.uColor.value.getHexString();
-    expect(`#${color(0)}`).toBe(DEFAULT_PALETTE.trunk);
+    expect(`#${color(0)}`).toBe('#6ea8ff');
     expect(`#${color(1)}`).toBe('#b48cff');
     // Una rama cerrada se desvanece al final; el tronco apenas.
     expect(built.branches[1].mesh.material.uniforms.uFadeOut.value).toBeGreaterThan(
@@ -56,11 +57,12 @@ describe('SceneBuilder', () => {
     expect(open).toBeLessThan(closed);
   });
 
-  it('los eventos con duración añaden un filamento del color de su categoría', () => {
+  it('los eventos con duración fuera de la trenza añaden un filamento del color de su línea', () => {
     const built = new SceneBuilder().build(model);
     const spans = built.effects.filter((effect): effect is BranchCurve => effect instanceof BranchCurve && effect.id.startsWith('span:'));
-    expect(spans.map((span) => span.id)).toEqual(['span:a-school', 'span:b-job', 'span:e-side-two']);
-    expect(spans.map((span) => `#${span.mesh.material.uniforms.uColor.value.getHexString()}`)).toEqual(['#6ea8ff', '#ffb454', '#b48cff']);
+    // a-school y b-job van por la trenza (allí no hacen falta); e-side-two va por su carril.
+    expect(spans.map((span) => span.id)).toEqual(['span:e-side-two']);
+    expect(spans.map((span) => `#${span.mesh.material.uniforms.uColor.value.getHexString()}`)).toEqual(['#b48cff']);
   });
 
   it('registra todos los efectos: acuarela, años, ramas, partículas y pulso (nada espacial)', () => {
@@ -68,18 +70,33 @@ describe('SceneBuilder', () => {
     expect(count(built.effects, WatercolorWash)).toBe(1);
     expect(built.effects).toContain(built.backdrop);
     expect(count(built.effects, YearMarkers)).toBe(1);
-    expect(count(built.effects, BranchCurve)).toBe(2 + 3);
-    expect(count(built.effects, ParticleFlow)).toBe(1);
+    // 2 líneas + sus fibras (las dos pasan por la trenza: side nace en ella) + 1 tramo.
+    expect(count(built.effects, BranchCurve)).toBe(2 + 2 * BRAID_FIBERS.length + 1);
+    // Motas de la trenza y motas (pocas) de las ramas exteriores.
+    expect(count(built.effects, ParticleFlow)).toBe(2);
     expect(count(built.effects, SelectionPulse)).toBe(1);
     expect(built.effects).toContain(built.pulse);
     for (const branch of built.branches) expect(built.effects).toContain(branch);
   });
 
-  it('las partículas recorren las ramas (no los tramos de duración)', () => {
+  it('la trenza concentra las motas; las ramas exteriores apenas llevan', () => {
     const built = new SceneBuilder().build(model);
-    const flow = built.effects.find((effect): effect is ParticleFlow => effect instanceof ParticleFlow);
-    const total = built.branches.reduce((sum, branch) => sum + branch.path.length, 0);
-    expect(flow?.count).toBe(Math.min(900, Math.round(total * 0.7)));
+    const [braid, outer] = built.effects.filter((effect): effect is ParticleFlow => effect instanceof ParticleFlow);
+    expect(braid.count).toBeGreaterThan(outer.count * 10);
+    expect(outer.count).toBeLessThanOrEqual(120);
+  });
+
+  it('en la trenza las líneas son más gruesas y brillantes y se enroscan; fuera, finas y tenues', () => {
+    const built = new SceneBuilder().build(model);
+    const side = built.branches[1].mesh;
+    const width = side.geometry.getAttribute('aWidth').array as Float32Array;
+    const focus = side.geometry.getAttribute('aFocus').array as Float32Array;
+    expect(Math.min(...width)).toBeCloseTo(BRAID_STYLE.outerWidth, 2);
+    expect(Math.max(...width)).toBeCloseTo(1, 2);
+    expect(Math.min(...focus)).toBeCloseTo(BRAID_STYLE.outer, 2);
+    expect(side.material.uniforms.uHelix.value.x).toBe(BRAID_STYLE.helix);
+    const fiber = built.effects.find((effect): effect is BranchCurve => effect instanceof BranchCurve && effect.id === 'fiber:main:0');
+    expect(fiber?.mesh.material.uniforms.uBraidOnly.value).toBe(1);
   });
 
   it('particleBudget reduce las motas de pigmento (movimiento reducido / móvil)', () => {
@@ -118,25 +135,24 @@ describe('SceneBuilder', () => {
     expect(built.strands[0].mesh.material.uniforms.uEmphasis.value).toBeLessThan(0.05);
   });
 
-  it('en su carril (fuera de la banda) las líneas van tenues', () => {
-    expect(bandFade(0)).toBe(1);
-    expect(bandFade(0.2)).toBe(1);
-    expect(bandFade(10)).toBeCloseTo(0.5, 5);
-    expect(bandFade(-2)).toBeCloseTo(0.5, 5);
-    expect(bandFade(1)).toBeLessThan(1);
+  it('una chispa por cada unión o separación de la trenza', () => {
+    const built = new SceneBuilder().build(model);
+    const sparks = built.seams.map((seam) => seam.id);
+    expect(sparks).toHaveLength(model.layout.junctions.length);
+    for (const id of sparks) expect(id).toMatch(/^(join|split):/);
   });
 
-  it('la paleta y la niebla son configurables', () => {
+  it('la paleta y la niebla son configurables (el tronco, para líneas sin color posible)', () => {
     const palette = { ...DEFAULT_PALETTE, trunk: '#123456' };
-    const built = new SceneBuilder({ palette, fogDensity: 0.02 }).build(model);
+    const built = new SceneBuilder({ palette, fogDensity: 0.02 }).build(unsafeModel(model, { categories: [] }));
     const uniforms = built.branches[0].mesh.material.uniforms;
     expect(uniforms.uColor.value.getHexString()).toBe('123456');
     expect(uniforms.uFogDensity.value).toBe(0.02);
   });
 
-  it('si falta la categoría de un evento usa el color de reserva', () => {
+  it('si una línea no tiene color posible (ni declarado ni de categoría) usa el del tronco', () => {
     const built = new SceneBuilder().build(unsafeModel(model, { categories: [] }));
-    expect(new Set(built.nodes.map((node) => node.color))).toEqual(new Set([DEFAULT_PALETTE.fallbackNode]));
+    expect(new Set(built.nodes.map((node) => node.color))).toEqual(new Set([DEFAULT_PALETTE.trunk]));
   });
 
   it('funciona con una línea temporal vacía (solo el tronco)', () => {

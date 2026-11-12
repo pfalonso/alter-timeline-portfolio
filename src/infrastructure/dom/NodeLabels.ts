@@ -13,6 +13,8 @@ interface Label {
   shown: boolean;
   /** Lado preferido respecto a la banda: alterna con la posición ordinal del nodo. */
   above: boolean;
+  /** Nodo de una rama exterior: su rótulo solo va hacia fuera (nunca sobre la trenza). */
+  outward: boolean;
   readonly importance: number;
 }
 
@@ -69,7 +71,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         el('span', { class: 'node-label__title', text: event.labelTitle }),
         el('span', { class: 'node-label__date', text: String(event.start.year) }),
       ]);
-      element.style.setProperty('--accent', model.timeline.primaryCategoryOf(event)?.color ?? '#ffffff');
+      element.style.setProperty('--accent', model.timeline.lineColorOf(event.branch) ?? '#ffffff');
       this.root.append(element);
       // Estimación de ancho (evita medir el DOM cada fotograma); el CSS limita el máximo.
       const perChar = event.importance === 3 ? 9.2 : 7.2;
@@ -79,6 +81,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         height: LABEL_HEIGHT[event.importance] ?? 32,
         shown: false,
         above: order % 2 === 0,
+        outward: false,
         importance: event.importance,
       });
     });
@@ -91,15 +94,19 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
   }
 
   /**
-   * Alterna entre los nodos que se rotulan solos (medios y mayores), en orden ordinal: dos rótulos
-   * vecinos nunca compiten por el mismo lado. Los menores (solo en hover) siguen su posición.
+   * Los nodos de la trenza alternan entre los que se rotulan solos (medios y mayores), en orden
+   * ordinal: dos rótulos vecinos nunca compiten por el mismo lado. Los menores (solo en hover) siguen
+   * su posición. Los de las ramas exteriores se rotulan hacia fuera.
    */
   private alternate(layout: TimelineLayoutResult): void {
     let labelled = 0;
     for (const node of layout.nodes) {
       const label = this.labels.get(node.eventId);
       if (!label) continue;
-      if (label.importance >= 2) {
+      // Un nodo en una rama exterior se rotula hacia fuera: el rótulo no cae sobre la trenza.
+      label.outward = node.position.y !== 0;
+      if (label.outward) label.above = node.position.y > 0;
+      else if (label.importance >= 2) {
         label.above = labelled % 2 === 0;
         labelled += 1;
       } else {
@@ -139,7 +146,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         id: node.eventId,
         x: clampLabelX(node.x, label.width, frame.viewport.width),
         // Alternando arriba/abajo de la banda (por posición ordinal); si no cabe, el otro lado.
-        ys: labelSlots(node.y, gap, label.height, label.above),
+        ys: outwardOnly(labelSlots(node.y, gap, label.height, label.above), label.outward),
         width: label.width,
         height: label.height,
         priority: labelPriority(node.importance, pinned, label.shown, node.radius),
@@ -160,4 +167,9 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       }
     }
   }
+}
+
+/** Para los nodos exteriores, solo los huecos del lado preferido (el 1.º y el 3.º de `labelSlots`). */
+function outwardOnly(slots: number[], outward: boolean): number[] {
+  return outward ? [slots[0], slots[2]] : slots;
 }

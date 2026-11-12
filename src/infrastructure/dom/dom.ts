@@ -40,3 +40,6 @@ export function safeLink(label: string, url: string, className?: string): HTMLAn
   link.rel = 'noopener noreferrer';
   return link;
 }
+
+/** Color neutro de los chips de categoría: el color en la interfaz es solo de las líneas vitales. */
+export const NEUTRAL_CHIP = '#c8c0dc';

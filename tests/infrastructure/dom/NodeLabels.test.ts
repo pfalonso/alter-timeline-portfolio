@@ -59,15 +59,18 @@ describe('NodeLabels', () => {
     expect(label('Escuela').style.transform).toContain('translateX(-50%)');
   });
 
-  it('alterna entre los nodos que se rotulan solos (medios y mayores), también tras filtrar', () => {
+  it('alterna entre los nodos de la trenza que se rotulan solos (medios y mayores), también tras filtrar', () => {
     const { labels, label } = setup();
     const model = buildModel();
-    // Sin a-school: e-side-two pasa a ser el segundo rotulable (abajo); b-job, el primero (arriba).
+    // Sin a-school: b-job pasa a ser el primero rotulable de la trenza (arriba).
     const layout = { ...model.layout, nodes: model.layout.nodes.filter((item) => item.eventId !== 'a-school').map((item, index) => ({ ...item, index })) };
     labels.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(), totalEvents: 4, layout });
     labels.onProjected(frame([node('b-job', 300, 300), node('e-side-two', 700, 300)]));
     expect(translation(label('Primer trabajo'))[1]).toBeLessThan(300);
-    expect(translation(label('Segunda parte'))[1]).toBeGreaterThan(300);
+    // e-side-two va por una rama exterior: se rotula hacia fuera (del lado de su carril).
+    const side = layout.nodes.find((item) => item.eventId === 'e-side-two')?.position.y ?? 0;
+    expect(side).not.toBe(0);
+    expect(translation(label('Segunda parte'))[1] < 300).toBe(side > 0);
     // Sin layout no cambia nada.
     labels.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(), totalEvents: 4 });
     labels.onProjected(frame([node('b-job', 300, 300), node('e-side-two', 700, 300)]));
@@ -79,6 +82,17 @@ describe('NodeLabels', () => {
     labels.onProjected(frame([node('a-school', 200, 20)]));
     // Encima no cabe (borde superior): debajo, y = 20 + 31.
     expect(translation(label('Escuela'))).toEqual([200, 51]);
+  });
+
+  it('un nodo de una rama exterior nunca se rotula hacia la trenza: si fuera no cabe, no se rotula', () => {
+    const { labels, label } = setup();
+    const up = (buildModel().layout.nodes.find((item) => item.eventId === 'e-side-two')?.position.y ?? 0) > 0;
+    // Pegado al borde de su lado exterior: no cabe fuera y no se pasa al otro lado.
+    labels.onProjected(frame([node('e-side-two', 400, up ? 20 : VIEWPORT.height - 20)]));
+    expect(shown(label('Segunda parte'))).toBe(false);
+    labels.onProjected(frame([node('e-side-two', 400, 300)]));
+    expect(shown(label('Segunda parte'))).toBe(true);
+    expect(translation(label('Segunda parte'))[1] < 300).toBe(up);
   });
 
   it('jerarquía: mayor siempre, medio al acercarse, menor nunca salvo hover/foco', () => {

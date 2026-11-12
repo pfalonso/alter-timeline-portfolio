@@ -121,17 +121,23 @@ distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `
 `"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `origin` ni `mergeInto`.
 Errores acumulados con ruta (`events[3].date.start: ...`, `branches[1].mergeInto.event: ...`), no solo el primero.
 
-Jerarquía, arcos e historia: `importance` 3 = glifo compuesto grande (forma + anillo/marco exterior +
-marca interior + aura de pigmento) y rótulo siempre; 2 = forma sola con contorno y relleno suave,
-rótulo al acercarse si cabe; 1 = marca pequeña sin aura ni rótulo salvo hover/foco/selección (se
-distinguen también en escala de grises). Forma por línea (`style`, por defecto `tecnologia`/`gestion` →
-geometric; `arte`/`gastronomia`/`rol` → organic; resto → neutral): geometric = rombo, hexágono, marco
-con esquinas y trazos de circuito; organic = mancha de acuarela, pétalo/gota, pincel, espiral; neutral =
-círculo y anillos. Glifos SDF en shader; hover/selección expanden el pigmento. Chips y leyenda usan
+Jerarquía, arcos e historia: nodos = sólidos 3D en wireframe (aristas luminosas del color de su línea,
+relleno interior tenue, giro lento; quietos con movimiento reducido). `importance` 3 = sólido compuesto
+grande con aura y rótulo siempre; 2 = sólido sencillo, rótulo al acercarse si cabe; 1 = sólido pequeño
+sin aura ni rótulo salvo hover/foco/selección. Forma por línea (`style`, por defecto `tecnologia`/`gestion` →
+geometric; `arte`/`gastronomia`/`rol` → organic; resto → neutral): geometric = icosaedro + cubo inscrito,
+octaedro, tetraedro; organic = nudo toroidal, esfera deformada, esfera pequeña; neutral = giroscopio de
+anillos, toro fino, anillo. Hover/selección: se expande y brilla un poco. Chips y leyenda usan
 el mismo lenguaje.
-Banda narrativa: todos los nodos en una banda central (|y| pequeño, desfase por carril, apilado si
-coinciden en fecha); las líneas salen de la banda entre nodos hacia su carril y vuelven a cada uno de
-sus eventos. Rótulos alternando arriba/abajo de la banda. `ledTo` = hebra de tinta del nodo origen al
+Trenza (desde el 12/11/2026, decisión 29): en cada fecha las líneas en foco viajan juntas por el
+centro (y = 0) entrelazándose (hélice lenta, fibras extra, flujo denso de motas): es lo más destacado.
+Sin líneas en foco, la trenza es `mainBranch`. Fuera de foco cada línea va recta por su carril
+exterior fijo (fina, tenue, casi sin motas); al entrar en foco se une con una curva corta y monótona
+entre dos de sus nodos y al salir se separa (chispa en cada unión/separación). `mergeInto` termina
+dentro de la trenza y no vuelve a salir. Nodo: y = 0 si su línea está en la trenza en su fecha; si no,
+el y del carril de su línea. Color único = el de la línea (nodo, aura, rótulo, pop-up, leyenda); las
+categorías solo filtran y sus chips son neutros. Rótulos: los de la trenza alternan arriba/abajo; los
+de ramas exteriores, siempre hacia fuera; halo oscuro tras cada rótulo. `ledTo` = hebra de tinta del nodo origen al
 destino (degradado de color entre las dos líneas; remolino de pigmento si cambian de línea); pop-up con
 «Viene de…» y «Esto llevó a…»; en la historia, si el paso siguiente es consecuencia del actual, la
 cámara sigue la hebra. Los
@@ -144,13 +150,13 @@ capítulo al entrar en un arco nuevo; sale con Esc o botón. Sin `story.path` no
 libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. `build:public-data` quita del recorrido
 los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados.
 
-Comportamiento visual de las líneas: la central siempre en el carril y = 0, la más brillante y algo más gruesa
-hoy; las que comparten `origin` salen del mismo punto como un haz; la intensidad (brillo/bloom, densidad
-y velocidad de partículas, opacidad) de cada tramo sale de `focusIntensityAt(line, fecha)` (dominio,
-pura: ≈ 0,3 fuera de foco, 0,55/0,78/1 según `level`, rampas suaves); `mergeInto` curva la línea hasta
-la destino y pone una costura de partículas; `until: "present"` llega a hoy atenuada; el resto se
+Comportamiento visual de las líneas: grosor, brillo y motas según la pertenencia a la trenza
+(`LayoutBranch.braid`, 0 en el carril … 1 en el centro); las que comparten `origin` salen del mismo
+punto; `focusIntensityAt` sigue en el dominio (`LayoutBranch.focus`) pero la escena usa `braid`;
+`mergeInto` termina en el nodo destino con una costura de partículas; `until: "present"` llega a hoy atenuada; el resto se
 disuelve como las ramas cerradas. Leyenda DOM accesible encima de los filtros (plegable en móvil) que
-resalta la línea en la escena al pasar el ratón.
+resalta la línea en la escena al pasar el ratón y marca «en foco ahora» las líneas de la trenza en la
+zona que mira la cámara (`LayoutResult.braidSpans` + `ProjectedFrame.lookX`).
 
 ## Arquitectura hexagonal
 
@@ -166,7 +172,7 @@ src/
     TimelineController.ts   # orquesta casos de uso ↔ vista
   infrastructure/
     http/            # HttpJsonTimelineRepository (fetch + fallback)
-    three/           # ThreeTimelineView + SceneBuilder, NodeMesh (glifos), BranchCurve, ParticleFlow, Watercolor, PostFX, CameraRig
+    three/           # ThreeTimelineView + SceneBuilder, NodeMesh + NodeShapes (sólidos wireframe), BranchCurve (líneas y trenza), ParticleFlow, Watercolor, PostFX, CameraRig
     dom/             # FilterBar, EventPopup, Hud, Tooltip
     storage/         # UrlFilterStateStore (filtros en query string)
   main.ts            # composition root (única pieza que conoce todo)
@@ -174,7 +180,7 @@ src/
 
 - Dependencias solo hacia dentro: infrastructure → application → domain. Dominio y aplicación no importan `three` ni tocan `document`/`window`/`fetch`.
 - SOLID: una responsabilidad por clase, puertos pequeños, inyección por constructor, extensible sin modificar (nuevas categorías = datos; nuevos efectos = nuevas clases que implementan una interfaz `SceneEffect`).
-- `TimelineLayout` es puro y determinista: de `Timeline` (y, opcionalmente, los ids visibles) → `{ nodes: {eventId, position{x,y,z}, branch, index}, branches: {id, points[], focus[], laneY, main, merge}, links: {from, to, fromBranch, toBranch, points[]}, years, arcs, nodeStep, band }`. El eje X es **ordinal**: los nodos visibles, en orden cronológico (desempate: importancia, línea central, id), se separan siempre `nodeStep`. Todos en y = 0; cada línea pasa por los suyos y entre ellos viaja por su carril cercano (±0,6–1,15 pasos) con curvas monótonas. Los `ledTo` son arcos por encima de la banda. Al filtrar se recalcula con los visibles.
+- `TimelineLayout` es puro y determinista: de `Timeline` (y, opcionalmente, los ids visibles) → `{ nodes: {eventId, position{x,y,z}, branch, index}, branches: {id, points[], focus[], braid[], laneY, main, merge}, links: {from, to, fromBranch, toBranch, points[]}, junctions: {branch, kind: join|split|merge, position}, braidSpans: {startX, endX, members[]}, years, arcs, nodeStep, band }`. El eje X es **ordinal**: los nodos visibles, en orden cronológico (desempate: importancia, línea central, id), se separan siempre `nodeStep`. La pertenencia a la trenza por fecha sale de `Braid` (`braidMembersAt`, `isInBraidAt`, `braidChangesOf`; dominio, puro). Nodos en y = 0 (trenza) o en el carril fijo de su línea (±0,5–0,8 pasos); uniones y separaciones con *smoothstep* entre dos nodos de la línea. Los `ledTo` son arcos por encima de sus extremos. Al filtrar se recalcula con los visibles.
 
 ## UX obligatoria
 

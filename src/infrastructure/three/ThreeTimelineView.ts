@@ -426,6 +426,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       cameraDistance: this.rig.distance,
       viewport: this.viewport,
       arcs,
+      lookX,
     };
   }
 

@@ -112,6 +112,7 @@ async function bootstrap(): Promise<void> {
     stage.setAttribute('role', 'application');
     stage.setAttribute('aria-label', STRINGS.stageLabel);
     stage.tabIndex = 0;
+    const legend = new LineLegend(byId('lines'), { highlightBranch: (id) => three?.highlightBranch(id) }, { fallbackColor: DEFAULT_PALETTE.trunk });
     three = new ThreeTimelineView({
       container: stage,
       backend,
@@ -119,7 +120,7 @@ async function bootstrap(): Promise<void> {
       loop: new RenderLoop(),
       reducedMotion,
       hoverListener: tooltip,
-      projectionListeners: [labels, ruler, arcStrip],
+      projectionListeners: [labels, ruler, arcStrip, legend],
       safeInsets: () =>
         measureSafeInsets(
           stage,
@@ -129,7 +130,7 @@ async function bootstrap(): Promise<void> {
     });
     parts.push(three);
     new ViewControls(byId('controls'), three);
-    parts.push(new LineLegend(byId('lines'), three, { fallbackColor: DEFAULT_PALETTE.trunk }));
+    parts.push(legend);
   } else {
     app.classList.add('app--no-webgl');
     eventList.showAsMainContent(STRINGS.noWebgl);

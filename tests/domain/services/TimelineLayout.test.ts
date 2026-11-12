@@ -85,12 +85,20 @@ describe('TimelineLayout: determinismo', () => {
 });
 
 describe('TimelineLayout: eje ordinal (X)', () => {
-  it('hay un nodo por evento visible, en su rama, todos en la banda (y = z = 0)', () => {
+  it('hay un nodo por evento visible, en su rama: los de la trenza en y = z = 0 y los demás en su carril', () => {
     const layout = layoutOf(makeData());
     expect(layout.nodes.map((node) => node.eventId).sort()).toEqual(['a-school', 'b-job', 'c-side', 'e-side-two']);
     expect(nodeOf(layout, 'c-side').branch).toBe('side');
-    for (const node of layout.nodes) expect([node.position.y, node.position.z]).toEqual([0, 0]);
-    expect(layout.band).toEqual({ minY: 0, maxY: 0 });
+    for (const node of layout.nodes) {
+      const branch = branchOf(layout, node.branch);
+      if (branch.main) expect([node.position.y, node.position.z]).toEqual([0, 0]);
+      else {
+        expect(node.position.y).toBe(branch.laneY);
+        expect(node.position.z).toBeLessThan(0);
+      }
+    }
+    const ys = layout.nodes.map((node) => node.position.y);
+    expect(layout.band).toEqual({ minY: Math.min(0, ...ys), maxY: Math.max(0, ...ys) });
   });
 
   it('paso constante entre nodos consecutivos, sea cual sea la distancia entre sus fechas', () => {
@@ -179,19 +187,19 @@ describe('TimelineLayout: líneas y carriles', () => {
       const layout = layoutOf(data);
       for (const node of layout.nodes) {
         const branch = branchOf(layout, node.branch);
-        expect(yAt(branch.points, node.position.x)).toBeCloseTo(0, 6);
+        expect(yAt(branch.points, node.position.x)).toBeCloseTo(node.position.y, 6);
       }
     }
   });
 
-  it('entre dos nodos contiguos va recta por la banda', () => {
+  it('entre dos nodos contiguos de la trenza va recta por el centro', () => {
     const layout = layoutOf(dataWith([makeEvent({ id: 'a', date: { start: '2010' } }), makeEvent({ id: 'b', date: { start: '2011' } })]));
     const main = branchOf(layout, 'main');
     for (const point of main.points.filter((item) => item.x >= 0 && item.x <= STEP)) expect(point.y).toBe(0);
   });
 
-  it('la línea central es una columna recta por la banda, por detrás de los símbolos', () => {
-    for (const data of [makeData(), makeLifeLinesData(), sparseData()]) {
+  it('sin focos declarados la trenza es la central: recta por el centro, por detrás de los símbolos', () => {
+    for (const data of [makeData(), sparseData()]) {
       const layout = layoutOf(data);
       const main = layout.branches.find((item) => item.main);
       if (!main) continue;
@@ -202,7 +210,7 @@ describe('TimelineLayout: líneas y carriles', () => {
     }
   });
 
-  it('si hay nodos de otras líneas en medio, viaja por su carril (amplitud acotada) y no los tapa', () => {
+  it('fuera de foco viaja recta por su carril exterior (amplitud acotada), lejos de la trenza', () => {
     const layout = layoutOf(sparseData());
     const side = branchOf(layout, 'side');
     const lane = Math.abs(side.laneY);
@@ -259,13 +267,16 @@ describe('TimelineLayout: líneas y carriles', () => {
     expect(Math.abs(yAt(side.points, s1 + (O.ramp * STEP) / 2))).toBeGreaterThan(0);
   });
 
-  it('carriles distintos para líneas simultáneas; la central abajo, la primera lateral arriba', () => {
+  it('carriles exteriores distintos para líneas simultáneas, repartidos arriba y abajo', () => {
     const layout = layoutOf(makeLifeLinesData());
     const ys = layout.branches.map((branch) => branch.laneY);
     expect(new Set(ys).size).toBe(ys.length);
-    expect(branchOf(layout, 'core').laneY).toBeLessThan(0);
+    expect(ys.some((y) => y > 0)).toBe(true);
+    expect(ys.some((y) => y < 0)).toBe(true);
     expect(new Set(layout.branches.map((branch) => branch.lane)).size).toBe(layout.branches.length);
     expect(layout.laneSpacing).toBeGreaterThan(0);
+    // Sin focos, la central nunca sale de la trenza: no necesita carril.
+    expect(branchOf(layoutOf(makeData()), 'main').lane).toBe(0);
   });
 
   it('reutiliza un carril cuando la línea anterior ya ha terminado', () => {
@@ -286,7 +297,7 @@ describe('TimelineLayout: líneas y carriles', () => {
     const layout = layoutOf(sparseData());
     const side = branchOf(layout, 'side');
     expect(side.originEventId).toBe('m2000');
-    expect(side.points[0]).toEqual(nodeOf(layout, 'm2000').position);
+    expect([side.points[0].x, side.points[0].y]).toEqual([nodeOf(layout, 'm2000').position.x, nodeOf(layout, 'm2000').position.y]);
     const orphan = layoutOf(dataWith([makeEvent({ id: 'm', date: { start: '2010' } }), makeEvent({ id: 's', date: { start: '2012' }, branch: 'side' })]));
     expect(branchOf(orphan, 'side').originEventId).toBeNull();
     expect(branchOf(orphan, 'side').points[0].x).toBeLessThan(nodeOf(orphan, 's').position.x);
@@ -306,8 +317,9 @@ describe('TimelineLayout: líneas y carriles', () => {
     const layout = layoutOf(makeLifeLinesData());
     const art = branchOf(layout, 'art');
     expect(art.merge?.into).toBe('core');
-    expect(art.merge?.position).toEqual(nodeOf(layout, 'master').position);
-    expect(art.points[art.points.length - 1]).toEqual(nodeOf(layout, 'master').position);
+    const master = nodeOf(layout, 'master').position;
+    expect(art.merge?.position).toEqual(art.points[art.points.length - 1]);
+    expect([art.merge?.position.x, art.merge?.position.y]).toEqual([master.x, master.y]);
   });
 
   it('el foco se calcula con la fecha de cada punto (interpolada entre nodos)', () => {
@@ -367,16 +379,20 @@ describe('TimelineLayout: enlaces causales (ledTo)', () => {
     ]);
     for (const link of layout.links) {
       const points = link.points;
-      expect(points[0]).toEqual(nodeOf(layout, link.from).position);
-      expect(points[points.length - 1]).toEqual(nodeOf(layout, link.to).position);
-      for (const point of points) expect(point.y).toBeGreaterThanOrEqual(0);
-      const height = Math.max(...points.map((point) => point.y));
+      const from = nodeOf(layout, link.from).position;
+      const to = nodeOf(layout, link.to).position;
+      expect(points[0]).toEqual(from);
+      expect(points[points.length - 1]).toEqual(to);
+      for (const point of points) expect(point.y).toBeGreaterThanOrEqual(Math.min(from.y, to.y) - 1e-9);
+      const height = Math.max(...points.map((point) => point.y)) - Math.max(from.y, to.y);
       expect(height).toBeGreaterThanOrEqual(O.linkMinHeight - 1e-9);
       expect(height).toBeLessThanOrEqual(O.linkMaxHeight + 1e-9);
     }
     // Cuanto más lejos, más alto.
     const [near, far] = layout.links;
-    expect(Math.max(...far.points.map((p) => p.y))).toBeGreaterThan(Math.max(...near.points.map((p) => p.y)));
+    const rise = (link: (typeof layout.links)[number]): number =>
+      Math.max(...link.points.map((p) => p.y)) - Math.max(link.points[0].y, link.points[link.points.length - 1].y);
+    expect(rise(far)).toBeGreaterThan(rise(near));
   });
 
   it('sin ledTo no hay hebras; los destinos ocultos o filtrados se ignoran', () => {
