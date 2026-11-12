@@ -221,6 +221,8 @@ Raíz del documento:
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
 | `bridge` | texto no vacío, máx. 160 caracteres | No | Frase puente que enlaza con el evento **anterior del recorrido** (`story.path`). Se muestra arriba del pop-up en el modo historia |
 | `ledTo` | lista de ids de evento | No | Enlaces causales «esto llevó a esto»: eventos **posteriores o de la misma fecha**, de cualquier línea. Se dibujan como una hebra de tinta del nodo origen al destino y aparecen en el pop-up («Esto llevó a…» / «Viene de…») |
+| `alsoBranches` | lista de ids de línea | No | **Nodo de unión** («encrucijada»): otras líneas que pasan por este nodo además de la dueña (`branch`). Todas convergen exactamente en él y vuelven a salir; el nodo lleva un anillo con sus colores (con ≥ 4 líneas, más grande y rotulado siempre) y el pop-up muestra «Líneas: …». Cada línea debe existir y estar viva en esa fecha |
+| `active` | booleano | No | Proyecto o etapa **en activo**: el nodo late despacio, lleva la etiqueta «En activo» y su línea se prolonga hasta hoy con una punta que avanza |
 
 #### `branches[]` (opcional)
 
@@ -237,6 +239,8 @@ Describe las líneas vitales. Una línea existe porque algún evento la usa en `
 | `until` | `"present"` | No | La línea llega hasta hoy aunque sus eventos hayan terminado (afición latente). Incompatible con `mergeInto` |
 | `style` | `"geometric"`, `"organic"` o `"neutral"` | No | Lenguaje de forma de los nodos de la línea (y de su marca en leyenda y chips): rectilíneo para lo racional, orgánico/abstracto para lo creativo, círculo neutro. Si falta: `tecnologia`/`gestion` → `geometric`; `arte`/`gastronomia`/`rol` → `organic`; el resto → `neutral` |
 | `focus` | lista de `{ start, end?, level? }` | No | Periodos de foco. `start`/`end` con el formato de fechas; `end` admite `"present"` y, si falta, el foco sigue hasta hoy. `level` `1`, `2` o `3` (por defecto `3`) |
+| `ghost` | booleano | No | **Camino que no fue** (p. ej. «Derecho»): nace en `origin` (obligatorio), recorre ~1,25 pasos muy tenue con su nombre en cursiva y se deshilacha. Sin eventos propios, `until`, `mergeInto` ni `pauses`; no sale en la leyenda de líneas |
+| `pauses` | lista de `{ from, to }` | No | Tramos en los que la línea **no se dibuja**: tras el evento `from` se deshilacha en motas y renace (con chispa) en `to`. Vale también para la central |
 
 #### `arcs[]` (opcional)
 
@@ -298,7 +302,7 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `meta.mainBranch` | Kebab-case y con algún evento. Sin `mainBranch`, si hay `branches` y ningún evento pertenece a `"main"`, es obligatorio indicarlo |
 | `branches[].id` | Kebab-case, único y usado por algún evento (o igual a `mainBranch`) |
 | `branches[].color` | `#RRGGBB` |
-| `branches[].origin` | El evento existe y es de otra línea; la línea central no admite `origin` |
+| `branches[].origin` | El evento existe y es de otra línea o el primer evento de la propia (nace en ese nodo). También la central: `mainBranch` es la línea del foco actual, no la que existe desde el principio; antes de nacer (o en pausa), sin focos, la trenza es la línea del primer evento |
 | `branches[].mergeInto` | `branch` existe y es distinta; `event` existe y pertenece a `branch`; sin ciclos de fusión; la central no se fusiona |
 | `branches[].until` | Solo `"present"`, y no junto a `mergeInto` |
 | `branches[].focus[]` | Fechas válidas, `end >= start`, `level` 1, 2 o 3 |
@@ -307,6 +311,10 @@ Todas estas las comprueba `LifeDataValidator` (y por tanto `npm run validate:dat
 | `bridge` | Opcional; si está, texto no vacío de 160 caracteres como máximo |
 | `ledTo` | Lista de ids existentes, sin el propio evento, sin repetir y con el destino en la misma fecha o después que el origen. `build:public-data` quita los destinos privados (y la lista si se queda vacía) |
 | `branches[].style` | `"geometric"`, `"organic"` o `"neutral"` |
+| `alsoBranches` | Lista de líneas existentes (no `ghost`), sin la dueña ni duplicados; cada una **viva** en la fecha del nodo: ya nacida (`origin`/`branchFrom`), sin fusionar, sin terminar (último evento, salvo `until: "present"`, un evento en curso o `active`) y sin pausa |
+| `active` | Booleano |
+| `branches[].ghost` | Booleano; con `true` exige `origin` y prohíbe eventos propios, `until`, `mergeInto` y `pauses` |
+| `branches[].pauses` | `from` y `to` existen, `from` es anterior a `to`, sin solapes entre pausas y sin eventos de la línea dentro (salvo en `from`/`to`). `build:public-data` quita las pausas con un extremo privado, reengancha (o quita) los caminos que no fueron con origen privado y limpia `alsoBranches` |
 
 > [!NOTE]
 > `schema/life.schema.json` describe la **forma** del documento y sirve para el autocompletado del editor. Las reglas cruzadas (unicidad, referencias, `end ≥ start`, ciclos, días reales del mes) no son expresables en JSON Schema: la referencia es `npm run validate:data`. El proyecto no incluye ninguna librería que valide contra el schema.

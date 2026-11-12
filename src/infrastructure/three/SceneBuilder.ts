@@ -47,7 +47,7 @@ export const BRAID_FIBERS = [
 ] as const;
 
 /** «Camino que no fue»: hebra muy tenue y fina que se deshilacha. */
-export const GHOST_STYLE = { radius: 0.035, intensity: 0.32, fadeOut: 0.7 } as const;
+export const GHOST_STYLE = { radius: 0.04, intensity: 0.42, fadeOut: 0.7 } as const;
 /** Nodo de unión de al menos tantas líneas: más grande y siempre rotulado. */
 export const BIG_UNION_LINES = 4;
 export const BIG_UNION_SCALE = 1.28;

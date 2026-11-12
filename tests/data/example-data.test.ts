@@ -31,10 +31,17 @@ describe('public/data/life.example.json', () => {
     const lines = data.branches ?? [];
     expect(data.meta.mainBranch).toBe('oficio');
     expect(lines.length).toBeGreaterThanOrEqual(4);
-    expect(lines.filter((line) => line.id !== data.meta.mainBranch).every((line) => line.origin === 'nacimiento')).toBe(true);
+    // Las líneas nacen en el nacimiento salvo una que nace en un nodo y los caminos que no fueron.
+    expect(lines.filter((line) => line.id !== data.meta.mainBranch && !line.ghost && line.origin === 'nacimiento').length).toBeGreaterThanOrEqual(3);
+    expect(lines.some((line) => !line.ghost && line.origin !== undefined && line.origin !== 'nacimiento')).toBe(true);
+    expect(lines.filter((line) => line.ghost)).toHaveLength(2);
+    expect(lines.some((line) => (line.pauses ?? []).length > 0)).toBe(true);
+    expect(data.events.some((event) => event.active === true)).toBe(true);
+    const lineCount = lines.filter((line) => !line.ghost).length;
+    expect(data.events.some((event) => (event.alsoBranches ?? []).length + 1 >= lineCount - 1)).toBe(true);
     expect(lines.some((line) => line.mergeInto !== undefined)).toBe(true);
     expect(lines.some((line) => line.until === 'present')).toBe(true);
-    expect(lines.every((line) => (line.focus ?? []).length > 0)).toBe(true);
+    expect(lines.filter((line) => !line.ghost).every((line) => (line.focus ?? []).length > 0)).toBe(true);
     expect(data.events.some((event) => event.visibility === 'private')).toBe(true);
     expect(data.events.some((event) => event.date.end === 'present')).toBe(true);
     expect(data.events.some((event) => event.categories.length > 1)).toBe(true);

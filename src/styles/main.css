@@ -1967,17 +1967,17 @@ a {
   left: 0;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.02em;
   white-space: nowrap;
-  color: color-mix(in srgb, var(--accent) 55%, var(--muted));
+  color: color-mix(in srgb, var(--accent) 60%, var(--ink-soft));
   opacity: 0;
   transition: opacity 0.3s ease;
   text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
 }
 
 .ghost-label--shown {
-  opacity: 0.62;
+  opacity: 0.78;
 }
 
 /* Pop-up de un nodo de unión: «Líneas:» y un chip por línea. */

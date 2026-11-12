@@ -113,7 +113,7 @@ export class LifeDataValidator {
     const mainBranch = this.validateMeta(input.meta, collector);
     const categoryIds = this.validateCategories(input.categories, collector);
     const graph = this.validateEvents(input.events, categoryIds, mainBranch, collector);
-    this.validateLines(input.branches, graph, mainBranch, collector);
+    this.validateLines(input.branches, graph, mainBranch, collector, startsOf(input.events));
     this.checkMainBranch(input, graph, mainBranch, collector);
     this.checkOriginCycles(graph, mainBranch, collector);
     this.validateArcs(input.arcs, collector);
@@ -349,7 +349,13 @@ export class LifeDataValidator {
   }
 
   /** `branches[]`: líneas vitales con nombre, origen, fusión, `until` y periodos de foco. */
-  private validateLines(lines: unknown, graph: BranchGraph, mainBranch: string, c: IssueCollector): void {
+  private validateLines(
+    lines: unknown,
+    graph: BranchGraph,
+    mainBranch: string,
+    c: IssueCollector,
+    starts: ReadonlyMap<string, PartialDate | null>,
+  ): void {
     if (lines === undefined) return;
     if (!Array.isArray(lines)) {
       c.add('branches', 'debe ser una lista de líneas { id, label, … }');
@@ -380,7 +386,15 @@ export class LifeDataValidator {
         if (typeof line.origin !== 'string' || !graph.eventIds.has(line.origin)) {
           c.add(`${path}.origin`, `el evento "${String(line.origin)}" no existe`);
         } else if (graph.branchOfEvent.get(line.origin) === id) {
-          c.add(`${path}.origin`, `"${line.origin}" pertenece a la propia línea "${id}"; debe ser un evento de otra`);
+          // Puede nacer en su propio primer evento (la línea empieza justo en ese nodo).
+          const own = starts.get(line.origin);
+          const earlier = [...graph.branchOfEvent].some(([other, branch]) => {
+            const start = starts.get(other);
+            return branch === id && own && start && start.compareTo(own) < 0;
+          });
+          if (earlier) {
+            c.add(`${path}.origin`, `"${line.origin}" pertenece a la propia línea "${id}": solo vale si es su primer evento; si no, debe ser un evento de otra`);
+          }
         } else if (id !== null) {
           graph.parentBranch.set(id, graph.branchOfEvent.get(line.origin) ?? mainBranch);
         }
@@ -624,6 +638,16 @@ export class LifeDataValidator {
       }
     }
   }
+}
+
+/** Fecha de inicio de cada evento (null si no es válida). */
+function startsOf(events: unknown): Map<string, PartialDate | null> {
+  const starts = new Map<string, PartialDate | null>();
+  if (!Array.isArray(events)) return starts;
+  for (const event of events) {
+    if (isRecord(event) && typeof event.id === 'string') starts.set(event.id, isRecord(event.date) ? PartialDate.tryParse(event.date.start) : null);
+  }
+  return starts;
 }
 
 interface BranchGraph {

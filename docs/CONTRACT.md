@@ -77,6 +77,8 @@ interface BranchInfo {
   until?: "present";          // sigue viva hasta hoy aunque su último evento haya terminado
   focus?: { start: string; end?: string | "present"; level?: 1 | 2 | 3 }[]; // sin end = hasta hoy; level por defecto 3
   style?: "geometric" | "organic" | "neutral"; // forma de sus nodos; por defecto según id (ver abajo)
+  ghost?: boolean;            // «camino que no fue»: nace en origin, ~1,25 pasos tenue con su nombre, se disuelve; sin eventos
+  pauses?: { from: string; to: string }[]; // no se dibuja entre esos eventos (se disuelve tras from, renace en to)
 }
 interface Category {
   id: string;                 // kebab-case, único
@@ -106,6 +108,8 @@ interface LifeEvent {
   visibility?: "public" | "private"; // "private" se oculta salvo ?private=1
   bridge?: string;            // ≤ 160: frase que conecta con el evento anterior del recorrido
   ledTo?: string[];           // enlaces causales: ids de eventos posteriores o de la misma fecha (cualquier línea)
+  alsoBranches?: string[];    // nodo de unión: otras líneas que pasan por él (convergen y vuelven a salir)
+  active?: boolean;           // proyecto/etapa vivo hoy: late, «En activo», su línea avanza hasta hoy
 }
 ```
 
@@ -118,7 +122,13 @@ distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `
 `ledTo` con ids existentes, sin el propio evento, sin duplicados y con destino no anterior al origen;
 `branches[].style` ∈ geometric | organic | neutral;
 `mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
-`"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `origin` ni `mergeInto`.
+`"main"`); `until` solo `"present"` y nunca con `mergeInto`; la central no admite `mergeInto` (sí
+`origin` y `pauses`: `mainBranch` es la línea del foco actual); `origin` puede ser el primer evento
+de la propia línea (nace en ese nodo). Uniones, caminos que no fueron y pausas (`LineLifeRules`):
+`alsoBranches` con líneas existentes y no ghost, sin la dueña ni duplicados, vivas en la fecha
+(nacidas, sin fusionar, sin terminar, sin pausa); `ghost` exige `origin` y prohíbe eventos propios,
+`until`, `mergeInto` y `pauses`; `pauses` con eventos existentes, `from` < `to`, sin solapes y sin
+eventos propios dentro; `active` booleano.
 Errores acumulados con ruta (`events[3].date.start: ...`, `branches[1].mergeInto.event: ...`), no solo el primero.
 
 Jerarquía, arcos e historia: nodos = sólidos 3D en wireframe (aristas luminosas del color de su línea,
@@ -137,7 +147,17 @@ entre dos de sus nodos y al salir se separa (chispa en cada unión/separación).
 dentro de la trenza y no vuelve a salir. Nodo: y = 0 si su línea está en la trenza en su fecha; si no,
 el y del carril de su línea. Color único = el de la línea (nodo, aura, rótulo, pop-up, leyenda); las
 categorías solo filtran y sus chips son neutros. Rótulos: los de la trenza alternan arriba/abajo; los
-de ramas exteriores, siempre hacia fuera; halo oscuro tras cada rótulo. `ledTo` = hebra de tinta del nodo origen al
+de ramas exteriores, siempre hacia fuera; halo oscuro tras cada rótulo. Nodos de unión (decisión 30): las líneas de `alsoBranches` llegan al nodo (rampa suave desde su
+carril) y salen enseguida; nodo en y = 0 si la dueña **o alguna de `alsoBranches`** está en la trenza
+en su fecha; anillo plano multicolor de cara a la cámara (≥ 4 líneas: ×1,28 y rótulo siempre);
+pop-up «Líneas: …». `origin`: la línea arranca en el nodo con chispa. Pausas: tras `from` la línea
+sigue recta ≤ 0,55 pasos y se deshilacha en motas; renace con chispa en `to`; sin puntos entre medias
+y fuera de la trenza. Ghosts: hebra tenue de 1,25 pasos desde el origen hacia fuera, rótulo en
+cursiva al acercarse; no están en la leyenda de líneas. `active`: aura y anillo laten (2,4 s), «En
+activo» junto al rótulo y una punta con estela que avanza hasta el final de la línea (quieta al final
+con movimiento reducido). Leyenda: claves «Encrucijada», «En activo», «Camino que no fue».
+Antes de nacer la central (o en su pausa), sin focos, la trenza es la línea del primer evento.
+`ledTo` = hebra de tinta del nodo origen al
 destino (degradado de color entre las dos líneas; remolino de pigmento si cambian de línea); pop-up con
 «Viene de…» y «Esto llevó a…»; en la historia, si el paso siguiente es consecuencia del actual, la
 cámara sigue la hebra. Los
@@ -148,7 +168,8 @@ separadores verticales etéreos + velo del arco activo en la escena, franja de c
 pop-up con progreso «3 / 22», arco y `bridge`, Anterior/Siguiente y ←/→ por el recorrido, tarjeta de
 capítulo al entrar en un arco nuevo; sale con Esc o botón. Sin `story.path` no hay botón. En modo
 libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. `build:public-data` quita del recorrido
-los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados.
+los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados, las pausas con
+un extremo privado, reengancha o quita los ghosts con origen privado y limpia `alsoBranches`.
 
 Comportamiento visual de las líneas: grosor, brillo y motas según la pertenencia a la trenza
 (`LayoutBranch.braid`, 0 en el carril … 1 en el centro); las que comparten `origin` salen del mismo
@@ -180,7 +201,7 @@ src/
 
 - Dependencias solo hacia dentro: infrastructure → application → domain. Dominio y aplicación no importan `three` ni tocan `document`/`window`/`fetch`.
 - SOLID: una responsabilidad por clase, puertos pequeños, inyección por constructor, extensible sin modificar (nuevas categorías = datos; nuevos efectos = nuevas clases que implementan una interfaz `SceneEffect`).
-- `TimelineLayout` es puro y determinista: de `Timeline` (y, opcionalmente, los ids visibles) → `{ nodes: {eventId, position{x,y,z}, branch, index}, branches: {id, points[], focus[], braid[], laneY, main, merge}, links: {from, to, fromBranch, toBranch, points[]}, junctions: {branch, kind: join|split|merge, position}, braidSpans: {startX, endX, members[]}, years, arcs, nodeStep, band }`. El eje X es **ordinal**: los nodos visibles, en orden cronológico (desempate: importancia, línea central, id), se separan siempre `nodeStep`. La pertenencia a la trenza por fecha sale de `Braid` (`braidMembersAt`, `isInBraidAt`, `braidChangesOf`; dominio, puro). Nodos en y = 0 (trenza) o en el carril fijo de su línea (±0,5–0,8 pasos); uniones y separaciones con *smoothstep* entre dos nodos de la línea. Los `ledTo` son arcos por encima de sus extremos. Al filtrar se recalcula con los visibles.
+- `TimelineLayout` es puro y determinista: de `Timeline` (y, opcionalmente, los ids visibles) → `{ nodes: {eventId, position{x,y,z}, branch, index, lines[]}, branches: {id, points[], focus[], braid[], laneY, main, merge, gaps[]}, links: {from, to, fromBranch, toBranch, points[]}, junctions: {branch, kind: join|split|merge|birth|fray, position}, braidSpans: {startX, endX, members[]}, ghosts: {id, originEventId, points[], side}, actives: {eventId, branch, points[]}, years, arcs, nodeStep, band }`. El eje X es **ordinal**: los nodos visibles, en orden cronológico (desempate: importancia, línea central, id), se separan siempre `nodeStep`. La pertenencia a la trenza por fecha sale de `Braid` (`braidMembersAt`, `isInBraidAt`, `braidChangesOf`; dominio, puro). Nodos en y = 0 (trenza) o en el carril fijo de su línea (±0,5–0,8 pasos); uniones y separaciones con *smoothstep* entre dos nodos de la línea. Los `ledTo` son arcos por encima de sus extremos. Al filtrar se recalcula con los visibles.
 
 ## UX obligatoria
 

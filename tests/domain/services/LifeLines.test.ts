@@ -26,6 +26,7 @@ describe('LifeDataValidator — branches[] y meta.mainBranch', () => {
         { id: 'food', label: 'Cocina', origin: 'bread', focus: [{ start: '2012', end: '2011' }, { start: 'ayer' }, { start: '2010', level: 5 as 1 }] },
       ];
     });
+    expect(issues(data)).not.toEqual(expect.arrayContaining([expect.stringContaining('branches[5].origin')]));
     expect(issues(data)).toEqual(
       expect.arrayContaining([
         expect.stringContaining('branches[1].id'),
@@ -37,7 +38,6 @@ describe('LifeDataValidator — branches[] y meta.mainBranch', () => {
         expect.stringContaining('branches[4].mergeInto.branch'),
         expect.stringContaining('branches[4].mergeInto.event'),
         expect.stringContaining('branches[4].until'),
-        expect.stringContaining('branches[5].origin'),
         expect.stringContaining('branches[5].focus[0].end'),
         expect.stringContaining('branches[5].focus[1].start'),
         expect.stringContaining('branches[5].focus[2].level'),

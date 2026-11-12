@@ -151,15 +151,15 @@ export class Timeline {
   }
 
   /**
-   * Evento visible del que nace una rama: `origin` de la línea si existe y es visible; si no, el
-   * primer `branchFrom` de sus eventos. Nunca un evento de la propia rama ni para la central.
+   * Evento visible del que nace una rama: `origin` de la línea si existe y es visible (puede ser su
+   * propio primer evento: nace en ese nodo); si no, el primer `branchFrom` de sus eventos (de otra rama).
    */
   originOf(branchId: string): LifeEvent | undefined {
     const declared = this.linesById.get(branchId)?.originEventId;
     const candidates = [declared, this.events.find((event) => event.branch === branchId && event.branchFrom)?.branchFrom];
-    for (const id of candidates) {
+    for (const [k, id] of candidates.entries()) {
       const event = id === undefined ? undefined : this.eventsById.get(id);
-      if (event && event.branch !== branchId) return event;
+      if (event && (event.branch !== branchId || k === 0)) return event;
     }
     return undefined;
   }

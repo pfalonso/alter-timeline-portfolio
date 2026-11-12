@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LifeDataValidator } from '../../../src/domain/services';
+import { buildModel } from '../../helpers/fixtures';
 import { eventOf, lineOf, looseUnionData, makeUnionData, type LooseData } from '../../helpers/unionFixtures';
 
 const validator = new LifeDataValidator();
@@ -124,5 +125,21 @@ describe('la línea central (mainBranch) también nace en un nodo y se pausa', (
   it('antes de nacer la central no pasa por nodos de unión', () => {
     const issues = validator.validate(centralTech((data) => (eventOf(data, 'e-art1').alsoBranches = ['tech']))).issues;
     expect(issues.map((issue) => issue.message).join('\n')).toMatch(/"tech" no está viva en 2005: aún no ha nacido/);
+  });
+});
+
+describe('origin en el propio primer evento', () => {
+  it('una línea puede nacer en su primer evento, pero no en uno posterior', () => {
+    expect(issuesOf((data) => (lineOf(data, 'arte').origin = 'e-art1'))).toEqual([]);
+    expect(issuesOf((data) => (lineOf(data, 'arte').origin = 'e-art2')).join('\n')).toMatch(/solo vale si es su primer evento/);
+  });
+
+  it('el layout la hace nacer en ese nodo, con chispa', () => {
+    const data = looseUnionData((d) => (lineOf(d, 'arte').origin = 'e-art1')) as never;
+    const model = buildModel(data, { now: new Date(Date.UTC(2020, 0, 1)) });
+    const node = model.layout.nodes.find((item) => item.eventId === 'e-art1');
+    const arte = model.layout.branches.find((branch) => branch.id === 'arte');
+    expect(arte?.points[0].x).toBeCloseTo(node?.position.x ?? NaN, 6);
+    expect(model.layout.junctions.some((item) => item.branch === 'arte' && item.kind === 'birth')).toBe(true);
   });
 });

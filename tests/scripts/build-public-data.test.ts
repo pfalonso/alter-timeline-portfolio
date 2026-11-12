@@ -162,7 +162,7 @@ describe('scripts/build-public-data.ts', () => {
     const result = run('public/data/life.example.json', target);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/26 eventos públicos \(1 privados eliminados\)/);
+    expect(result.stdout).toMatch(/28 eventos públicos \(1 privados eliminados\)/);
     const written = JSON.parse(readFileSync(target, 'utf8')) as Raw;
     expect(written.events.some((event) => event.visibility === 'private')).toBe(false);
   }, 90_000);

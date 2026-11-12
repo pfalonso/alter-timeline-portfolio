@@ -523,7 +523,12 @@ export class TimelineLayout {
       const last = anchors[anchors.length - 1] ?? span.firstX;
       // Origen visible y anterior al primer nodo: la línea sale de él.
       const originEvent = timeline.originOf(id);
-      const origin = isVisible(originEvent) && (nodeX.get(originEvent.id) as number) < first - EPS ? originEvent : null;
+      // Origen visible y anterior al primer nodo (o su propio primer nodo: nace en él).
+      const origin =
+        isVisible(originEvent) &&
+        ((nodeX.get(originEvent.id) as number) < first - EPS || (originEvent.branch === id && (nodeX.get(originEvent.id) as number) <= first + EPS))
+          ? originEvent
+          : null;
       const mergeInfo = main ? undefined : timeline.mergeOf(id);
       const merge =
         mergeInfo && isVisible(mergeInfo.event) && (nodeX.get(mergeInfo.event.id) as number) > last + EPS
