@@ -57,6 +57,17 @@ export interface ProjectedFrame {
   readonly arcs?: readonly ProjectedArc[];
   /** X de mundo al que mira la cámara (centro de la zona visible). */
   readonly lookX?: number;
+  /** Punto (en pantalla) donde va el rótulo de cada «camino que no fue». */
+  readonly ghosts?: readonly ProjectedGhost[];
+}
+
+export interface ProjectedGhost {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly inFront: boolean;
+  /** 1 si la hebra se aleja hacia arriba; −1 hacia abajo. */
+  readonly side: 1 | -1;
 }
 
 /** Capas DOM que se colocan siguiendo la proyección de la escena (etiquetas, regla de años). */

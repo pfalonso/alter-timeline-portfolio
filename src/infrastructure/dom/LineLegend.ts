@@ -107,6 +107,8 @@ export class LineLegend implements TimelineViewPart, ProjectionListener {
       list.append(el('li', { class: 'lines__item' }, [button]));
     }
     this.root.append(el('span', { class: 'lines__title', text: STRINGS.linesLabel }), this.toggle, list);
+    const keys = this.keysOf(model);
+    if (keys) this.root.append(keys);
   }
 
   /** Marca las líneas que van por la trenza donde mira la cámara. */
@@ -163,6 +165,26 @@ export class LineLegend implements TimelineViewPart, ProjectionListener {
     for (const [lineId, button] of this.buttons) button.classList.toggle('line--active', lineId === active);
     this.root.classList.toggle('lines--highlighting', active !== null);
     this.highlighter?.highlightBranch(active);
+  }
+
+  /** Claves pequeñas para lo que aparece en los datos: encrucijadas, activos y caminos que no fueron. */
+  private keysOf(model: TimelineViewModel): HTMLElement | null {
+    const { layout } = model;
+    const keys: [string, string, string][] = [];
+    if (layout.nodes.some((node) => node.lines.length > 1)) keys.push(['union', STRINGS.keyUnion, STRINGS.keyUnionHint]);
+    if (layout.actives.length > 0) keys.push(['active', STRINGS.keyActive, STRINGS.keyActiveHint]);
+    if (layout.ghosts.length > 0) keys.push(['ghost', STRINGS.keyGhost, STRINGS.keyGhostHint]);
+    if (keys.length === 0) return null;
+    return el(
+      'ul',
+      { class: 'lines__keys' },
+      keys.map(([kind, label, hint]) =>
+        el('li', { class: `key key--${kind}`, attrs: { title: hint } }, [
+          el('span', { class: `key__icon key__icon--${kind}`, attrs: { 'aria-hidden': 'true' } }),
+          el('span', { class: 'key__label', text: label }),
+        ]),
+      ),
+    );
   }
 
   private linesOf(model: TimelineViewModel): LegendLine[] {

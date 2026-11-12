@@ -419,9 +419,16 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       endX: screenX(arc.endX),
       active: arc.id === active,
     }));
+    // Rótulo de cada camino que no fue: hacia la mitad de su hebra.
+    const ghosts = (this.layout?.ghosts ?? []).map((ghost) => {
+      const point = ghost.points[Math.round((ghost.points.length - 1) * 0.5)];
+      const screen = toScreen(point.x, point.y, point.z);
+      return { id: ghost.id, x: screen.x, y: screen.y, inFront: screen.inFront, side: ghost.side };
+    });
     return {
       nodes,
       years,
+      ghosts,
       nowX: now && now.inFront ? now.x : null,
       cameraDistance: this.rig.distance,
       viewport: this.viewport,

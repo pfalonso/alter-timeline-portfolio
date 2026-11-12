@@ -18,6 +18,7 @@ import { KeyboardShortcuts } from './infrastructure/dom/KeyboardShortcuts';
 import { LineLegend } from './infrastructure/dom/LineLegend';
 import { LiveAnnouncer } from './infrastructure/dom/LiveAnnouncer';
 import { NodeLabels } from './infrastructure/dom/NodeLabels';
+import { GhostLabels } from './infrastructure/dom/GhostLabels';
 import { StoryControls } from './infrastructure/dom/StoryControls';
 import { STRINGS } from './infrastructure/dom/strings';
 import { Tooltip } from './infrastructure/dom/Tooltip';
@@ -112,6 +113,7 @@ async function bootstrap(): Promise<void> {
     stage.setAttribute('role', 'application');
     stage.setAttribute('aria-label', STRINGS.stageLabel);
     stage.tabIndex = 0;
+    const ghostLabels = new GhostLabels(byId('ghost-labels'));
     const legend = new LineLegend(byId('lines'), { highlightBranch: (id) => three?.highlightBranch(id) }, { fallbackColor: DEFAULT_PALETTE.trunk });
     three = new ThreeTimelineView({
       container: stage,
@@ -120,7 +122,7 @@ async function bootstrap(): Promise<void> {
       loop: new RenderLoop(),
       reducedMotion,
       hoverListener: tooltip,
-      projectionListeners: [labels, ruler, arcStrip, legend],
+      projectionListeners: [labels, ghostLabels, ruler, arcStrip, legend],
       safeInsets: () =>
         measureSafeInsets(
           stage,
@@ -130,7 +132,7 @@ async function bootstrap(): Promise<void> {
     });
     parts.push(three);
     new ViewControls(byId('controls'), three);
-    parts.push(legend);
+    parts.push(legend, ghostLabels);
   } else {
     app.classList.add('app--no-webgl');
     eventList.showAsMainContent(STRINGS.noWebgl);
