@@ -383,10 +383,25 @@ export class TimelineLayout {
     });
 
     const byId = new Map(nodes.map((node) => [node.eventId, node]));
+    // Un arco causal solo aporta si une nodos que la propia línea no conecta ya: si origen y destino
+    // comparten una línea y no hay ningún otro nodo de esa línea entre ellos, la línea ya es el puente.
+    const linesOfEvent = new Map(ordered.map((event) => [event.id, [event.branch, ...event.alsoBranches]]));
+    const indexOf = new Map(ordered.map((event, index) => [event.id, index]));
+    const alreadyConnected = (from: string, to: string): boolean => {
+      const fromLines = linesOfEvent.get(from) ?? [];
+      const toLines = linesOfEvent.get(to) ?? [];
+      const shared = fromLines.filter((line) => toLines.includes(line));
+      if (shared.length === 0) return false;
+      const i = indexOf.get(from) as number;
+      const j = indexOf.get(to) as number;
+      const between = ordered.slice(Math.min(i, j) + 1, Math.max(i, j));
+      return shared.some((line) => !between.some((event) => (linesOfEvent.get(event.id) ?? []).includes(line)));
+    };
     const links: LayoutLink[] = timeline.causalLinks.flatMap((link) => {
       const a = byId.get(link.from);
       const b = byId.get(link.to);
       if (!a || !b || b.position.x <= a.position.x) return [];
+      if (alreadyConnected(link.from, link.to)) return [];
       return [{ from: link.from, to: link.to, fromBranch: a.branch, toBranch: b.branch, points: this.arch(a.position, b.position) }];
     });
 

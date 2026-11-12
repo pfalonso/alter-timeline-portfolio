@@ -722,20 +722,21 @@ describe('ThreeTimelineView: arcos y modo historia', () => {
   it('si el paso siguiente es consecuencia del actual (ledTo), la cámara sigue la hebra causal', () => {
     const data = makeStoryData();
     const from = data.events.find((event) => event.id === 'a-school');
-    if (from) from.ledTo = ['b-job'];
+    if (from) from.ledTo = ['c-side'];
     const causalModel = buildModel(data);
     const fly = vi.spyOn(CameraRig.prototype, 'flyAlong');
     const h = harness({ reduced: false });
     h.view.render(causalModel);
     h.view.applySelection({ ...selection('a-school', true), story: story('a-school', null) });
     h.step(10);
-    h.view.applySelection({ ...selection('b-job', true), story: story('b-job', 'a-school') });
-    const link = causalModel.layout.links.find((item) => item.from === 'a-school' && item.to === 'b-job');
+    h.view.applySelection({ ...selection('c-side', true), story: story('c-side', 'a-school') });
+    const link = causalModel.layout.links.find((item) => item.from === 'a-school' && item.to === 'c-side');
+    expect(link).toBeDefined();
     expect(fly.mock.calls.at(-1)?.[0]).toEqual(routeAlong(link?.points ?? []));
     // Sin enlace, la ruta va recta por la banda.
-    h.view.applySelection({ ...selection('c-side', true), story: story('c-side', 'b-job') });
+    h.view.applySelection({ ...selection('e-side-two', true), story: story('e-side-two', 'c-side') });
     const straight = fly.mock.calls.at(-1)?.[0] ?? [];
-    expect(straight[0]).toEqual({ x: h.built.at(-1)?.nodes.find((n) => n.eventId === 'b-job')?.group.position.x, y: expect.any(Number) });
+    expect(straight[0]).toEqual({ x: h.built.at(-1)?.nodes.find((n) => n.eventId === 'c-side')?.group.position.x, y: expect.any(Number) });
   });
 
   it('con movimiento reducido el paso de la historia es un corte', () => {

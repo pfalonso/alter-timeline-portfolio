@@ -220,7 +220,7 @@ Raíz del documento:
 | `branchFrom` | id de evento | No | Evento **de otra rama** del que nace esta rama (modelo clásico; `branches[].origin` prevalece) |
 | `visibility` | `"public"` o `"private"` | No (por defecto `"public"`) | Los privados se ocultan salvo con `?private=1` |
 | `bridge` | texto no vacío, máx. 160 caracteres | No | Frase puente que enlaza con el evento **anterior del recorrido** (`story.path`). Se muestra arriba del pop-up en el modo historia |
-| `ledTo` | lista de ids de evento | No | Enlaces causales «esto llevó a esto»: eventos **posteriores o de la misma fecha**, de cualquier línea. Se dibujan como una hebra de tinta del nodo origen al destino y aparecen en el pop-up («Esto llevó a…» / «Viene de…») |
+| `ledTo` | lista de ids de evento | No | Enlaces causales «esto llevó a esto»: eventos **posteriores o de la misma fecha**, de cualquier línea. Se dibujan como una hebra de tinta del nodo origen al destino, salvo si son nodos consecutivos de una misma línea (la línea ya es el puente), y siempre aparecen en el pop-up («Esto llevó a…» / «Viene de…») |
 | `alsoBranches` | lista de ids de línea | No | **Nodo de unión** («encrucijada»): otras líneas que pasan por este nodo además de la dueña (`branch`). Todas convergen exactamente en él y vuelven a salir; el nodo lleva un anillo con sus colores (con ≥ 4 líneas, más grande y rotulado siempre) y el pop-up muestra «Líneas: …». Cada línea debe existir y estar viva en esa fecha |
 | `active` | booleano | No | Proyecto o etapa **en activo**: el nodo late despacio, lleva la etiqueta «En activo» y su línea se prolonga hasta hoy con una punta que avanza |
 

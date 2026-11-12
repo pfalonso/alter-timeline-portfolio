@@ -488,3 +488,8 @@ Sustituye a la decisión 28 (la central ya no es una columna fija: el centro es 
   `ProjectedFrame.lookX` busca el tramo de `braidSpans` y marca «en foco ahora» (clase
   `line--braided`, swatch grueso); «latente» se oculta mientras la línea va por la trenza. La
   central ya no lleva «foco actual» fijo.
+
+### 31. Arcos causales solo donde aportan
+
+- Un arco `ledTo` no se dibuja si origen y destino comparten una línea y no hay ningún otro nodo visible de esa línea entre ellos: la propia línea ya los une. Solo quedan los puentes entre nodos que no estarían conectados de otra forma (otra línea o nodos intermedios).
+- La regla se evalúa con los nodos visibles, así que al filtrar un arco puede desaparecer si sus extremos quedan seguidos en la misma línea. El pop-up sigue mostrando «Viene de… / Esto llevó a…» completos.
