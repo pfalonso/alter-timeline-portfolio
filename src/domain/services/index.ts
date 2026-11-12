@@ -4,13 +4,17 @@ export type { ValidationResult } from './LifeDataValidator';
 export { isHttpUrl } from './safeUrl';
 export { TimelineFactory } from './TimelineFactory';
 export type { TimelineFactoryOptions } from './TimelineFactory';
-export { compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
+export { branchPieces, compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
+export { validateLineLife } from './LineLifeRules';
 export type {
   BraidSpan,
   JunctionKind,
+  LayoutActive,
   LayoutArc,
   LayoutBounds,
   LayoutBranch,
+  LayoutGap,
+  LayoutGhost,
   LayoutJunction,
   LayoutLink,
   LayoutMerge,

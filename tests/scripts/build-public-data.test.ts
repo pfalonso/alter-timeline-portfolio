@@ -7,6 +7,7 @@ import type { LifeData, LifeEventData } from '../../src/domain/model';
 import { LifeDataValidator } from '../../src/domain/services/LifeDataValidator';
 import { toPublicData } from '../../scripts/build-public-data';
 import { makeData, makeEvent, makeLifeLinesData, makeStoryData } from '../helpers/fixtures';
+import { makeUnionData } from '../helpers/unionFixtures';
 
 type Raw = Parameters<typeof toPublicData>[0];
 const asRaw = (data: LifeData): Raw => data as unknown as Raw;
@@ -161,7 +162,7 @@ describe('scripts/build-public-data.ts', () => {
     const result = run('public/data/life.example.json', target);
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/26 eventos públicos \(1 privados eliminados\)/);
+    expect(result.stdout).toMatch(/28 eventos públicos \(1 privados eliminados\)/);
     const written = JSON.parse(readFileSync(target, 'utf8')) as Raw;
     expect(written.events.some((event) => event.visibility === 'private')).toBe(false);
   }, 90_000);
@@ -196,5 +197,50 @@ describe('toPublicData con enlaces causales', () => {
     expect('ledTo' in eventOf(result, 'b-job')).toBe(false);
     expect(new LifeDataValidator().validate(result).ok).toBe(true);
     expect(data.events[1].ledTo).toEqual(['d-secret']);
+  });
+});
+
+describe('toPublicData con nodos de unión, caminos que no fueron y pausas', () => {
+  const validator = new LifeDataValidator();
+  const base = (): Raw => asRaw(makeUnionData());
+  const privatize = (data: Raw, ...privateIds: string[]): Raw => {
+    for (const id of privateIds) eventOf(data, id).visibility = 'private';
+    return data;
+  };
+
+  it('sin privados, conserva alsoBranches, active, ghost y pauses', () => {
+    const out = toPublicData(base());
+    expect(eventOf(out, 'e-accident').alsoBranches).toEqual(['tech', 'arte', 'cocina']);
+    expect(eventOf(out, 'e-tech2').active).toBe(true);
+    expect(out.branches?.filter((line) => line.ghost).map((line) => line.id)).toEqual(['derecho', 'arquitectura']);
+    expect(validator.validate(out).issues).toEqual([]);
+  });
+
+  it('una pausa con un extremo privado se quita y el resultado valida', () => {
+    const out = toPublicData(privatize(base(), 'e-recovery'));
+    expect(out.branches?.find((line) => line.id === 'tech')?.pauses).toBeUndefined();
+    expect(validator.validate(out).issues).toEqual([]);
+  });
+
+  it('un camino que no fue con origen privado se reengancha o desaparece; la línea nacida allí también', () => {
+    const data = privatize(base(), 'e-cross');
+    const out = toPublicData(data);
+    expect(out.branches?.some((line) => line.ghost)).toBe(false);
+    expect(validator.validate(out).issues).toEqual([]);
+  });
+
+  it('quita de alsoBranches las líneas que ya no existen o ya no están vivas', () => {
+    const data = privatize(base(), 'e-cook1', 'e-cook2');
+    const out = toPublicData(data);
+    // cocina solo sigue por los nodos de unión públicos.
+    expect(eventOf(out, 'e-accident').alsoBranches).toContain('cocina');
+    const ended = base();
+    eventOf(ended, 'e-art2').visibility = 'private';
+    eventOf(ended, 'e-cook2').alsoBranches = ['arte'];
+    eventOf(ended, 'e-cook2').date = { start: '2019' };
+    eventOf(ended, 'e-art2').date = { start: '2018', end: '2019' };
+    const cleaned = toPublicData(ended);
+    expect(eventOf(cleaned, 'e-cook2').alsoBranches).toBeUndefined();
+    expect(validator.validate(cleaned).issues).toEqual([]);
   });
 });

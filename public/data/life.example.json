@@ -140,6 +140,27 @@
       ]
     },
     {
+      "id": "una-encrucijada",
+      "title": "Una encrucijada",
+      "subtitle": "Selectividad",
+      "date": {
+        "start": "2010-07"
+      },
+      "categories": [
+        "academico",
+        "personal"
+      ],
+      "summary": "Medicina, Arquitectura o Sonido: todas sus líneas se cruzan en un mismo verano y de ahí sale cada una por su lado.",
+      "description": "Tenía plaza en tres carreras. Medicina era lo esperado; Arquitectura, lo que dibujaba en los márgenes. Eligió la que unía las dos cosas que no sabía nombrar: el espacio y el sonido.",
+      "importance": 3,
+      "alsoBranches": [
+        "creacion",
+        "artes-visuales",
+        "cocina"
+      ],
+      "bridge": "Antes de elegir carrera, todas sus líneas se juntan en un mismo punto."
+    },
+    {
       "id": "grado-sonido-imagen",
       "title": "Grado en Ingeniería de Sonido e Imagen",
       "shortTitle": "Ingeniería de Sonido e Imagen",
@@ -460,7 +481,8 @@
       ],
       "importance": 3,
       "branch": "creacion",
-      "bridge": "Lo que hacía en sus ratos libres pide nombre propio: nace su estudio."
+      "bridge": "Lo que hacía en sus ratos libres pide nombre propio: nace su estudio.",
+      "active": true
     },
     {
       "id": "charla-onda-larga",
@@ -481,6 +503,26 @@
         }
       ],
       "importance": 1
+    },
+    {
+      "id": "silencio-forzoso",
+      "title": "Un silencio forzoso",
+      "subtitle": "Lesión de oído",
+      "date": {
+        "start": "2019-07"
+      },
+      "categories": [
+        "personal"
+      ],
+      "summary": "Un trauma acústico la obliga a parar: durante meses solo sigue su oficio, a medio gas.",
+      "description": "Tras una prueba de sonido mal calibrada, un acúfeno persistente. El médico le prescribe silencio. Deja de cocinar para otros, cierra el estudio y aparca los cuadernos hasta que vuelve a oír con calma.",
+      "importance": 2,
+      "alsoBranches": [
+        "creacion",
+        "artes-visuales",
+        "cocina"
+      ],
+      "bridge": "Un pitido que no se va lo detiene todo de golpe."
     },
     {
       "id": "pausa-2019",
@@ -527,6 +569,10 @@
       "ledTo": [
         "museo-mareas",
         "docencia-universidad"
+      ],
+      "alsoBranches": [
+        "creacion",
+        "cocina"
       ]
     },
     {
@@ -793,7 +839,13 @@
           "level": 2
         }
       ],
-      "style": "organic"
+      "style": "organic",
+      "pauses": [
+        {
+          "from": "silencio-forzoso",
+          "to": "master-artes-digitales"
+        }
+      ]
     },
     {
       "id": "artes-visuales",
@@ -838,14 +890,20 @@
           "level": 1
         }
       ],
-      "style": "organic"
+      "style": "organic",
+      "pauses": [
+        {
+          "from": "silencio-forzoso",
+          "to": "master-artes-digitales"
+        }
+      ]
     },
     {
       "id": "ensenar",
       "label": "Enseñar",
       "color": "#6EA8FF",
       "description": "Docencia universitaria y talleres. Una línea que se apagó en 2023.",
-      "origin": "nacimiento",
+      "origin": "master-artes-digitales",
       "focus": [
         {
           "start": "2021-02",
@@ -854,6 +912,22 @@
         }
       ],
       "style": "neutral"
+    },
+    {
+      "id": "medicina",
+      "label": "Medicina",
+      "color": "#9FB4C7",
+      "origin": "una-encrucijada",
+      "ghost": true,
+      "description": "Camino que no fue: la carrera que se esperaba de ella."
+    },
+    {
+      "id": "arquitectura",
+      "label": "Arquitectura",
+      "color": "#D9C27A",
+      "origin": "una-encrucijada",
+      "ghost": true,
+      "description": "Camino que no fue: los planos que se quedaron en el cajón."
     }
   ],
   "arcs": [
@@ -897,6 +971,7 @@
       "primeros-cuadernos",
       "coro-instituto",
       "primer-sintetizador",
+      "una-encrucijada",
       "grado-sonido-imagen",
       "erasmus-tampere",
       "obrador-masa-lenta",
@@ -905,6 +980,7 @@
       "mudanza-lisboa",
       "lumen-atelier",
       "estudio-penumbra",
+      "silencio-forzoso",
       "pausa-2019",
       "master-artes-digitales",
       "museo-mareas",

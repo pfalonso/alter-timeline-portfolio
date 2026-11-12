@@ -1,4 +1,6 @@
 import type { TimelineViewModel } from '../../application/ports';
+import { branchPieces } from '../../domain/services';
+import { ActiveTip } from './ActiveTip';
 import { ArcBands } from './ArcBands';
 import { BranchCurve, type BranchStyle } from './BranchCurve';
 import { sampleAlongPath } from './math';
@@ -44,6 +46,12 @@ export const BRAID_FIBERS = [
   { radius: 0.022, intensity: 0.6, helix: 0.42, phase: 4.2, frequency: 0.8, speed: 1.25 },
 ] as const;
 
+/** «Camino que no fue»: hebra muy tenue y fina que se deshilacha. */
+export const GHOST_STYLE = { radius: 0.04, intensity: 0.42, fadeOut: 0.7 } as const;
+/** Nodo de unión de al menos tantas líneas: más grande y siempre rotulado. */
+export const BIG_UNION_LINES = 4;
+export const BIG_UNION_SCALE = 1.28;
+
 /** Realce de las hebras causales: discretas por defecto, encendidas al señalar uno de sus nodos. */
 export const STRAND_EMPHASIS = { rest: 0.14, lit: 1.6, other: 0.1 } as const;
 
@@ -67,6 +75,10 @@ export interface BuiltScene {
   readonly seams: readonly MergeSeam[];
   /** Hebras causales («esto llevó a esto»), del nodo origen al destino. */
   readonly strands: readonly BranchCurve[];
+  /** «Caminos que no fueron»: hebras tenues que se disuelven enseguida. */
+  readonly ghosts: readonly BranchCurve[];
+  /** Puntas que avanzan por la línea de cada proyecto en activo. */
+  readonly actives: readonly ActiveTip[];
   /** Resalta una línea (y atenúa las demás); `null` vuelve al estado normal. */
   highlightBranch(id: string | null): void;
   /** Ilumina las hebras causales que tocan estos eventos (señalado, seleccionado, paso de la historia). */
@@ -102,17 +114,24 @@ export class SceneBuilder {
 
     // Cada línea: filamento principal (grueso y brillante en la trenza, fino y tenue en su carril)
     // y, dentro de la trenza, dos fibras más finas que se entrelazan con las de las demás líneas.
-    const branches = layout.branches.map((branch, order) => {
-      const merges = branch.merge !== null;
+    // Una línea en pausa se dibuja en varios tramos: el anterior a la pausa se disuelve en motas y
+    // el siguiente renace en el nodo donde termina la pausa.
+    const tail = layout.nodeStep * 0.55;
+    const pieces = layout.branches.flatMap((branch, order) =>
+      branchPieces(branch).map((piece, k, all) => ({ branch, order, piece, k, last: k === all.length - 1 })),
+    );
+    const branches = pieces.map(({ branch, order, piece, k: pieceIndex, last }) => {
+      const merges = branch.merge !== null && last;
       const color = colorOfLine(branch.id);
-      const braid = branch.braid;
+      const braid = piece.braid;
       const phase = (order / lineCount) * Math.PI * 2;
+      const length = Math.max(1e-3, piece.points[piece.points.length - 1].x - piece.points[0].x);
       const style: BranchStyle = {
         color,
         radius: BRAID_STYLE.radius,
         intensity: BRAID_STYLE.intensity,
-        fadeIn: 0.04,
-        fadeOut: branch.open ? 0.04 : merges ? 0.015 : 0.3,
+        fadeIn: pieceIndex > 0 ? Math.min(0.3, (tail * 0.4) / length) : 0.04,
+        fadeOut: !last ? Math.min(0.6, tail / length) : branch.open ? 0.04 : merges ? 0.015 : 0.3,
         flowSpeed: 0.11,
         fogDensity,
         focus: braid.map((w) => BRAID_STYLE.outer + (1 - BRAID_STYLE.outer) * w),
@@ -120,12 +139,12 @@ export class SceneBuilder {
         braid,
         helix: { radius: BRAID_STYLE.helix, phase, frequency: BRAID_STYLE.frequency, speed: BRAID_STYLE.speed },
       };
-      const curve = new BranchCurve(branch.id, branch.points, style);
+      const curve = new BranchCurve(pieceIndex === 0 ? branch.id : `${branch.id}#${pieceIndex}`, piece.points, style);
       const inBraid = braid.some((w) => w > 0.5);
       const fibers = inBraid
         ? BRAID_FIBERS.map(
             (fiber, k) =>
-              new BranchCurve(`fiber:${branch.id}:${k}`, branch.points, {
+              new BranchCurve(`fiber:${branch.id}:${k}${pieceIndex > 0 ? `#${pieceIndex}` : ''}`, piece.points, {
                 ...style,
                 radius: fiber.radius,
                 intensity: fiber.intensity,
@@ -137,8 +156,8 @@ export class SceneBuilder {
           )
         : [];
       // Una rama que no llega al presente (ni converge en otra) se deshace en polvo al final.
-      const dissolve = !branch.open && !merges ? style.fadeOut : 0;
-      return { branch, curve, fibers, color, dissolve };
+      const dissolve = !last || (!branch.open && !merges) ? style.fadeOut : 0;
+      return { branch, curve, fibers, color, dissolve, points: piece.points, braid };
     });
     const branchById = new Map(layout.branches.map((branch) => [branch.id, branch]));
 
@@ -148,6 +167,15 @@ export class SceneBuilder {
       if (junction.kind === 'merge') {
         const into = branchById.get(junction.branch)?.merge?.into ?? junction.branch;
         return new MergeSeam(junction.branch, junction.position, color, colorOfLine(into), { count: 26, radius: 0.9, core: 0.9 });
+      }
+      if (junction.kind === 'fray') {
+        // La línea se deshilacha: motas de su color que se dispersan, sin destello.
+        return new MergeSeam(`fray:${junction.branch}@${junction.position.x}`, junction.position, color, palette.background, {
+          count: 14,
+          radius: 0.75,
+          core: 0,
+          seed: Math.round(junction.position.x * 10) + 5,
+        });
       }
       return new MergeSeam(`${junction.kind}:${junction.branch}@${junction.position.x}`, junction.position, color, '#ffffff', {
         count: 16,
@@ -213,6 +241,10 @@ export class SceneBuilder {
           style: timeline.lineStyleOf(node.branch),
           importance: event?.importance ?? 2,
           phase: index * 1.37,
+          // Encrucijada: anillo con los colores de las líneas que pasan; activo: anillo de su línea.
+          ringColors: node.lines.length > 1 ? node.lines.map(colorOfLine) : event?.active ? [colorOfLine(node.branch)] : undefined,
+          active: event?.active === true,
+          scale: node.lines.length >= BIG_UNION_LINES ? BIG_UNION_SCALE : 1,
         },
         assets,
       );
@@ -220,32 +252,57 @@ export class SceneBuilder {
 
     // Motas: la trenza es la protagonista (flujo denso que la recorre girando a su alrededor); en
     // las ramas exteriores, apenas unas pocas.
-    const braidPaths: FlowPath[] = branches.map(({ branch, curve, color }) => ({
+    const braidPaths: FlowPath[] = branches.map(({ branch, curve, color, points, braid }) => ({
       id: branch.id,
       path: curve.path,
       color,
-      focus: sampleAlongPath(curve.path, branch.points, branch.braid),
+      focus: sampleAlongPath(curve.path, points, braid),
     }));
-    const outerPaths: FlowPath[] = branches.map(({ branch, curve, color, dissolve }) => ({
+    const outerPaths: FlowPath[] = branches.map(({ branch, curve, color, dissolve, points, braid }) => ({
       id: branch.id,
       path: curve.path,
       color,
       dissolve,
       focus: sampleAlongPath(
         curve.path,
-        branch.points,
-        branch.braid.map((w) => 1 - w),
+        points,
+        braid.map((w) => 1 - w),
       ),
     }));
     const backdrop = new WatercolorWash(
-      branches.map(({ branch, color }) => ({
+      branches.map(({ branch, color, points, braid }) => ({
         color,
-        points: branch.points,
-        focus: branch.braid.map((w) => 0.25 + 0.75 * w),
+        points,
+        focus: braid.map((w) => 0.25 + 0.75 * w),
         main: branch.main,
       })),
       { ...DEFAULT_WATERCOLOR, paper: palette.background },
     );
+
+    // Caminos que no fueron: hebra tenue del color de la línea que se disuelve en unas motas.
+    const ghosts = layout.ghosts.map(
+      (ghost) =>
+        new BranchCurve(`ghost:${ghost.id}`, ghost.points, {
+          color: colorOfLine(ghost.id),
+          radius: GHOST_STYLE.radius,
+          intensity: GHOST_STYLE.intensity,
+          fadeIn: 0.08,
+          fadeOut: GHOST_STYLE.fadeOut,
+          flowSpeed: 0.05,
+          fogDensity,
+        }),
+    );
+    const ghostMotes = layout.ghosts.map((ghost) => {
+      const end = ghost.points[Math.floor(ghost.points.length * 0.7)];
+      return new MergeSeam(`ghost-fray:${ghost.id}`, end, colorOfLine(ghost.id), palette.background, {
+        count: 10,
+        radius: 0.6,
+        core: 0,
+        seed: Math.round(end.x * 10) + 9,
+      });
+    });
+    // Proyectos en activo: una punta que avanza por su línea hasta hoy.
+    const actives = layout.actives.map((active) => new ActiveTip(active.eventId, active.points, colorOfLine(active.branch)));
 
     const pulse = new SelectionPulse(assets.ring);
     const arcs = new ArcBands(layout.arcs, layout.bounds);
@@ -277,10 +334,13 @@ export class SceneBuilder {
       ...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]),
       ...spans,
       ...strands,
+      ...ghosts,
       flow,
       outerFlow,
       ...seams,
       ...swirls,
+      ...ghostMotes,
+      ...actives,
       pulse,
     ];
 
@@ -289,6 +349,8 @@ export class SceneBuilder {
       branches: branches.map(({ curve }) => curve),
       seams,
       strands,
+      ghosts,
+      actives,
       highlightBranch: (id) => {
         for (const { branch, curve, fibers } of branches) {
           const emphasis = id === null ? 'none' : branch.id === id ? 'on' : 'off';
@@ -305,7 +367,7 @@ export class SceneBuilder {
         });
       },
       fadeIn: () => {
-        for (const curve of [...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]), ...strands, ...spans]) curve.fadeIn();
+        for (const curve of [...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]), ...strands, ...spans, ...ghosts]) curve.fadeIn();
       },
       effects,
       pulse,

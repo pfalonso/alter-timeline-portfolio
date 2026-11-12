@@ -176,9 +176,10 @@ export class EventPopup implements TimelineViewPart {
       event.subtitle ? el('p', { class: 'popup__subtitle', text: event.subtitle }) : null,
       el('div', { class: 'popup__badges' }, [
         arc ? el('span', { class: 'badge badge--arc', text: STRINGS.arcOf(arc.title) }) : null,
-        event.ongoing ? el('span', { class: 'badge badge--live', text: STRINGS.ongoing }) : null,
+        event.active ? el('span', { class: 'badge badge--live badge--active', text: STRINGS.active }) : null,
+        event.ongoing && !event.active ? el('span', { class: 'badge badge--live', text: STRINGS.ongoing }) : null,
         event.isPrivate ? el('span', { class: 'badge', text: STRINGS.privateEvent }) : null,
-        line ? this.lineBadge(STRINGS.lineOf(line.label), accent) : null,
+        event.isUnion ? this.linesBadges(event) : line ? this.lineBadge(STRINGS.lineOf(line.label), accent) : null,
         origin && !line ? el('span', { class: 'badge badge--branch', text: STRINGS.branchFrom(origin.title) }) : null,
       ]),
       facts,
@@ -191,6 +192,15 @@ export class EventPopup implements TimelineViewPart {
       this.listSection(STRINGS.skills, event.skills, 'popup__skills'),
       this.linksSection(event),
     );
+  }
+
+  /** Nodo de unión: «Líneas:» y un chip por cada línea que pasa por él (la dueña primero). */
+  private linesBadges(event: LifeEvent): HTMLElement {
+    const timeline = this.timeline as Timeline;
+    return el('span', { class: 'popup__lines' }, [
+      el('span', { class: 'popup__lines-label', text: STRINGS.linesOf }),
+      ...event.lineIds.map((id) => this.lineBadge(timeline.getLine(id)?.label ?? id, timeline.lineColorOf(id) ?? '#9fd8ff')),
+    ]);
   }
 
   private lineBadge(text: string, color: string): HTMLElement {

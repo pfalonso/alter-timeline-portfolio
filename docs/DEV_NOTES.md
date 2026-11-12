@@ -270,6 +270,35 @@ real es `webgl.ts` y `PostFX.ts`.
     meridianos más tenues. Filtros y ayuda suben a `pad + 58px`: la franja de capítulos ya no pisa
     la última fila de chips.
 
+### 30. Nodos de unión, caminos que no fueron, pausas y proyectos en activo
+
+Feedback de Pablo (12/11/2026): la historia tiene momentos donde varias o todas las líneas se
+juntan («Una encrucijada», «Accidente de coche grave»), líneas que nacen en un nodo, caminos que no
+fueron (Derecho, Arquitectura), líneas que se pausan (tras el accidente solo sigue la vida hasta
+«Recuperación») y proyectos vivos que deben destacar.
+
+- **Esquema.** `event.alsoBranches`, `event.active`, `branches[].ghost`, `branches[].pauses`. La
+  central admite `origin` y `pauses` (`mainBranch` = línea del foco actual) y `origin` puede ser el
+  primer evento de la propia línea. Reglas en `LineLifeRules.ts` («vida» de una línea: nacimiento por
+  `origin`/`branchFrom`, fin por fusión o último evento salvo `until`/en curso/`active`, pausas
+  abiertas en los extremos).
+- **Dominio.** `Braid`: una línea no está en la trenza antes de nacer ni en pausa; si no hay focos y
+  la central no existe aún (o está en pausa), la trenza es la línea del primer evento. `Timeline`:
+  `branchIds` cuenta las líneas que solo pasan por uniones; `ghostLines`; `LifeEvent.lineIds/isUnion`.
+- **Layout.** Las uniones son estaciones de cada línea implicada (a la altura del nodo, punto exacto
+  de la polilínea); tras cualquier estación cuya altura no es la de la línea, la línea vuelve
+  enseguida a su altura (antes esperaba al siguiente nodo). Sin chispas join/split en nudos ni en el
+  origen. Pausas: estación en `from`, cola recta hasta `gapX` (≤ 0,55 pasos), hueco sin puntos
+  (`gaps`, `branchPieces`) y estación en `to` (en el nodo si la línea pasa por él). Uniones nuevas
+  `birth` (origen y renacer) y `fray` (inicio del hueco). `ghosts` y `actives` como salidas propias.
+- **Escena.** `NodeMesh`: anillo `RingGeometry` por segmentos (aditivo, opacidad 0,62) de cara a la
+  cámara; `active` → latido «lub-dub» (`heartbeat`, 2,4 s) en aura y anillo. `ActiveTip`: plumilla
+  fija al final + punta con estela que recorre la línea (periodo ≥ 4,5 s). Pausas: un `BranchCurve`
+  por tramo (`id`, `id#1`…), el anterior con `fadeOut` de la cola y motas que se dispersan. Ghosts:
+  `BranchCurve` fino (0,035) al 32 % con `fadeOut` 0,7 y unas motas al final; `GhostLabels` (DOM,
+  cursiva) vía `ProjectedFrame.ghosts`. `NodeLabels`: «En activo» y rótulo de mayor para uniones de
+  ≥ 4 líneas. Leyenda con claves solo si los datos las usan.
+
 ## Comprobación visual automatizada
 
 `scripts/ui-check.mjs` abre la web en Chrome headless (WebGL por software) y recorre: escena,
@@ -337,6 +366,10 @@ con datos reales y de ejemplo.
 Pasada de layout (11/11/2026, rama `feature/layout-carriles`): carriles compactos y encuadre con
 franjas reservadas (decisiones 13 y 14). Cadena de calidad en verde; capturas revisadas con datos
 reales (1600×900 y 390×844) y con el ejemplo.
+
+Pasada de nodos de unión (12/11/2026, rama `feature/nodos-union`): `alsoBranches`, `active`, `ghost`,
+`pauses`, central con `origin`/`pauses` (decisión 30). Cadena de calidad en verde; `ui-check` «Todo
+correcto» con el ejemplo y con datos reales; capturas de cerca de encrucijadas, pausa y activos.
 
 Pasada de líneas vitales (11/11/2026, rama `feature/lineas-vitales`): esquema `branches[]` y
 `meta.mainBranch`, foco, fusión, `until`, leyenda (decisiones 15–18). Cadena de calidad en verde;

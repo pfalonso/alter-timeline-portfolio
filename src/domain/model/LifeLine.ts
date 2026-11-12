@@ -35,6 +35,14 @@ export interface LineMerge {
   readonly eventId: string;
 }
 
+/** Pausa ya resuelta: la línea se disuelve tras `from` y renace en `to` (fechas de inicio de ambos). */
+export interface LinePause {
+  readonly fromEventId: string;
+  readonly toEventId: string;
+  readonly from: PartialDate;
+  readonly to: PartialDate;
+}
+
 /**
  * Línea vital (rama) declarada en `branches`: nombre, color, nacimiento, fusión y periodos de foco.
  * Las ramas que solo existen por `event.branch` no tienen `LifeLine`.
@@ -51,4 +59,13 @@ export interface LifeLine {
   readonly focus: readonly FocusPeriod[];
   /** Estilo declarado (si falta, `defaultLineStyle(id)`). */
   readonly style?: LineStyle;
+  /** «Camino que no fue»: sin eventos, nace en `originEventId` y se disuelve enseguida. */
+  readonly ghost: boolean;
+  /** Tramos en los que la línea no se dibuja, en orden. */
+  readonly pauses: readonly LinePause[];
+}
+
+/** `true` si la línea está en pausa en ese año (estrictamente entre `from` y `to`). */
+export function isPausedAt(line: Pick<LifeLine, 'pauses'> | undefined, year: number): boolean {
+  return (line?.pauses ?? []).some((pause) => year > pause.from.toDecimalYear() && year < pause.to.toDecimalYear());
 }

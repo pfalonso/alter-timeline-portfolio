@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://alter-timeline-portfolio.invalid/schema/life.schema.json",
   "title": "LifeData",
-  "description": "Datos de la línea temporal (schemaVersion 1). Las reglas que un JSON Schema no puede expresar (ids únicos, referencias a categorías, eventos y líneas existentes, end >= start, ramas y fusiones sin ciclos, que cada línea declarada tenga eventos, until incompatible con mergeInto) las comprueba además `npm run validate:data`.",
+  "description": "Datos de la línea temporal (schemaVersion 1). Las reglas que un JSON Schema no puede expresar (ids únicos, referencias a categorías, eventos y líneas existentes, end >= start, ramas y fusiones sin ciclos, que cada línea declarada tenga eventos, until incompatible con mergeInto, que las líneas de alsoBranches estén vivas en esa fecha, ghost y pauses) las comprueba además `npm run validate:data`.",
   "type": "object",
   "required": ["schemaVersion", "meta", "categories", "events"],
   "properties": {
@@ -128,7 +128,20 @@
           }
         },
         "until": { "const": "present", "description": "La línea sigue viva hasta hoy; incompatible con mergeInto" },
-        "focus": { "type": "array", "items": { "$ref": "#/$defs/focusPeriod" } }
+        "focus": { "type": "array", "items": { "$ref": "#/$defs/focusPeriod" } },
+        "ghost": { "type": "boolean", "description": "«Camino que no fue»: nace en origin (obligatorio), recorre ~1–1,5 pasos tenue con su nombre y se disuelve. Sin eventos propios, until, mergeInto ni pauses" },
+        "pauses": {
+          "type": "array",
+          "description": "Tramos en los que la línea no se dibuja: se disuelve tras from y renace en to. from anterior a to, sin solapes y sin eventos propios dentro (lo comprueba validate:data)",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "$ref": "#/$defs/kebabId", "description": "Evento tras el que la línea se disuelve" },
+              "to": { "$ref": "#/$defs/kebabId", "description": "Evento en el que renace" }
+            }
+          }
+        }
       }
     },
     "arc": {
@@ -209,7 +222,14 @@
           "items": { "$ref": "#/$defs/kebabId" },
           "description": "Enlaces causales «esto llevó a»: ids de eventos existentes, distintos de este y no anteriores (lo comprueba validate:data)"
         },
-        "visibility": { "enum": ["public", "private"], "default": "public" }
+        "visibility": { "enum": ["public", "private"], "default": "public" },
+        "alsoBranches": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabId" },
+          "description": "Nodo de unión: otras líneas que pasan por este nodo (sin la dueña). Cada una debe existir y estar viva en esa fecha: nacida, sin fusionar, sin terminar y sin pausa (lo comprueba validate:data)"
+        },
+        "active": { "type": "boolean", "description": "Proyecto o etapa vivo hoy: el nodo late y su línea se prolonga hasta hoy" }
       }
     }
   }

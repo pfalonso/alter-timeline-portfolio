@@ -1396,6 +1396,7 @@ a {
     display: inline-block;
   }
 
+  .lines--collapsed .lines__keys,
   .lines--collapsed .lines__list {
     display: none;
   }
@@ -1937,4 +1938,121 @@ a {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
   opacity: 0.7;
+}
+
+/* ───────── Nodos de unión, en activo y caminos que no fueron ───────── */
+
+/* «En activo»: etiqueta pequeña y contenida junto al año (sin neón). */
+.node-label__active {
+  margin-top: 2px;
+  padding: 1px 6px 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 65%, white);
+  background: color-mix(in srgb, var(--accent) 10%, rgba(14, 10, 30, 0.6));
+}
+
+/* Rótulo de un camino que no fue: cursiva pequeña y tenue, del color de su línea. */
+.labels--ghosts {
+  z-index: 0;
+}
+
+.ghost-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--accent) 60%, var(--ink-soft));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.ghost-label--shown {
+  opacity: 0.78;
+}
+
+/* Pop-up de un nodo de unión: «Líneas:» y un chip por línea. */
+.popup__lines {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.popup__lines-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Claves de la leyenda: encrucijada, en activo, camino que no fue. */
+.lines__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.key__icon {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.key__icon--union {
+  background:
+    radial-gradient(circle, rgba(220, 220, 235, 0.85) 0 2px, transparent 2.5px),
+    conic-gradient(#ffb454 0 25%, transparent 25% 27%, #6ea8ff 27% 50%, transparent 50% 52%, #e985c4 52% 75%, transparent 75% 77%, #7be0a4 77% 98%, transparent 98%);
+  -webkit-mask: radial-gradient(circle, #000 0 2.5px, transparent 3px 4px, #000 4.5px);
+  mask: radial-gradient(circle, #000 0 2.5px, transparent 3px 4px, #000 4.5px);
+}
+
+.key__icon--active {
+  border: 1px solid rgba(235, 230, 255, 0.7);
+  background: radial-gradient(circle, rgba(235, 230, 255, 0.9) 0 2px, transparent 3px);
+  box-shadow: 0 0 6px rgba(235, 230, 255, 0.35);
+  animation: key-heartbeat 2.4s ease-in-out infinite;
+}
+
+.key__icon--ghost {
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(220, 220, 235, 0.55), rgba(220, 220, 235, 0));
+}
+
+@keyframes key-heartbeat {
+  0%, 100% { box-shadow: 0 0 4px rgba(235, 230, 255, 0.25); }
+  10% { box-shadow: 0 0 9px rgba(235, 230, 255, 0.6); }
+  27% { box-shadow: 0 0 7px rgba(235, 230, 255, 0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key__icon--active {
+    animation: none;
+  }
 }

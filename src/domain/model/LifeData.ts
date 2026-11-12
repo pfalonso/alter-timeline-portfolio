@@ -45,6 +45,16 @@ export interface LifeEventData {
   bridge?: string;
   /** Eventos (posteriores o de la misma fecha, de cualquier línea) a los que este llevó. */
   ledTo?: string[];
+  /** Otras líneas que pasan por este nodo (nodo de unión): convergen en él y vuelven a salir. */
+  alsoBranches?: string[];
+  /** Proyecto o etapa vivo hoy: el nodo late y su línea se sigue escribiendo hasta hoy. */
+  active?: boolean;
+}
+
+/** Tramo en el que una línea no se dibuja: se disuelve tras `from` y renace en `to` (ids de eventos). */
+export interface LinePauseData {
+  from: string;
+  to: string;
 }
 
 export interface LifeMetaData {
@@ -81,6 +91,10 @@ export interface BranchInfoData {
   focus?: FocusPeriodData[];
   /** Lenguaje de forma de sus nodos: rectilíneo, orgánico o neutro (por defecto, según el id). */
   style?: 'geometric' | 'organic' | 'neutral';
+  /** «Camino que no fue»: nace en `origin`, recorre un paso tenue con su nombre y se disuelve. Sin eventos. */
+  ghost?: boolean;
+  /** Tramos en los que la línea no se dibuja (se disuelve tras `from` y renace en `to`). */
+  pauses?: LinePauseData[];
 }
 
 /** Arco temporal (capítulo). Los arcos son contiguos y no se solapan. */

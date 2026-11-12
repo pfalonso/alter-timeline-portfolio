@@ -3,6 +3,7 @@ import type { TimelineLayoutResult } from '../../domain/services';
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
+import { STRINGS } from './strings';
 import { clampLabelX, labelDistanceLimit, labelPriority, labelSlots, layoutLabels, type Box, type LabelCandidate, type Obstacle } from './labelLayout';
 
 interface Label {
@@ -17,6 +18,9 @@ interface Label {
   outward: boolean;
   readonly importance: number;
 }
+
+/** Nodo de unión de al menos tantas líneas: se rotula siempre (como uno mayor). */
+export const BIG_UNION_LINES = 4;
 
 /** Alto estimado por nivel (título + año); se sustituye por el medido. */
 const LABEL_HEIGHT: Record<number, number> = { 1: 30, 2: 32, 3: 40 };
@@ -67,22 +71,25 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
     clear(this.root);
     this.labels.clear();
     model.timeline.events.forEach((event, order) => {
-      const element = el('div', { class: `node-label node-label--i${event.importance}` }, [
+      // Una encrucijada de muchas líneas se rotula siempre, como un nodo mayor.
+      const importance = event.lineIds.length >= BIG_UNION_LINES ? 3 : event.importance;
+      const element = el('div', { class: `node-label node-label--i${importance}${event.isUnion ? ' node-label--union' : ''}` }, [
         el('span', { class: 'node-label__title', text: event.labelTitle }),
         el('span', { class: 'node-label__date', text: String(event.start.year) }),
+        event.active ? el('span', { class: 'node-label__active', text: STRINGS.active }) : null,
       ]);
       element.style.setProperty('--accent', model.timeline.lineColorOf(event.branch) ?? '#ffffff');
       this.root.append(element);
       // Estimación de ancho (evita medir el DOM cada fotograma); el CSS limita el máximo.
-      const perChar = event.importance === 3 ? 9.2 : 7.2;
+      const perChar = importance === 3 ? 9.2 : 7.2;
       this.labels.set(event.id, {
         element,
-        width: Math.min(event.importance === 3 ? 280 : 230, event.labelTitle.length * perChar + 18),
-        height: LABEL_HEIGHT[event.importance] ?? 32,
+        width: Math.min(importance === 3 ? 280 : 230, event.labelTitle.length * perChar + 18),
+        height: LABEL_HEIGHT[importance] ?? 32,
         shown: false,
         above: order % 2 === 0,
         outward: false,
-        importance: event.importance,
+        importance,
       });
     });
     this.alternate(model.layout);
@@ -132,12 +139,13 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
     for (const node of frame.nodes) {
       const label = this.labels.get(node.eventId);
       if (!label || !node.inFront) continue;
+      const importance = Math.max(node.importance, label.importance);
       const pinned = node.highlighted || node.eventId === this.focusedId;
       // Un rótulo puede pasar por encima de un punto menor, pero nunca tapa un nodo medio o mayor.
-      if (node.presence > 0.5 && (node.importance >= 2 || pinned)) {
+      if (node.presence > 0.5 && (importance >= 2 || pinned)) {
         obstacles.push({ id: node.eventId, x: node.x, y: node.y, radius: node.radius * 1.5 });
       }
-      const eligible = node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(node.importance));
+      const eligible = node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(importance));
       // Un rótulo cuyo nodo está fuera de pantalla no se pinta; si el nodo está dentro, el rótulo
       // se desplaza lo necesario para no quedar cortado por el borde.
       if (!eligible || node.x < 0 || node.x > frame.viewport.width) continue;
@@ -149,7 +157,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         ys: outwardOnly(labelSlots(node.y, gap, label.height, label.above), label.outward),
         width: label.width,
         height: label.height,
-        priority: labelPriority(node.importance, pinned, label.shown, node.radius),
+        priority: labelPriority(importance, pinned, label.shown, node.radius),
       });
     }
     const placed = layoutLabels(candidates, frame.viewport, obstacles, this.reserved);

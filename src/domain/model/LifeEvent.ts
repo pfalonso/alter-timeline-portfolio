@@ -33,6 +33,10 @@ export interface LifeEventProps {
   readonly bridge?: string;
   /** Ids de los eventos a los que llevó este (enlaces causales). */
   readonly ledTo?: readonly string[];
+  /** Otras líneas que pasan por este nodo (unión), sin la dueña ni duplicados. */
+  readonly alsoBranches?: readonly string[];
+  /** Proyecto o etapa vivo hoy. */
+  readonly active?: boolean;
 }
 
 /** Evento vital ya validado y normalizado (valores por defecto aplicados). */
@@ -59,15 +63,27 @@ export class LifeEvent implements LifeEventProps {
   readonly isPrivate!: boolean;
   readonly bridge?: string;
   readonly ledTo!: readonly string[];
+  readonly alsoBranches!: readonly string[];
+  readonly active!: boolean;
 
   constructor(props: LifeEventProps) {
-    Object.assign(this, { ...props, ledTo: props.ledTo ?? [] });
+    Object.assign(this, { ...props, ledTo: props.ledTo ?? [], alsoBranches: props.alsoBranches ?? [], active: props.active ?? false });
     Object.freeze(this);
   }
 
   /** Texto del rótulo en la escena: el título corto si lo hay; si no, el título. */
   get labelTitle(): string {
     return this.shortTitle ?? this.title;
+  }
+
+  /** Todas las líneas que pasan por el nodo: la dueña primero y después las de `alsoBranches`. */
+  get lineIds(): string[] {
+    return [this.branch, ...this.alsoBranches];
+  }
+
+  /** `true` si es un nodo de unión (pasan por él varias líneas). */
+  get isUnion(): boolean {
+    return this.alsoBranches.length > 0;
   }
 
   /** La primera categoría es la principal: da color al nodo. */

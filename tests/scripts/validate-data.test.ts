@@ -31,7 +31,7 @@ describe('scripts/validate-data.ts', () => {
     const result = run('public/data/life.example.json');
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/válido — 27 eventos \(1 privados\), 6 categorías, 5 ramas/);
+    expect(result.stdout).toMatch(/válido — 29 eventos \(1 privados\), 6 categorías, 5 ramas/);
   }, 90_000);
 
   it('sale con 1 y lista todos los errores con su ruta cuando no valida', () => {

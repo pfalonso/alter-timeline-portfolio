@@ -94,15 +94,26 @@ export class Timeline {
   }
 
   /**
-   * Ids de las ramas con algún evento: la central siempre primero, después las declaradas en
-   * `branches` (en su orden) y por último las demás en orden de aparición.
+   * Ids de las ramas con algún evento (propio o de unión, `alsoBranches`): la central siempre
+   * primero, después las declaradas en `branches` (en su orden) y por último las demás en orden de
+   * aparición. Los «caminos que no fueron» (`ghost`) no cuentan: no tienen eventos.
    */
   get branchIds(): string[] {
-    const used = new Set(this.events.map((event) => event.branch));
+    const used = new Set(this.events.flatMap((event) => event.lineIds));
     const ids = new Set<string>([this.mainBranch]);
-    for (const line of this.lines) if (used.has(line.id)) ids.add(line.id);
+    for (const line of this.lines) if (used.has(line.id) && !line.ghost) ids.add(line.id);
     for (const event of this.events) ids.add(event.branch);
     return [...ids];
+  }
+
+  /** «Caminos que no fueron» cuyo evento de origen es visible. */
+  get ghostLines(): LifeLine[] {
+    return this.lines.filter((line) => line.ghost && line.originEventId !== undefined && this.eventsById.has(line.originEventId));
+  }
+
+  /** Eventos visibles por los que pasa una línea sin ser la dueña (nodos de unión). */
+  unionsOf(branchId: string): LifeEvent[] {
+    return this.events.filter((event) => event.alsoBranches.includes(branchId));
   }
 
   getLine(branchId: string): LifeLine | undefined {
@@ -140,16 +151,15 @@ export class Timeline {
   }
 
   /**
-   * Evento visible del que nace una rama: `origin` de la línea si existe y es visible; si no, el
-   * primer `branchFrom` de sus eventos. Nunca un evento de la propia rama ni para la central.
+   * Evento visible del que nace una rama: `origin` de la línea si existe y es visible (puede ser su
+   * propio primer evento: nace en ese nodo); si no, el primer `branchFrom` de sus eventos (de otra rama).
    */
   originOf(branchId: string): LifeEvent | undefined {
-    if (branchId === this.mainBranch) return undefined;
     const declared = this.linesById.get(branchId)?.originEventId;
     const candidates = [declared, this.events.find((event) => event.branch === branchId && event.branchFrom)?.branchFrom];
-    for (const id of candidates) {
+    for (const [k, id] of candidates.entries()) {
       const event = id === undefined ? undefined : this.eventsById.get(id);
-      if (event && event.branch !== branchId) return event;
+      if (event && (event.branch !== branchId || k === 0)) return event;
     }
     return undefined;
   }

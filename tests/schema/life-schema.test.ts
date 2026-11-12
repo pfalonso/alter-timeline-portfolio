@@ -74,7 +74,7 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
   it('los campos del schema coinciden con los del contrato', () => {
     expect(Object.keys(defs.event.properties ?? {}).sort()).toEqual(
       [
-        'branch', 'branchFrom', 'bridge', 'categories', 'date', 'description', 'highlights', 'id', 'importance', 'ledTo', 'links',
+        'active', 'alsoBranches', 'branch', 'branchFrom', 'bridge', 'categories', 'date', 'description', 'highlights', 'id', 'importance', 'ledTo', 'links',
         'location', 'media', 'organization', 'shortTitle', 'skills', 'subtitle', 'summary', 'title', 'visibility',
       ].sort(),
     );
@@ -83,7 +83,7 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
       'contact', 'locale', 'mainBranch', 'owner', 'tagline', 'title',
     ]);
     expect(Object.keys(defs.branch.properties ?? {}).sort()).toEqual(
-      ['color', 'description', 'focus', 'id', 'label', 'mergeInto', 'origin', 'style', 'until'].sort(),
+      ['color', 'description', 'focus', 'ghost', 'id', 'label', 'mergeInto', 'origin', 'pauses', 'style', 'until'].sort(),
     );
     expect(Object.keys(defs.focusPeriod.properties ?? {}).sort()).toEqual(['end', 'level', 'start']);
     expect(Object.keys(defs.arc.properties ?? {}).sort()).toEqual(['end', 'id', 'start', 'subtitle', 'summary', 'title']);

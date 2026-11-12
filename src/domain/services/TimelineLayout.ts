@@ -17,6 +17,31 @@ export interface LayoutNode {
   readonly index: number;
   /** Para eventos con duración: puntos sobre la rama desde el inicio hasta el fin (o "hoy"). */
   readonly span?: readonly Vec3[];
+  /** Líneas que pasan por el nodo: la dueña primero y, en un nodo de unión, las de `alsoBranches`. */
+  readonly lines: readonly string[];
+}
+
+/** «Camino que no fue»: hebra corta que sale del nodo de origen y se disuelve. */
+export interface LayoutGhost {
+  readonly id: string;
+  readonly originEventId: string;
+  /** Polilínea de la hebra (≈ `ghostSteps` pasos), del origen hacia fuera. */
+  readonly points: readonly Vec3[];
+  /** Hacia dónde se aleja: 1 arriba, −1 abajo. */
+  readonly side: 1 | -1;
+}
+
+/** Proyecto en activo: su línea, desde el nodo hasta el final, por donde avanza la punta. */
+export interface LayoutActive {
+  readonly eventId: string;
+  readonly branch: string;
+  readonly points: readonly Vec3[];
+}
+
+/** Hueco de una línea en pausa: entre `fromX` (donde termina de disolverse) y `toX` (donde renace). */
+export interface LayoutGap {
+  readonly fromX: number;
+  readonly toX: number;
 }
 
 export interface LayoutBranch {
@@ -39,6 +64,24 @@ export interface LayoutBranch {
   readonly merge: LayoutMerge | null;
   /** Pertenencia a la trenza (0..1) en cada punto: 1 en el centro, 0 en su carril exterior. */
   readonly braid: readonly number[];
+  /** Pausas: `points` no tiene puntos dentro de estos huecos (la línea se corta en tramos). */
+  readonly gaps: readonly LayoutGap[];
+}
+
+/** Tramos dibujables de una línea (separados por sus pausas), con su `braid`. */
+export function branchPieces(branch: Pick<LayoutBranch, 'points' | 'braid' | 'gaps'>): { points: Vec3[]; braid: number[] }[] {
+  const pieces: { points: Vec3[]; braid: number[] }[] = [{ points: [], braid: [] }];
+  branch.points.forEach((point, i) => {
+    const current = pieces[pieces.length - 1];
+    const previous = current.points[current.points.length - 1];
+    if (previous && branch.gaps.some((gap) => previous.x <= gap.fromX + EPS && point.x >= gap.toX - EPS)) {
+      pieces.push({ points: [point], braid: [branch.braid[i]] });
+    } else {
+      current.points.push(point);
+      current.braid.push(branch.braid[i]);
+    }
+  });
+  return pieces.filter((piece) => piece.points.length >= 2);
 }
 
 export interface LayoutMerge {
@@ -99,6 +142,10 @@ export interface TimelineLayoutResult {
   readonly junctions: readonly LayoutJunction[];
   /** Composición de la trenza a lo largo del eje X (tramos contiguos, de `bounds.minX` a `bounds.maxX`). */
   readonly braidSpans: readonly BraidSpan[];
+  /** «Caminos que no fueron» con origen visible. */
+  readonly ghosts: readonly LayoutGhost[];
+  /** Proyectos en activo visibles y su prolongación hasta hoy. */
+  readonly actives: readonly LayoutActive[];
 }
 
 export interface LayoutOptions {
@@ -126,6 +173,12 @@ export interface LayoutOptions {
   readonly linkMinHeight: number;
   readonly linkMaxHeight: number;
   readonly linkRise: number;
+  /** Longitud de un «camino que no fue», en pasos. */
+  readonly ghostSteps: number;
+  /** Cuánto se aleja (en Y) un camino que no fue, en pasos. */
+  readonly ghostDrift: number;
+  /** Lo que tarda en disolverse una línea tras el inicio de su pausa, en pasos. */
+  readonly pauseTail: number;
 }
 
 export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
@@ -142,6 +195,9 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   linkMinHeight: 1.6,
   linkMaxHeight: 6.5,
   linkRise: 0.45,
+  ghostSteps: 1.25,
+  ghostDrift: 0.3,
+  pauseTail: 0.55,
 };
 
 /** Rampa de un cambio de altura: de `from` a `to` entre `center − half` y `center + half`. */
@@ -150,6 +206,8 @@ interface Ramp {
   readonly half: number;
   readonly from: number;
   readonly to: number;
+  /** Salto oculto dentro del hueco de una pausa (no es una unión ni una separación). */
+  readonly hidden?: boolean;
 }
 
 /** Punto por el que la línea pasa a una altura fija (origen, nodo propio, fusión, extremos). */
@@ -157,6 +215,19 @@ interface Station {
   readonly x: number;
   readonly y: number;
   readonly year: number;
+  /** Tras esta estación empieza el hueco de una pausa (no hay rampas hasta la siguiente). */
+  readonly gap?: boolean;
+}
+
+/** Pausa ya situada en X: la línea llega a `fromX`, se disuelve hasta `gapX` y renace en `toX`. */
+interface PlannedPause {
+  readonly fromX: number;
+  readonly gapX: number;
+  readonly toX: number;
+  readonly from: LifeEvent | null;
+  readonly to: LifeEvent | null;
+  readonly fromYear: number;
+  readonly toYear: number;
 }
 
 interface BranchPlan {
@@ -165,6 +236,12 @@ interface BranchPlan {
   readonly order: number;
   /** Eventos visibles de la línea, en orden ordinal. */
   readonly events: readonly LifeEvent[];
+  /** Nodos de unión visibles por los que pasa sin ser la dueña. */
+  readonly unions: readonly LifeEvent[];
+  /** Pausas dentro de su vida visible. */
+  readonly pauses: readonly PlannedPause[];
+  /** X de los nodos de unión por los que pasa (propios o ajenos). */
+  readonly knotXs: readonly number[];
   origin: LifeEvent | null;
   merge: { readonly event: LifeEvent; readonly into: string; readonly x: number } | null;
   startX: number;
@@ -182,9 +259,10 @@ interface BranchPlan {
   startY: number;
 }
 
-export type JunctionKind = 'join' | 'split' | 'merge';
+/** Unión/separación con la trenza, fusión, nacimiento (origen o renacer tras una pausa) y deshilachado (inicio de una pausa). */
+export type JunctionKind = 'join' | 'split' | 'merge' | 'birth' | 'fray';
 
-/** Unión, separación o fusión de una línea con la trenza: punto de la trenza (y = 0) donde ocurre. */
+/** Unión, separación o fusión con la trenza (en y = 0), nacimiento o deshilachado de una línea. */
 export interface LayoutJunction {
   readonly branch: string;
   readonly kind: JunctionKind;
@@ -253,12 +331,14 @@ export class TimelineLayout {
     const yearAtX = this.yearScale(ordered, nowX, now);
     const xAtYear = (year: number): number => this.inverse(ordered, nowX, now, year);
 
-    const plans = this.planBranches(timeline, ordered, nodeX, isVisible, { firstX, endX, now });
+    const plans = this.planBranches(timeline, ordered, nodeX, isVisible, { firstX, endX, now, xAtYear });
     const laneSpacing = this.assignLanes(plans);
     const planById = new Map(plans.map((plan) => [plan.id, plan]));
 
-    // Cada nodo, en la trenza o en el carril de su línea según el foco en su fecha.
-    const inBraid = (event: LifeEvent): boolean => isInBraidAt(timeline, event.branch, event.start.toDecimalYear());
+    // Cada nodo, en la trenza si su línea (o alguna de las que pasan por él) está en ella en su
+    // fecha; si no, en el carril de su línea.
+    const inBraid = (event: LifeEvent): boolean =>
+      event.lineIds.some((id) => planById.has(id) && isInBraidAt(timeline, id, event.start.toDecimalYear()));
     const nodeY = new Map(
       ordered.map((event) => {
         const plan = planById.get(event.branch) as BranchPlan;
@@ -276,6 +356,7 @@ export class TimelineLayout {
         position: { x: round(x), y: round(y), z: round(this.depthAt(plan, y) + (y === 0 ? o.mainBehind : 0)) },
         branch: event.branch,
         index,
+        lines: event.lineIds.filter((id) => planById.has(id)),
       };
       if (!event.isRange) return node;
       const spanEnd = Math.min(plan.endX, event.ongoing ? nowX : xAtYear((event.end ?? event.start).toDecimalYear()));
@@ -297,6 +378,7 @@ export class TimelineLayout {
         focus: points.map((point) => focusIntensityAt(line, yearAtX(point.x))),
         merge: plan.merge ? { into: plan.merge.into, eventId: plan.merge.event.id, position: points[points.length - 1] } : null,
         braid: points.map((point) => round(this.braidWeight(plan, point.y))),
+        gaps: plan.pauses.map((pause) => ({ fromX: round(pause.gapX), toX: round(pause.toX) })),
       };
     });
 
@@ -343,7 +425,51 @@ export class TimelineLayout {
       band: { minY: Math.min(0, ...nodeYs), maxY: Math.max(0, ...nodeYs) },
       junctions: this.junctions(plans),
       braidSpans: this.braidSpans(plans, firstX, endX),
+      ghosts: this.ghosts(timeline, byId),
+      actives: this.actives(ordered, nodeX, planById),
     };
+  }
+
+  /** Caminos que no fueron: salen del nodo de origen, se alejan de la banda y se acaban enseguida. */
+  private ghosts(timeline: Timeline, byId: ReadonlyMap<string, LayoutNode>): LayoutGhost[] {
+    const o = this.options;
+    const perOrigin = new Map<string, number>();
+    return timeline.ghostLines.flatMap((line) => {
+      const origin = byId.get(line.originEventId ?? '');
+      if (!origin) return [];
+      const k = perOrigin.get(origin.eventId) ?? 0;
+      perOrigin.set(origin.eventId, k + 1);
+      const p = origin.position;
+      const side: 1 | -1 = p.y !== 0 ? (p.y > 0 ? 1 : -1) : k % 2 === 0 ? 1 : -1;
+      const length = o.ghostSteps * o.nodeStep;
+      const steps = Math.max(4, Math.ceil(length / o.sampleStep));
+      const points: Vec3[] = [];
+      for (let i = 0; i <= steps; i += 1) {
+        const s = i / steps;
+        points.push({
+          x: round(p.x + length * s),
+          y: round(p.y + side * o.ghostDrift * o.nodeStep * smoothstep(s * 1.4)),
+          z: round(p.z - 0.25 * s),
+        });
+      }
+      return [{ id: line.id, originEventId: origin.eventId, points, side }];
+    });
+  }
+
+  /** Proyectos en activo: tramo de su línea desde el nodo hasta el final (o la primera pausa). */
+  private actives(
+    ordered: readonly LifeEvent[],
+    nodeX: ReadonlyMap<string, number>,
+    planById: ReadonlyMap<string, BranchPlan>,
+  ): LayoutActive[] {
+    return ordered.flatMap((event) => {
+      const plan = planById.get(event.branch);
+      if (!event.active || !plan) return [];
+      const x = nodeX.get(event.id) as number;
+      const cut = plan.pauses.find((pause) => pause.gapX > x)?.gapX ?? plan.endX;
+      if (cut - x < this.options.sampleStep) return [];
+      return [{ eventId: event.id, branch: plan.id, points: this.sample(plan, x, cut) }];
+    });
   }
 
   /** Año decimal en una X (lineal a trozos entre nodos; de "hoy" en adelante, hoy). */
@@ -381,45 +507,60 @@ export class TimelineLayout {
     ordered: readonly LifeEvent[],
     nodeX: ReadonlyMap<string, number>,
     isVisible: (event: LifeEvent | undefined) => event is LifeEvent,
-    span: { firstX: number; endX: number; now: number },
+    span: { firstX: number; endX: number; now: number; xAtYear: (year: number) => number },
   ): BranchPlan[] {
     const o = this.options;
     const step = o.nodeStep;
     const plans: BranchPlan[] = [];
     timeline.branchIds.forEach((id, order) => {
       const events = ordered.filter((event) => event.branch === id);
+      const unions = ordered.filter((event) => event.alsoBranches.includes(id));
       const main = id === timeline.mainBranch;
-      if (!main && events.length === 0) return;
-      const anchors = events.map((event) => nodeX.get(event.id) as number);
+      if (!main && events.length === 0 && unions.length === 0) return;
+      const anchors = [...events, ...unions].map((event) => nodeX.get(event.id) as number).sort((a, b) => a - b);
       const line = timeline.getLine(id);
       const first = anchors[0] ?? span.firstX;
       const last = anchors[anchors.length - 1] ?? span.firstX;
       // Origen visible y anterior al primer nodo: la línea sale de él.
-      const originEvent = main ? undefined : timeline.originOf(id);
-      const origin = isVisible(originEvent) && (nodeX.get(originEvent.id) as number) < first - EPS ? originEvent : null;
+      const originEvent = timeline.originOf(id);
+      // Origen visible y anterior al primer nodo (o su propio primer nodo: nace en él).
+      const origin =
+        isVisible(originEvent) &&
+        ((nodeX.get(originEvent.id) as number) < first - EPS || (originEvent.branch === id && (nodeX.get(originEvent.id) as number) <= first + EPS))
+          ? originEvent
+          : null;
       const mergeInfo = main ? undefined : timeline.mergeOf(id);
       const merge =
         mergeInfo && isVisible(mergeInfo.event) && (nodeX.get(mergeInfo.event.id) as number) > last + EPS
           ? { event: mergeInfo.event, into: mergeInfo.branch, x: nodeX.get(mergeInfo.event.id) as number }
           : null;
-      const open = !merge && (main || events.some((event) => event.ongoing) || line?.untilPresent === true);
-      const startX = origin ? (nodeX.get(origin.id) as number) : main ? span.firstX : first - o.padSteps * step * 0.75;
+      const open = !merge && (main || events.some((event) => event.ongoing || event.active) || line?.untilPresent === true);
+      // La central existe desde el principio salvo que declare `origin`.
+      const declaredOrigin = timeline.getLine(id)?.originEventId !== undefined;
+      const startX = origin ? (nodeX.get(origin.id) as number) : main && !declaredOrigin ? span.firstX : first - o.padSteps * step * 0.75;
       // Necesita carril si alguno de sus nodos o algún tramo de su vida queda fuera de la trenza.
       const from = origin ? origin.start.toDecimalYear() : -Infinity;
       const to = merge ? merge.event.start.toDecimalYear() : span.now;
       const outside =
-        events.some((event) => !isInBraidAt(timeline, id, event.start.toDecimalYear())) ||
+        [...events, ...unions].some((event) => !isInBraidAt(timeline, id, event.start.toDecimalYear())) ||
         braidChangesOf(timeline, id, from, to).length > 0 ||
         (events.length === 0 && !isInBraidAt(timeline, id, span.now));
+      const planEndX = merge ? merge.x : open ? span.endX : last + o.tailSteps * step;
       plans.push({
         id,
         main,
         order,
         events,
+        unions,
+        // Nudos (uniones) y el origen: ahí la línea ya tiene su chispa o su nudo.
+        knotXs: [...events, ...unions, ...(origin ? [origin] : [])]
+          .filter((event) => event.isUnion || event === origin)
+          .map((event) => nodeX.get(event.id) as number),
+        pauses: this.planPauses(timeline, id, nodeX, isVisible, span.xAtYear, startX, planEndX),
         origin,
         merge,
         startX,
-        endX: merge ? merge.x : open ? span.endX : last + o.tailSteps * step,
+        endX: planEndX,
         open,
         needsLane: outside || !main,
         beside:
@@ -436,6 +577,30 @@ export class TimelineLayout {
       });
     });
     return plans;
+  }
+
+  /** Pausas de la línea situadas en X (solo las que caen dentro de su vida visible). */
+  private planPauses(
+    timeline: Timeline,
+    id: string,
+    nodeX: ReadonlyMap<string, number>,
+    isVisible: (event: LifeEvent | undefined) => event is LifeEvent,
+    xAtYear: (year: number) => number,
+    startX: number,
+    endX: number,
+  ): PlannedPause[] {
+    const tail = this.options.pauseTail * this.options.nodeStep;
+    return (timeline.getLine(id)?.pauses ?? []).flatMap((pause) => {
+      const from = timeline.getEvent(pause.fromEventId);
+      const to = timeline.getEvent(pause.toEventId);
+      const fromYear = pause.from.toDecimalYear();
+      const toYear = pause.to.toDecimalYear();
+      const fromX = isVisible(from) ? (nodeX.get(from.id) as number) : xAtYear(fromYear);
+      const toX = isVisible(to) ? (nodeX.get(to.id) as number) : xAtYear(toYear);
+      if (toX - fromX < EPS || fromX <= startX + EPS || toX >= endX - EPS) return [];
+      const gapX = fromX + Math.min(tail, (toX - fromX) * 0.45);
+      return [{ fromX, gapX, toX, from: isVisible(from) ? from : null, to: isVisible(to) ? to : null, fromYear, toYear }];
+    });
   }
 
   /**
@@ -496,13 +661,31 @@ export class TimelineLayout {
     const o = this.options;
     const levelAt = (year: number): number => (isInBraidAt(timeline, plan.id, year) ? 0 : plan.laneY);
     const stations: Station[] = [];
-    const firstYear = plan.events[0]?.start.toDecimalYear() ?? context.now;
+    const passes = [...plan.events, ...plan.unions].sort((a, b) => (nodeX.get(a.id) as number) - (nodeX.get(b.id) as number));
+    const firstYear = passes[0]?.start.toDecimalYear() ?? context.now;
     if (plan.origin) {
       const year = plan.origin.start.toDecimalYear();
       stations.push({ x: plan.startX, y: nodeY.get(plan.origin.id) ?? 0, year });
     } else stations.push({ x: plan.startX, y: levelAt(firstYear), year: firstYear });
-    for (const event of plan.events) {
-      stations.push({ x: nodeX.get(event.id) as number, y: nodeY.get(event.id) as number, year: event.start.toDecimalYear() });
+    // Nodos propios y nodos de unión: la línea pasa exactamente por ellos.
+    const middle: Station[] = passes.map((event) => ({
+      x: nodeX.get(event.id) as number,
+      y: nodeY.get(event.id) as number,
+      year: event.start.toDecimalYear(),
+    }));
+    // Pausas: llega a `from` (por el nodo si pasa por él), se disuelve recta y renace en `to`.
+    const passesBy = (event: LifeEvent | null): event is LifeEvent => event !== null && event.lineIds.includes(plan.id);
+    for (const pause of plan.pauses) {
+      const fromY = passesBy(pause.from) ? (nodeY.get(pause.from.id) as number) : levelAt(pause.fromYear - 1e-4);
+      const toY = passesBy(pause.to) ? (nodeY.get(pause.to.id) as number) : levelAt(pause.toYear + 1e-4);
+      middle.push({ x: pause.fromX, y: fromY, year: pause.fromYear });
+      middle.push({ x: pause.gapX, y: fromY, year: pause.fromYear, gap: true });
+      middle.push({ x: pause.toX, y: toY, year: pause.toYear });
+    }
+    middle.sort((a, b) => a.x - b.x);
+    for (const station of middle) {
+      // Una misma X (nodo propio o de unión que además es borde de pausa) es una sola estación.
+      if (Math.abs(station.x - stations[stations.length - 1].x) > EPS) stations.push(station);
     }
     if (plan.merge) stations.push({ x: plan.endX, y: nodeY.get(plan.merge.event.id) ?? 0, year: plan.merge.event.start.toDecimalYear() });
     else {
@@ -517,11 +700,19 @@ export class TimelineLayout {
       const a = stations[i];
       const b = stations[i + 1];
       if (b.x - a.x < EPS) continue;
+      // La cola antes del hueco va recta (se disuelve a la altura del nodo donde empieza la pausa).
+      if (b.gap) continue;
+      if (a.gap) {
+        // Dentro del hueco no se dibuja nada: el salto de altura queda oculto.
+        if (a.y !== b.y) plan.ramps.push({ center: (a.x + b.x) / 2, half: (b.x - a.x) / 4, from: a.y, to: b.y, hidden: true });
+        continue;
+      }
       // Secuencia de alturas y posición preferida de cada cambio.
       const wanted: { to: number; x: number }[] = [];
       let current = a.y;
       const after = levelAt(a.year + 1e-4);
-      if (i === 0 && plan.origin && after !== current) {
+      // Tras el origen, un nodo de unión o un renacer, la línea vuelve enseguida a su altura.
+      if ((i > 0 || plan.origin) && after !== current) {
         wanted.push({ to: after, x: a.x });
         current = after;
       }
@@ -574,16 +765,26 @@ export class TimelineLayout {
   private junctions(plans: readonly BranchPlan[]): LayoutJunction[] {
     const out: LayoutJunction[] = [];
     for (const plan of plans) {
+      // Al entrar y salir de un nodo de unión no hay chispas: el nudo ya se lee por sí mismo.
+      const atKnot = (x: number): boolean => plan.knotXs.some((kx) => Math.abs(kx - x) < 1e-3);
       for (const ramp of plan.ramps) {
+        if (ramp.hidden) continue;
         if (ramp.to === 0 && ramp.from !== 0) {
+          if (atKnot(ramp.center + ramp.half)) continue;
           const x = ramp.center + ramp.half;
           if (plan.merge && Math.abs(x - plan.endX) < EPS) continue;
           out.push({ branch: plan.id, kind: 'join', position: { x: round(x), y: 0, z: round(-this.options.mainBehind) } });
         } else if (ramp.from === 0 && ramp.to !== 0) {
+          if (atKnot(ramp.center - ramp.half)) continue;
           out.push({ branch: plan.id, kind: 'split', position: { x: round(ramp.center - ramp.half), y: 0, z: round(-this.options.mainBehind) } });
         }
       }
       if (plan.merge) out.push({ branch: plan.id, kind: 'merge', position: this.pointOnBranch(plan, plan.endX) });
+      if (plan.origin) out.push({ branch: plan.id, kind: 'birth', position: this.pointOnBranch(plan, plan.startX) });
+      for (const pause of plan.pauses) {
+        out.push({ branch: plan.id, kind: 'fray', position: this.pointOnBranch(plan, pause.gapX) });
+        out.push({ branch: plan.id, kind: 'birth', position: this.pointOnBranch(plan, pause.toX) });
+      }
     }
     return out.sort((a, b) => a.position.x - b.position.x || a.branch.localeCompare(b.branch));
   }
@@ -596,7 +797,10 @@ export class TimelineLayout {
     for (let i = 0; i <= steps; i += 1) {
       const x = fromX + ((toX - fromX) * i) / steps;
       const members = plans
-        .filter((plan) => x >= plan.startX - EPS && x <= plan.endX + EPS && this.braidWeight(plan, this.heightAt(plan, x)) >= 0.5)
+        .filter(
+          (plan) =>
+            x >= plan.startX - EPS && x <= plan.endX + EPS && !this.inGap(plan, x) && this.braidWeight(plan, this.heightAt(plan, x)) >= 0.5,
+        )
         .map((plan) => plan.id);
       const last = spans[spans.length - 1];
       if (last && last.members.join('|') === members.join('|')) last.endX = x;
@@ -645,6 +849,17 @@ export class TimelineLayout {
     for (const ramp of plan.ramps) {
       for (const x of [ramp.center - ramp.half, ramp.center, ramp.center + ramp.half]) if (x > fromX && x < toX) xs.add(round(x));
     }
-    return [...xs].sort((a, b) => a - b).map((x) => this.pointOnBranch(plan, x));
+    for (const pause of plan.pauses) for (const x of [pause.gapX, pause.toX]) if (x > fromX && x < toX) xs.add(round(x));
+    // Los nudos son puntos exactos de la polilínea: todas sus hebras se tocan en el nodo.
+    for (const x of plan.knotXs) if (x > fromX && x < toX) xs.add(round(x));
+    return [...xs]
+      .filter((x) => !this.inGap(plan, x))
+      .sort((a, b) => a - b)
+      .map((x) => this.pointOnBranch(plan, x));
+  }
+
+  /** `true` si X cae dentro del hueco de una pausa (bordes excluidos). */
+  private inGap(plan: BranchPlan, x: number): boolean {
+    return plan.pauses.some((pause) => x > round(pause.gapX) + EPS && x < round(pause.toX) - EPS);
   }
 }
