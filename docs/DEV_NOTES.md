@@ -356,8 +356,9 @@ capturas con el ejemplo (apertura, vista general, hover en la leyenda, móvil y 
   podido medir en GPU real. El coste principal son el bloom y la nebulosa procedural a pantalla
   completa.
 - Probado solo en Chrome headless; sin pruebas en Firefox/Safari ni en dispositivos táctiles reales.
-- La leyenda solo resalta líneas en la escena 3D; sin WebGL no se muestra. Los rótulos de nodos no
-  conocen el foco: un evento de una línea fuera de foco se rotula igual que uno en foco.
+- La leyenda solo resalta líneas en la escena 3D; sin WebGL no se muestra.
+- Las aristas de los nodos son `LineSegments` de 1 px (WebGL no admite grosor de línea): el brillo
+  lo da el bloom. En pantallas de mucha densidad pueden verse finas.
 - En pantallas táctiles el resaltado de la leyenda depende de `pointerenter` (que en táctil llega con
   el toque): el clic fija/suelta la línea, que es lo que funciona igual en todos los dispositivos.
 
@@ -394,3 +395,63 @@ Convenciones:
 
 - La línea central (`mainBranch`) ya no sube a su carril entre nodos: va siempre recta por la banda (y = 0) y un poco por detrás en Z (`mainBehind`), pasando por detrás de los símbolos de otras líneas. Elimina el "diente de sierra" que se veía en la vista general.
 - Los carriles de las demás líneas se acercan a la banda (`laneMin` 0,42 y `laneMax` 0,78 pasos) para que sus curvas de bajada sean cortas y tranquilas.
+
+### 29. La trenza: el foco en el centro, colores por línea y nodos 3D en wireframe
+
+Feedback de Pablo (12/11/2026): la central no es «la línea de tecnología con todos los nodos», es el
+foco, que ha ido cambiando; los colores deben ser coherentes (un nodo es del color de su línea); la
+central debe ser la más destacada; iconos 3D (valen wireframes). Se conserva el eje ordinal y la calma.
+Sustituye a la decisión 28 (la central ya no es una columna fija: el centro es la trenza).
+
+- **Dominio (`Braid.ts`, puro).** `braidMembersAt(timeline, año)`: líneas cuyo `focus` contiene la
+  fecha (cualquier `level`; fin incluido hasta el final de su mes/año); si ninguna, `[mainBranch]`.
+  Una línea con `mergeInto` deja de existir en la fecha de la fusión (en ese instante ya es la
+  destino) y, si su último periodo de foco llega hasta la fusión o no tiene eventos entre su final y
+  la fusión, sigue en la trenza desde que empezó ese periodo («ya no sale»). `braidChangesOf` da las
+  uniones/separaciones de una línea entre dos fechas (evaluando cada borde de foco o fusión a ±1e-4
+  años); para una línea que se fusiona ignora los bordes a partir de la fusión.
+- **Layout.** Cada línea que alguna vez sale de la trenza tiene un carril exterior fijo para toda su
+  vida (*interval scheduling*; del lado de la línea en la que converge o de la que nace si eso ocurre
+  fuera de la trenza; si no, del lado con menos líneas vivas; carriles en `[laneMin, laneMax]` =
+  `[0,5, 0,8]` pasos). Sin focos, la central no necesita carril (`lane` 0) y es la trenza entera.
+  Nodo: y = 0 si su línea está en la trenza en su fecha; si no, `laneY` (z = `laneZ`). La línea se
+  construye con «estaciones» (origen, nodos propios, fusión, extremos) a altura fija y, entre cada
+  par, una cadena de rampas: salida del origen hacia su estado, los cambios de foco que caen entre
+  sus fechas y la llegada a la altura de la siguiente estación. Cada rampa (`smoothstep`, media
+  anchura `ramp` = 0,7 pasos o menos si no cabe) se centra lo más cerca posible de la X de su fecha
+  (`inverse` de la escala ordinal) sin solaparse con las demás ni invadir las estaciones: monótona,
+  sin *overshoot* y los nodos quedan exactos. `braid[]` por punto = 1 − |y| / |laneY|. Salidas
+  nuevas: `junctions` (unión/separación donde la rampa toca y = 0; fusión al final) y `braidSpans`
+  (composición de la trenza por tramos de X, según la geometría: una línea cuenta si `braid` ≥ 0,5).
+  Los `ledTo` suben `height` por encima del extremo más alto (los extremos pueden ir en carriles).
+- **Escena.** Un solo color por línea (`timeline.lineColorOf`, también la central; `palette.trunk`
+  solo si no hay color posible): nodos, tramos, motas, chispas, rótulos, tooltip, pop-up (acento y
+  chip de la línea) y leyenda. `BranchCurve` admite `braid[]` (atributo por anillo) y `helix` (radio,
+  fase, vueltas por unidad de X, velocidad): en el *vertex shader* el anillo se desplaza en YZ con
+  `radio × braid`, así que la hélice solo existe en la trenza y la línea sale recta a su carril. Cada
+  línea que pasa por la trenza añade dos fibras finas (`braidOnly`: se apagan fuera de ella) con otra
+  fase, radio, paso y sentido de giro: la trenza se ve gruesa aunque en un tramo solo haya una línea.
+  Grosor y brillo: 1 en la trenza, `outerWidth` 0,5 y `outer` 0,3 en el carril. Motas: un
+  `ParticleFlow` para la trenza (foco = `braid`, `weighted`, `floor` 0, sin limpiar la banda, órbita
+  0,55; densidad 2,4, máx. 1400) y otro casi vacío para las ramas exteriores (0,06, máx. 120). Chispas
+  (`MergeSeam` pequeño) en cada unión y separación; costura completa en las fusiones. La acuarela
+  pondera los pigmentos por `braid`. Los tramos de duración solo se dibujan fuera de la trenza.
+  Hebras causales en reposo más discretas (0,14).
+- **Nodos 3D (`NodeShapes.ts`, `NodeMesh.ts`).** Sustituyen a los glifos SDF (`glyphShader.ts`
+  eliminado). Geometrías por estilo y peso a radio 1, compartidas en `NodeAssets.shape()`:
+  geometric = icosaedro (aristas) + cubo inscrito / octaedro / tetraedro; organic = nudo toroidal /
+  icosaedro subdividido deformado con ruido determinista / esfera de baja resolución (wireframe);
+  neutral = dos anillos cruzados + anillo interior (giroscopio) / toro fino / un anillo. Aristas
+  `LineSegments` aditivas (color de la línea apenas aclarado), relleno `MeshBasicMaterial` de papel
+  teñido un 20 % (tapa la trenza al pasar por detrás; `renderOrder` 5, aristas 6) y un aura en
+  cuadro que mira a la cámara (solo el peso 3 en reposo; todos al señalarlos). Giro lento
+  (0,32 rad/s, la estructura interior al revés); quietos con movimiento reducido. Hover/selección:
+  crece (`lift`), gira algo más deprisa y las aristas suben de brillo con tope 1.
+- **Interfaz.** Chips de categoría y etiquetas de categoría del pop-up en neutro (`NEUTRAL_CHIP`)
+  con su icono y su forma: el color significa siempre «línea vital» y dos códigos de color
+  compitiendo era justo la incoherencia que señalaba Pablo. Rótulos: halo oscuro detrás (las ramas
+  pasan por detrás sin cortar la lectura); los nodos de ramas exteriores se rotulan solo hacia fuera
+  (si no cabe, se oculta). Leyenda: `LineLegend` es también `ProjectionListener`; con
+  `ProjectedFrame.lookX` busca el tramo de `braidSpans` y marca «en foco ahora» (clase
+  `line--braided`, swatch grueso); «latente» se oculta mientras la línea va por la trenza. La
+  central ya no lleva «foco actual» fijo.
