@@ -23,3 +23,4 @@ export type {
 export { FOCUS_LEVEL_INTENSITY, FOCUS_OUT, FOCUS_TRANSITION_YEARS, focusIntensityAt, sampleFocus } from './LineFocus';
 export { braidBoundaries, braidChangesOf, braidMembersAt, isFocusedAt, isInBraidAt } from './Braid';
 export type { BraidChange, BraidSource } from './Braid';
+export { validateLineLife } from './LineLifeRules';

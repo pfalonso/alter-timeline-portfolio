@@ -10,14 +10,15 @@ export type {
   LifeData,
   LifeEventData,
   LifeMetaData,
+  LinePauseData,
   LinkData,
   MediaData,
   StoryData,
 } from './LifeData';
 export { DEFAULT_IMPORTANCE, LifeEvent, MAIN_BRANCH } from './LifeEvent';
 export type { Importance, LifeEventProps } from './LifeEvent';
-export { DEFAULT_FOCUS_LEVEL, defaultLineStyle, LINE_STYLES } from './LifeLine';
-export type { FocusLevel, FocusPeriod, LifeLine, LineMerge, LineStyle } from './LifeLine';
+export { DEFAULT_FOCUS_LEVEL, defaultLineStyle, isPausedAt, LINE_STYLES } from './LifeLine';
+export type { FocusLevel, FocusPeriod, LifeLine, LineMerge, LinePause, LineStyle } from './LifeLine';
 export { PartialDate } from './PartialDate';
 export type { DatePrecision } from './PartialDate';
 export { Timeline } from './Timeline';

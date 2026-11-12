@@ -80,15 +80,12 @@ describe('LifeDataValidator — branches[] y meta.mainBranch', () => {
     expect(issues(data)).toEqual([expect.stringContaining('ciclo de bifurcaciones')]);
   });
 
-  it('la línea central no nace de otra ni se fusiona', () => {
+  it('la línea central puede nacer en un nodo (origin), pero no se fusiona', () => {
     const data = lifeLines((d) => {
       lines(d)[0].origin = 'drawing';
       lines(d)[0].mergeInto = { branch: 'art', event: 'show' };
     });
-    expect(issues(data)).toEqual([
-      expect.stringContaining('branches[0].origin'),
-      expect.stringContaining('branches[0].mergeInto'),
-    ]);
+    expect(issues(data)).toEqual([expect.stringContaining('branches[0].mergeInto')]);
   });
 
   it('meta.mainBranch: kebab-case y con eventos; sin él, con líneas declaradas, "main" debe tener eventos', () => {

@@ -4,6 +4,7 @@ import type { LifeData } from '../model/LifeData';
 import { MAIN_BRANCH } from '../model/LifeEvent';
 import { LINE_STYLES } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
+import { validateLineLife } from './LineLifeRules';
 import { isHttpUrl } from './safeUrl';
 
 /** Longitud máxima del título corto que se usa en los rótulos de la escena. */
@@ -118,6 +119,7 @@ export class LifeDataValidator {
     this.validateArcs(input.arcs, collector);
     this.validateStory(input.story, input.events, collector);
     this.validateLedTo(input.events, collector);
+    validateLineLife(input, mainBranch, (path, message) => collector.add(path, message));
 
     const ok = collector.issues.length === 0;
     return ok ? { ok, issues: [], data: input as unknown as LifeData } : { ok, issues: collector.issues };
@@ -179,7 +181,7 @@ export class LifeDataValidator {
     mainBranch: string,
     c: IssueCollector,
   ): BranchGraph {
-    const empty: BranchGraph = { eventIds: new Set(), branchOfEvent: new Map(), parentBranch: new Map(), usedBranches: new Set() };
+    const empty: BranchGraph = { eventIds: new Set(), branchOfEvent: new Map(), parentBranch: new Map(), usedBranches: new Set(), alsoBranches: new Set() };
     if (!Array.isArray(events)) {
       c.add('events', 'debe ser una lista de eventos');
       return empty;
@@ -230,6 +232,9 @@ export class LifeDataValidator {
       }
       if (event.branch !== undefined && (typeof event.branch !== 'string' || !KEBAB.test(event.branch))) {
         c.add(`${path}.branch`, 'debe ser un id de rama en kebab-case');
+      }
+      if (event.active !== undefined && typeof event.active !== 'boolean') {
+        c.add(`${path}.active`, 'debe ser true o false');
       }
       if (event.branchFrom !== undefined && typeof event.branchFrom !== 'string') {
         c.add(`${path}.branchFrom`, 'debe ser el id de un evento');
@@ -337,7 +342,10 @@ export class LifeDataValidator {
       originOfBranch.set(branch, from);
       parentBranch.set(branch, branchOfEvent.get(from) ?? mainBranch);
     }
-    return { eventIds: ids, branchOfEvent, parentBranch, usedBranches: new Set(branchOfEvent.values()) };
+    const alsoBranches = new Set(
+      events.flatMap(({ event }) => (Array.isArray(event.alsoBranches) ? event.alsoBranches.filter((id): id is string => typeof id === 'string') : [])),
+    );
+    return { eventIds: ids, branchOfEvent, parentBranch, usedBranches: new Set(branchOfEvent.values()), alsoBranches };
   }
 
   /** `branches[]`: líneas vitales con nombre, origen, fusión, `until` y periodos de foco. */
@@ -348,6 +356,8 @@ export class LifeDataValidator {
       return;
     }
     const known = new Set([...graph.usedBranches, mainBranch]);
+    // Una línea también «se usa» si pasa por un nodo de unión (alsoBranches).
+    const crossing = new Set(graph.alsoBranches);
     const seen = new Set<string>();
     const mergeTarget = new Map<string, string>();
     lines.forEach((line, index) => {
@@ -362,15 +372,13 @@ export class LifeDataValidator {
       if (line.color !== undefined && (typeof line.color !== 'string' || !HEX_COLOR.test(line.color))) {
         c.add(`${path}.color`, `"${String(line.color)}" debe ser un color hex #RRGGBB`);
       }
-      if (id !== null && !known.has(id)) {
+      if (id !== null && !known.has(id) && !crossing.has(id) && line.ghost !== true) {
         c.add(`${path}.id`, `ningún evento usa la rama "${id}" (y no es meta.mainBranch "${mainBranch}")`);
       }
       const isMain = id === mainBranch;
       if (line.origin !== undefined) {
         if (typeof line.origin !== 'string' || !graph.eventIds.has(line.origin)) {
           c.add(`${path}.origin`, `el evento "${String(line.origin)}" no existe`);
-        } else if (isMain) {
-          c.add(`${path}.origin`, `"${mainBranch}" es la línea central y no nace de otra`);
         } else if (graph.branchOfEvent.get(line.origin) === id) {
           c.add(`${path}.origin`, `"${line.origin}" pertenece a la propia línea "${id}"; debe ser un evento de otra`);
         } else if (id !== null) {
@@ -625,4 +633,6 @@ interface BranchGraph {
   /** Rama madre de cada rama (por `branchFrom` y, después, por `branches[].origin`). */
   readonly parentBranch: Map<string, string>;
   readonly usedBranches: ReadonlySet<string>;
+  /** Líneas que pasan por algún nodo de unión (`alsoBranches`). */
+  readonly alsoBranches: ReadonlySet<string>;
 }

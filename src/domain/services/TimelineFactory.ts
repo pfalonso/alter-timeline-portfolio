@@ -22,7 +22,8 @@ export class TimelineFactory {
     const events = data.events
       .filter((event) => options.includePrivate === true || event.visibility !== 'private')
       .map((event) => this.toEvent(event, data.meta.mainBranch ?? MAIN_BRANCH));
-    const lines = (data.branches ?? []).map((line) => this.toLine(line));
+    const starts = new Map(data.events.map((event) => [event.id, PartialDate.parse(event.date.start)]));
+    const lines = (data.branches ?? []).map((line) => this.toLine(line, starts));
     const arcs = (data.arcs ?? []).map((arc) => this.toArc(arc));
     const story = data.story ? { title: data.story.title, path: [...data.story.path] } : undefined;
     return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now), lines, { arcs, story });
@@ -39,7 +40,7 @@ export class TimelineFactory {
     };
   }
 
-  private toLine(raw: BranchInfoData): LifeLine {
+  private toLine(raw: BranchInfoData, starts: ReadonlyMap<string, PartialDate>): LifeLine {
     return {
       id: raw.id,
       label: raw.label,
@@ -49,6 +50,13 @@ export class TimelineFactory {
       mergeInto: raw.mergeInto ? { branch: raw.mergeInto.branch, eventId: raw.mergeInto.event } : undefined,
       untilPresent: raw.until === PRESENT,
       style: raw.style,
+      ghost: raw.ghost === true,
+      // Las fechas se toman de todos los eventos (también privados): la pausa no depende de lo visible.
+      pauses: (raw.pauses ?? []).flatMap((pause) => {
+        const from = starts.get(pause.from);
+        const to = starts.get(pause.to);
+        return from && to ? [{ fromEventId: pause.from, toEventId: pause.to, from, to }] : [];
+      }),
       focus: (raw.focus ?? []).map((period) => ({
         start: PartialDate.parse(period.start),
         end: period.end === undefined || period.end === PRESENT ? null : PartialDate.parse(period.end),
@@ -83,6 +91,8 @@ export class TimelineFactory {
       isPrivate: raw.visibility === 'private',
       bridge: raw.bridge?.trim() || undefined,
       ledTo: [...new Set(raw.ledTo ?? [])],
+      alsoBranches: [...new Set(raw.alsoBranches ?? [])].filter((id) => id !== (raw.branch ?? mainBranch)),
+      active: raw.active === true,
     });
   }
 }
