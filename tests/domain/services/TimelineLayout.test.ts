@@ -399,7 +399,19 @@ describe('TimelineLayout: enlaces causales (ledTo)', () => {
     expect(layoutOf(makeData()).links).toEqual([]);
     const hidden = events().map((event) => (event.id === 'coop' ? { ...event, visibility: 'private' as const } : event));
     expect(layoutOf(dataWith(hidden)).links.map((link) => link.to)).toEqual(['culinary']);
+    // Si al filtrar origen y destino quedan seguidos en la misma línea, la línea ya los une: sin arco.
     const filtered = new TimelineLayout().compute(timelineOf(dataWith(events())), new Set(['tfg', 'coop']));
-    expect(filtered.links.map((link) => link.to)).toEqual(['coop']);
+    expect(filtered.links).toEqual([]);
+  });
+
+  it('no dibuja arco entre nodos consecutivos de una misma línea: la línea ya es el puente', () => {
+    const chain = (): LifeData['events'] => [
+      makeEvent({ id: 'a', date: { start: '2015' }, ledTo: ['b', 'c'] }),
+      makeEvent({ id: 'b', date: { start: '2016' }, ledTo: ['c'] }),
+      makeEvent({ id: 'c', date: { start: '2017' } }),
+    ];
+    const layout = layoutOf(dataWith(chain()));
+    // a→b y b→c son consecutivos en la línea principal; a→c salta un nodo, así que sí lleva arco.
+    expect(layout.links.map((link) => [link.from, link.to])).toEqual([['a', 'c']]);
   });
 });

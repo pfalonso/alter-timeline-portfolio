@@ -108,26 +108,26 @@ describe('SceneBuilder', () => {
 
   it('una hebra causal por enlace, del color de la línea origen al de la destino, con remolino si cambian de línea', () => {
     const data = makeData();
-    data.events[0].ledTo = ['b-job', 'c-side'];
+    data.events[0].ledTo = ['c-side', 'e-side-two'];
     const built = new SceneBuilder().build(buildModel(data));
-    expect(built.strands.map((strand) => strand.id)).toEqual(['link:a-school>b-job', 'link:a-school>c-side']);
+    expect(built.strands.map((strand) => strand.id)).toEqual(['link:a-school>c-side', 'link:a-school>e-side-two']);
     for (const strand of built.strands) expect(built.effects).toContain(strand);
     const uniforms = built.strands[1].mesh.material.uniforms;
     expect(uniforms.uColor.value.getHexString()).not.toBe(uniforms.uColorEnd.value.getHexString());
     const swirls = built.effects.filter((effect) => effect instanceof MergeSeam && effect.id.startsWith('swirl:'));
-    expect(swirls).toHaveLength(1);
+    expect(swirls).toHaveLength(2);
   });
 
   it('las hebras causales son discretas y se encienden al señalar uno de sus nodos', () => {
     const data = makeData();
-    data.events[0].ledTo = ['b-job', 'c-side'];
+    data.events[0].ledTo = ['c-side', 'e-side-two'];
     const built = new SceneBuilder().build(buildModel(data));
     const settle = (): number[] => {
       for (let i = 0; i < 200; i += 1) for (const strand of built.strands) strand.update(frameContext({ delta: 0.05 }));
       return built.strands.map((strand) => strand.mesh.material.uniforms.uEmphasis.value as number);
     };
     expect(settle()).toEqual([STRAND_EMPHASIS.rest, STRAND_EMPHASIS.rest].map((value) => expect.closeTo(value, 3)));
-    built.highlightLinks(['c-side']);
+    built.highlightLinks(['e-side-two']);
     expect(settle()).toEqual([expect.closeTo(STRAND_EMPHASIS.other, 3), expect.closeTo(STRAND_EMPHASIS.lit, 3)]);
     built.highlightLinks([]);
     built.fadeIn();
