@@ -36,12 +36,37 @@ describe('TimelineLayout: nodos de unión', () => {
     expect(nodeOf(layout, 'e-accident').lines).toEqual(['vida', 'tech', 'arte', 'cocina']);
   });
 
-  it('entre nodos, cada línea vuelve a su carril (el nudo no arrastra a las líneas)', () => {
+  it('tras un nudo, la línea va a su carril si su siguiente nodo está fuera de la banda; si está en la banda y cerca, sigue por la banda', () => {
+    const step = layout.nodeStep;
+    for (const branch of layout.branches) {
+      if (branch.laneY === 0) continue;
+      const own = layout.nodes
+        .filter((node) => node.lines.includes(branch.id))
+        .sort((a, b) => a.position.x - b.position.x);
+      for (let i = 0; i + 1 < own.length; i += 1) {
+        const a = own[i].position;
+        const b = own[i + 1].position;
+        const mid = branch.points.filter((point) => point.x > a.x + 1e-6 && point.x < b.x - 1e-6);
+        if (mid.length === 0) continue;
+        if (a.y === 0 && b.y === 0 && b.x - a.x <= 6 * step + 1e-6) {
+          // Puente por la banda: nunca sale de ella (salvo que el foco cambie entre medias).
+          const focusChanges = branch.focus.some((value, k) => k > 0 && value !== branch.focus[k - 1]);
+          if (!focusChanges) for (const point of mid) expect(point.y).toBe(0);
+        } else if (b.y !== 0 && a.y !== 0) {
+          for (const point of mid) expect(Math.abs(point.y)).toBeLessThanOrEqual(Math.abs(branch.laneY) + 1e-6);
+        }
+      }
+    }
+    // El nudo no arrastra a una línea cuyo siguiente nodo está en su carril.
     const arte = branchOf(layout, 'arte');
     const cross = nodeOf(layout, 'e-cross').position.x;
-    const step = layout.nodeStep;
-    const after = pointAt(arte.points, cross + step);
-    expect(after?.y).toBeCloseTo(arte.laneY, 6);
+    const nextArt = layout.nodes
+      .filter((node) => node.lines.includes('arte') && node.position.x > cross)
+      .sort((a, b) => a.position.x - b.position.x)[0];
+    if (nextArt && nextArt.position.y !== 0) {
+      const after = pointAt(arte.points, cross + step);
+      expect(after?.y).toBeCloseTo(arte.laneY, 6);
+    }
   });
 
   it('sin chispas de unión/separación en los nudos', () => {

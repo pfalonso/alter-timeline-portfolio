@@ -159,6 +159,8 @@ export interface LayoutOptions {
   readonly laneDepth: number;
   /** Retroceso en Z de la trenza para que pase por detrás de los símbolos que viajan en ella. */
   readonly mainBehind: number;
+  /** Máximo de pasos entre dos nodos de una línea, ambos en la banda, que la línea une por la banda. */
+  readonly bandBridge: number;
   /** Media longitud de la curva con la que una línea se une a la trenza o se separa, en fracciones de `nodeStep`. */
   readonly ramp: number;
   /** Distancia en X entre muestras de la polilínea. */
@@ -187,6 +189,7 @@ export const DEFAULT_LAYOUT_OPTIONS: LayoutOptions = {
   laneMax: 0.8,
   laneDepth: 0.9,
   mainBehind: 0.25,
+  bandBridge: 6,
   ramp: 0.7,
   sampleStep: 0.3,
   padSteps: 1.2,
@@ -385,7 +388,15 @@ export class TimelineLayout {
     const byId = new Map(nodes.map((node) => [node.eventId, node]));
     // Un arco causal solo aporta si une nodos que la propia línea no conecta ya: si origen y destino
     // comparten una línea y no hay ningún otro nodo de esa línea entre ellos, la línea ya es el puente.
-    const linesOfEvent = new Map(ordered.map((event) => [event.id, [event.branch, ...event.alsoBranches]]));
+    // Las líneas que NACEN en un nodo también lo unen con su primer nodo propio.
+    const bornAt = new Map<string, string[]>();
+    for (const plan of plans) {
+      const origin = timeline.originOf(plan.id);
+      if (origin) bornAt.set(origin.id, [...(bornAt.get(origin.id) ?? []), plan.id]);
+    }
+    const linesOfEvent = new Map(
+      ordered.map((event) => [event.id, [event.branch, ...event.alsoBranches, ...(bornAt.get(event.id) ?? [])]]),
+    );
     const indexOf = new Map(ordered.map((event, index) => [event.id, index]));
     const alreadyConnected = (from: string, to: string): boolean => {
       const fromLines = linesOfEvent.get(from) ?? [];
@@ -709,6 +720,10 @@ export class TimelineLayout {
       stations.push({ x: plan.endX, y: plan.open ? levelAt(year) : last.y, year });
     }
 
+    // Cambios de trenza estrictamente entre dos estaciones: uno que cae justo en la siguiente (p. ej.
+    // el inicio de una pausa en ese mismo nodo) no es un tramo que recorrer y provocaba un rizo.
+    const changesBetween = (from: number, to: number) =>
+      braidChangesOf(timeline, plan.id, from, to).filter((change) => change.year < to - 1e-6);
     plan.startY = stations[0].y;
     const ramp = o.ramp * o.nodeStep;
     for (let i = 0; i + 1 < stations.length; i += 1) {
@@ -722,6 +737,15 @@ export class TimelineLayout {
         if (a.y !== b.y) plan.ramps.push({ center: (a.x + b.x) / 2, half: (b.x - a.x) / 4, from: a.y, to: b.y, hidden: true });
         continue;
       }
+      // Dos nodos seguidos de la línea en la banda y no muy lejos: la línea los une por la banda (por
+      // detrás de los nodos ajenos) en vez de salir a su carril y volver sin pasar por ningún nodo.
+      if (
+        a.y === 0 &&
+        b.y === 0 &&
+        b.x - a.x <= o.bandBridge * o.nodeStep + EPS &&
+        changesBetween(a.year, b.year).length === 0
+      )
+        continue;
       // Secuencia de alturas y posición preferida de cada cambio.
       const wanted: { to: number; x: number }[] = [];
       let current = a.y;
@@ -731,7 +755,7 @@ export class TimelineLayout {
         wanted.push({ to: after, x: a.x });
         current = after;
       }
-      for (const change of braidChangesOf(timeline, plan.id, a.year, b.year)) {
+      for (const change of changesBetween(a.year, b.year)) {
         const to = change.kind === 'join' ? 0 : plan.laneY;
         if (to === current) continue;
         wanted.push({ to, x: xAtYear(change.year) });
