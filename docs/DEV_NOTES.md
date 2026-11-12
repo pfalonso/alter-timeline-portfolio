@@ -493,3 +493,9 @@ Sustituye a la decisión 28 (la central ya no es una columna fija: el centro es 
 
 - Un arco `ledTo` no se dibuja si origen y destino comparten una línea y no hay ningún otro nodo visible de esa línea entre ellos: la propia línea ya los une. Solo quedan los puentes entre nodos que no estarían conectados de otra forma (otra línea o nodos intermedios).
 - La regla se evalúa con los nodos visibles, así que al filtrar un arco puede desaparecer si sus extremos quedan seguidos en la misma línea. El pop-up sigue mostrando «Viene de… / Esto llevó a…» completos.
+
+### 32. Sin rizos entre nodos de la banda
+
+- Si dos nodos consecutivos de una línea están en la banda (y = 0), a ≤ `bandBridge` pasos (6) y el foco no cambia entre ellos, la línea los une por la banda (por detrás de los nodos ajenos) en lugar de salir a su carril y volver sin pasar por ningún nodo.
+- Un cambio de trenza que cae exactamente en la siguiente estación (p. ej. el inicio de una pausa en ese mismo nodo) ya no genera rampa: provocaba un rizo justo antes del nodo.
+- Arcos causales: una línea que nace en un nodo también lo une con su primer nodo propio, así que ese enlace no lleva arco.

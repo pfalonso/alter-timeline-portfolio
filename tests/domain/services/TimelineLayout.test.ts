@@ -366,7 +366,7 @@ describe('TimelineLayout: capítulos', () => {
 describe('TimelineLayout: enlaces causales (ledTo)', () => {
   const events = (): LifeData['events'] => [
     makeEvent({ id: 'tfg', date: { start: '2017' }, ledTo: ['culinary', 'coop'] }),
-    makeEvent({ id: 'culinary', date: { start: '2018' }, branch: 'side', branchFrom: 'tfg' }),
+    makeEvent({ id: 'culinary', date: { start: '2018' }, branch: 'side' }),
     makeEvent({ id: 'mid', date: { start: '2019' } }),
     makeEvent({ id: 'coop', date: { start: '2020' } }),
   ];
@@ -402,6 +402,18 @@ describe('TimelineLayout: enlaces causales (ledTo)', () => {
     // Si al filtrar origen y destino quedan seguidos en la misma línea, la línea ya los une: sin arco.
     const filtered = new TimelineLayout().compute(timelineOf(dataWith(events())), new Set(['tfg', 'coop']));
     expect(filtered.links).toEqual([]);
+  });
+
+  it('tampoco entre el nodo donde nace una línea y el primer nodo de esa línea', () => {
+    const data = dataWith([
+      makeEvent({ id: 'birth', date: { start: '2010' }, ledTo: ['first', 'second'] }),
+      makeEvent({ id: 'first', date: { start: '2011' }, branch: 'side' }),
+      makeEvent({ id: 'second', date: { start: '2012' }, branch: 'side' }),
+    ]);
+    data.branches = [{ id: 'side', label: 'Lateral', origin: 'birth' }];
+    const layout = layoutOf(data);
+    // birth→first ya lo une la línea que nace en birth; birth→second salta un nodo de esa línea.
+    expect(layout.links.map((link) => [link.from, link.to])).toEqual([['birth', 'second']]);
   });
 
   it('no dibuja arco entre nodos consecutivos de una misma línea: la línea ya es el puente', () => {
