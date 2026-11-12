@@ -4,13 +4,17 @@ export type { ValidationResult } from './LifeDataValidator';
 export { isHttpUrl } from './safeUrl';
 export { TimelineFactory } from './TimelineFactory';
 export type { TimelineFactoryOptions } from './TimelineFactory';
-export { compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
+export { branchPieces, compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';
+export { validateLineLife } from './LineLifeRules';
 export type {
   BraidSpan,
   JunctionKind,
+  LayoutActive,
   LayoutArc,
   LayoutBounds,
   LayoutBranch,
+  LayoutGap,
+  LayoutGhost,
   LayoutJunction,
   LayoutLink,
   LayoutMerge,
@@ -23,4 +27,3 @@ export type {
 export { FOCUS_LEVEL_INTENSITY, FOCUS_OUT, FOCUS_TRANSITION_YEARS, focusIntensityAt, sampleFocus } from './LineFocus';
 export { braidBoundaries, braidChangesOf, braidMembersAt, isFocusedAt, isInBraidAt } from './Braid';
 export type { BraidChange, BraidSource } from './Braid';
-export { validateLineLife } from './LineLifeRules';

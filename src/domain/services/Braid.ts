@@ -1,4 +1,4 @@
-import type { LifeLine } from '../model/LifeLine';
+import { isPausedAt, type LifeLine } from '../model/LifeLine';
 import type { Timeline } from '../model/Timeline';
 
 /**
@@ -9,7 +9,7 @@ import type { Timeline } from '../model/Timeline';
  * la trenza desde que empezó ese periodo; si no, vuelve a su carril y se une justo antes de la
  * fusión (eso lo resuelve el layout). Funciones puras.
  */
-export type BraidSource = Pick<Timeline, 'mainBranch' | 'branchIds' | 'getLine' | 'mergeOf' | 'eventsOfBranch'>;
+export type BraidSource = Pick<Timeline, 'mainBranch' | 'branchIds' | 'getLine' | 'mergeOf' | 'eventsOfBranch' | 'originOf' | 'events'>;
 
 /** Margen para evaluar «justo antes» y «justo después» de un borde. */
 const EDGE = 1e-4;
@@ -45,11 +45,24 @@ function absorbedFrom(source: BraidSource, id: string): number | null {
   return end >= merge || !between ? last.start.toDecimalYear() : null;
 }
 
+/** Año en que nace una línea (su `origin` visible); `-Infinity` si existe desde el principio. */
+function birthYear(source: BraidSource, id: string): number {
+  return source.originOf(id)?.start.toDecimalYear() ?? -Infinity;
+}
+
+/** `true` si la línea existe en ese año: ya ha nacido y no está en pausa. */
+function existsAt(source: BraidSource, id: string, year: number): boolean {
+  return year >= birthYear(source, id) && !isPausedAt(source.getLine(id), year);
+}
+
 /** Foco propio de una línea en un año (sin la regla de la línea central por defecto). */
 function ownFocus(source: BraidSource, id: string, year: number): boolean {
+  if (year < birthYear(source, id)) return false;
   const merge = mergeYear(source, id);
   // En la fecha de la fusión ya forma parte de la línea destino.
   if (merge !== null && year >= merge) return false;
+  // En pausa la línea no existe: tampoco viaja por la trenza.
+  if (isPausedAt(source.getLine(id), year)) return false;
   const absorbed = absorbedFrom(source, id);
   if (absorbed !== null && year >= absorbed) return true;
   return isFocusedAt(source.getLine(id), year);
@@ -58,7 +71,12 @@ function ownFocus(source: BraidSource, id: string, year: number): boolean {
 /** Líneas que forman la trenza en un año, en el orden de `branchIds`. Nunca vacía. */
 export function braidMembersAt(source: BraidSource, year: number): string[] {
   const members = source.branchIds.filter((id) => ownFocus(source, id, year));
-  return members.length > 0 ? members : [source.mainBranch];
+  if (members.length > 0) return members;
+  // Sin líneas en foco, la trenza es la central; si aún no ha nacido o está en pausa, la línea del
+  // primer evento (la que existe desde el principio).
+  if (existsAt(source, source.mainBranch, year)) return [source.mainBranch];
+  const first = source.events[0]?.branch;
+  return [first !== undefined && existsAt(source, first, year) ? first : source.mainBranch];
 }
 
 /** `true` si la línea viaja por la trenza en ese año. */
@@ -74,8 +92,14 @@ export function braidBoundaries(source: BraidSource): number[] {
       years.add(period.start.toDecimalYear());
       if (period.end !== null) years.add(period.end.toDecimalYearEnd());
     }
+    for (const pause of source.getLine(id)?.pauses ?? []) {
+      years.add(pause.from.toDecimalYear());
+      years.add(pause.to.toDecimalYear());
+    }
     const merge = mergeYear(source, id);
     if (merge !== null) years.add(merge);
+    const birth = birthYear(source, id);
+    if (Number.isFinite(birth)) years.add(birth);
   }
   return [...years].sort((a, b) => a - b);
 }

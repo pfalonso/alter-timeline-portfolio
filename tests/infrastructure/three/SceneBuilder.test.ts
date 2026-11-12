@@ -139,7 +139,7 @@ describe('SceneBuilder', () => {
     const built = new SceneBuilder().build(model);
     const sparks = built.seams.map((seam) => seam.id);
     expect(sparks).toHaveLength(model.layout.junctions.length);
-    for (const id of sparks) expect(id).toMatch(/^(join|split):/);
+    for (const id of sparks) expect(id).toMatch(/^(join|split|birth|fray):/);
   });
 
   it('la paleta y la niebla son configurables (el tronco, para líneas sin color posible)', () => {

@@ -140,7 +140,7 @@ describe('SceneBuilder con líneas vitales', () => {
 
   it('una costura por cada fusión y una chispa por cada unión o separación de la trenza', () => {
     const built = new SceneBuilder().build(model);
-    expect(built.seams.filter((seam) => !/^(join|split):/.test(seam.id)).map((seam) => seam.id)).toEqual(['art']);
+    expect(built.seams.filter((seam) => !/^(join|split|birth|fray):/.test(seam.id)).map((seam) => seam.id)).toEqual(['art']);
     expect(built.seams).toHaveLength(model.layout.junctions.length);
     for (const seam of built.seams) expect(built.effects).toContain(seam);
     built.dispose();

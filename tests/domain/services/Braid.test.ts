@@ -6,6 +6,7 @@ import {
   braidMembersAt,
   isFocusedAt,
   isInBraidAt,
+  LifeDataValidator,
   TimelineFactory,
   TimelineLayout,
   type TimelineLayoutResult,
@@ -187,11 +188,11 @@ describe('TimelineLayout: la trenza', () => {
   it('genera uniones y separaciones en la trenza (y = 0) y la fusión al final de la línea', () => {
     const layout = layoutOf(relay());
     const of = (branch: string) => layout.junctions.filter((junction) => junction.branch === branch).map((junction) => junction.kind);
-    expect(of('food')).toEqual(['split', 'join', 'split']);
+    expect(of('food')).toEqual(['birth', 'join', 'split']);
     expect(of('tech')).toEqual(['split', 'join']);
-    expect(of('art')).toEqual(['split', 'join', 'merge']);
-    expect(of('life')).toEqual(['split']);
-    for (const junction of layout.junctions.filter((item) => item.kind !== 'merge')) expect(junction.position.y).toBe(0);
+    expect(of('art')).toEqual(['birth', 'join', 'merge']);
+    expect(of('life')).toEqual(['birth']);
+    for (const junction of layout.junctions.filter((item) => item.kind === 'join' || item.kind === 'split')) expect(junction.position.y).toBe(0);
     const xs = layout.junctions.map((junction) => junction.position.x);
     expect(xs).toEqual([...xs].sort((a, b) => a - b));
   });
@@ -242,5 +243,35 @@ describe('TimelineLayout: la trenza', () => {
 
   it('es determinista', () => {
     expect(layoutOf(relay())).toEqual(layoutOf(relay()));
+  });
+});
+
+describe('braidMembersAt: la central nace en un nodo y se pausa', () => {
+  const data = (): LifeData =>
+    relay((d) => {
+      d.meta.mainBranch = 'tech';
+      const tech = d.branches?.find((line) => line.id === 'tech');
+      if (tech) Object.assign(tech, { origin: 'l1', focus: [], pauses: [{ from: 'merge', to: 't3' }] });
+      for (const event of d.events) if (event.id === 'birth' || event.id === 't1' || event.id === 't2') event.branch = 'life';
+      const life = d.branches?.find((line) => line.id === 'life');
+      if (life) delete life.origin;
+      for (const line of d.branches ?? []) if (line.id !== 'tech') line.origin = line.id === 'life' ? undefined : 'birth';
+    });
+
+  it('antes de nacer y durante su pausa, sin focos, la trenza es la línea del primer evento', () => {
+    const timeline = new TimelineFactory().create(new LifeDataValidator().assertValid(data()), { now: new Date(Date.UTC(2024, 0, 1)) });
+    expect(braidMembersAt(timeline, 2001)).toEqual(['life']);
+    expect(braidMembersAt(timeline, 2013.5)).not.toContain('tech');
+    expect(braidMembersAt(timeline, 2020)).toEqual(['life']);
+    expect(braidMembersAt(timeline, 2021.5)).toEqual(['tech']);
+  });
+
+  it('el layout dibuja la central desde su origen y con el hueco de la pausa', () => {
+    const timeline = new TimelineFactory().create(new LifeDataValidator().assertValid(data()), { now: new Date(Date.UTC(2024, 0, 1)) });
+    const layout = new TimelineLayout().compute(timeline);
+    const tech = layout.branches.find((branch) => branch.id === 'tech');
+    const originX = layout.nodes.find((node) => node.eventId === 'l1')?.position.x ?? NaN;
+    expect(tech?.points[0].x).toBeCloseTo(originX, 6);
+    expect(tech?.gaps).toHaveLength(1);
   });
 });
