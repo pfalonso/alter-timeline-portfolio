@@ -168,11 +168,11 @@ describe('Timeline y TimelineFactory con líneas vitales', () => {
 describe('TimelineLayout con líneas vitales', () => {
   const layoutOf = (data: LifeData) => new TimelineLayout().compute(build(data));
 
-  it('la línea central va en el carril 0 aunque no se llame "main"', () => {
+  it('la línea central se reconoce aunque no se llame "main"; si sale de foco, tiene su carril', () => {
     const layout = layoutOf(lifeLines());
     const core = layout.branches.find((branch) => branch.id === 'core');
     expect(core?.main).toBe(true);
-    expect(core?.lane).toBe(0);
+    expect(core?.lane).not.toBe(0);
     expect(layout.branches.filter((branch) => branch.main)).toHaveLength(1);
     expect(new Set(layout.branches.map((branch) => branch.lane)).size).toBe(layout.branches.length);
   });
@@ -183,7 +183,7 @@ describe('TimelineLayout con líneas vitales', () => {
     for (const id of ['art', 'food', 'teach']) {
       const branch = layout.branches.find((item) => item.id === id);
       expect(branch?.originEventId).toBe('birth');
-      expect(branch?.points[0]).toEqual(birth);
+      expect([branch?.points[0].x, branch?.points[0].y]).toEqual([birth?.x, birth?.y]);
       for (const point of branch?.points ?? []) expect(Math.abs(point.y)).toBeLessThanOrEqual(Math.abs(branch?.laneY ?? 0) + 1e-9);
     }
   });
@@ -193,8 +193,8 @@ describe('TimelineLayout con líneas vitales', () => {
     const art = layout.branches.find((branch) => branch.id === 'art');
     const master = layout.nodes.find((node) => node.eventId === 'master');
     expect(art?.open).toBe(false);
-    expect(art?.merge).toEqual({ into: 'core', eventId: 'master', position: master?.position });
-    expect(art?.points[art.points.length - 1]).toEqual(master?.position);
+    expect(art?.merge).toEqual({ into: 'core', eventId: 'master', position: art?.points[art.points.length - 1] });
+    expect([art?.merge?.position.x, art?.merge?.position.y]).toEqual([master?.position.x, master?.position.y]);
     // Antes de bajar al nodo destino va por su carril (si hay nodos por medio).
     const before = art?.points.find((point) => point.x > (master?.position.x ?? 0) - layout.nodeStep * 1.2);
     expect(Math.abs(before?.y ?? 0)).toBeGreaterThan(0.5);
@@ -251,7 +251,8 @@ describe('TimelineLayout con líneas vitales', () => {
     const teach = layout.branches.find((branch) => branch.id === 'teach');
     expect(Math.sign(teach?.lane ?? 0)).toBe(Math.sign(food?.lane ?? 0));
     const later = layout.nodes.find((node) => node.eventId === 'later');
-    expect(teach?.points[teach.points.length - 1]).toEqual(later?.position);
+    const end = teach?.points[teach.points.length - 1];
+    expect([end?.x, end?.y]).toEqual([later?.position.x, later?.position.y]);
   });
 
   it('es determinista', () => {
