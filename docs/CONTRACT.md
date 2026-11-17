@@ -47,7 +47,12 @@ interface LifeData {
   schemaVersion: 1;
   meta: {
     owner: string;            // "Pablo Fernández Alonso"
-    title: string;            // titular del sitio
+    title: string;            // titular del sitio (antetítulo; si empieza por owner, solo se muestra lo que sigue)
+    headline?: string;        // oficio en una línea bajo el nombre
+    location?: string;        // «Donostia / San Sebastián»
+    availability?: string;    // situación y disponibilidad en una línea
+    email?: string;           // texto copiable + mailto (cabecera y cierre de la historia)
+    cv?: { label: string; url: string }[]; // CV en PDF: http(s) o ruta del sitio (/cv/…, sin «..»)
     tagline?: string;
     locale: string;           // "es" | "en" ...
     contact?: { label: string; url: string }[];
@@ -57,7 +62,8 @@ interface LifeData {
   events: LifeEvent[];
   branches?: BranchInfo[];    // líneas vitales (opcional)
   arcs?: Arc[];               // capítulos contiguos sin solape (opcional)
-  story?: { title?: string; path: string[] }; // recorrido del modo historia (opcional)
+  story?: { title?: string; path: string[] }; // historia completa (opcional; cronológica)
+  storyShort?: { title?: string; path: string[] }; // versión corta del botón principal (opcional; orden libre, no vacía)
 }
 interface Arc {
   id: string;                 // kebab-case único
@@ -118,7 +124,9 @@ fechas con formato válido y `end >= start`; color hex válido; URLs http(s). L�
 por algún evento (o `mainBranch`); `origin` y `mergeInto.event` existen; `mergeInto.branch` existe, es
 distinta y contiene `mergeInto.event`; sin ciclos de fusión ni de nacimiento; `focus` con fechas válidas,
 `end >= start` y `level` 1–3; `arcs` con ids únicos, fechas válidas, `end >= start` y sin solapes;
-`story.path` con ids existentes, sin repetir y en orden cronológico; `bridge` no vacío y ≤ 160;
+`story.path` con ids existentes, sin repetir y en orden cronológico; `storyShort.path` con ids
+existentes, sin repetir y no vacío (sin exigir orden); `meta.email` con forma de correo; `meta.cv[]`
+con `label` y `url` http(s) o ruta del sitio (`/…`, sin `//` ni `..`); `bridge` no vacío y ≤ 160;
 `ledTo` con ids existentes, sin el propio evento, sin duplicados y con destino no anterior al origen;
 `branches[].style` ∈ geometric | organic | neutral;
 `mainBranch` con eventos (obligatorio si hay `branches` y nadie usa
@@ -136,7 +144,7 @@ relleno interior tenue, giro lento; quietos con movimiento reducido). `importanc
 grande con aura y rótulo siempre; 2 = sólido sencillo, rótulo al acercarse si cabe; 1 = sólido pequeño
 sin aura ni rótulo salvo hover/foco/selección. Forma por línea (`style`, por defecto `tecnologia`/`gestion` →
 geometric; `arte`/`gastronomia`/`rol` → organic; resto → neutral): geometric = icosaedro + cubo inscrito,
-octaedro, tetraedro; organic = nudo toroidal, esfera deformada, esfera pequeña; neutral = giroscopio de
+octaedro, cubo; organic = nudo toroidal, esfera deformada, esfera pequeña; neutral = giroscopio de
 anillos, toro fino, anillo. Hover/selección: se expande y brilla un poco. Chips y leyenda usan
 el mismo lenguaje.
 Trenza (desde el 12/11/2026, decisión 29): en cada fecha las líneas en foco viajan juntas por el
@@ -167,17 +175,24 @@ separadores verticales etéreos + velo del arco activo en la escena, franja de c
 `story.path` (limitado a lo visible) con vuelos que siguen las líneas (cortes con movimiento reducido),
 pop-up con progreso «3 / 22», arco y `bridge`, Anterior/Siguiente y ←/→ por el recorrido, tarjeta de
 capítulo al entrar en un arco nuevo; sale con Esc o botón. Sin `story.path` no hay botón. En modo
-libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. `build:public-data` quita del recorrido
-los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados, las pausas con
+libre, ←/→ saltan a importancia ≥ 2 y Mayús+←/→ nodo a nodo. Desde el 17/11/2026 (revisión UX,
+decisión 33): el botón principal lanza `storyShort` (si no, `story`) y «Historia completa» lanza
+`story`; la corta no lleva tarjetas de capítulo; la tarjeta es un momento propio (la ficha espera);
+tras el último paso, pantalla de cierre (oficio, disponibilidad, contacto, «Ver la historia
+completa / Explorar la línea / Volver al principio»). `build:public-data` quita del recorrido
+(y de `storyShort`, que se elimina si queda vacío) los ids privados y conserva los arcos; también quita de `ledTo` los destinos privados, las pausas con
 un extremo privado, reengancha o quita los ghosts con origen privado y limpia `alsoBranches`.
 
 Comportamiento visual de las líneas: grosor, brillo y motas según la pertenencia a la trenza
 (`LayoutBranch.braid`, 0 en el carril … 1 en el centro); las que comparten `origin` salen del mismo
 punto; `focusIntensityAt` sigue en el dominio (`LayoutBranch.focus`) pero la escena usa `braid`;
 `mergeInto` termina en el nodo destino con una costura de partículas; `until: "present"` llega a hoy atenuada; el resto se
-disuelve como las ramas cerradas. Leyenda DOM accesible encima de los filtros (plegable en móvil) que
-resalta la línea en la escena al pasar el ratón y marca «en foco ahora» las líneas de la trenza en la
-zona que mira la cámara (`LayoutResult.braidSpans` + `ProjectedFrame.lookX`).
+disuelve como las ramas cerradas. Leyenda DOM accesible (filtro de primer nivel: pulsar aísla
+la línea; en móvil, dentro de la hoja «Líneas y filtros») que resalta la línea en la escena al pasar
+el ratón y marca «en foco» las líneas según los **datos** (`LayoutResult.focusSpans`, de
+`braidMembersAt`: periodos `focus`, fusiones, pausas) en la fecha que mira la cámara, con el momento
+(«En foco · hoy» si hoy está en pantalla; si no, el año del momento centrado); solo cambia con la
+cámara quieta. `braidSpans` (geometría) sigue existiendo para la escena, no para la leyenda.
 
 ## Arquitectura hexagonal
 
@@ -208,11 +223,11 @@ src/
 - Línea temporal 3D navegable: arrastrar/scroll para recorrer el tiempo, zoom, y teclas ←/→ para saltar entre eventos
   (de importancia ≥ 2; Mayús+←/→ nodo a nodo). Modo historia guiado por `story.path` (botón y tecla H).
 - Nodo: hover → tooltip (título + fechas); clic/Enter → **pop-up** con todo el detalle del evento; Esc o clic fuera lo cierra; la cámara vuela al nodo.
-- **Filtros por categoría** (chips con el color de cada una, multi-selección, "todas/ninguna"); los nodos filtrados salen del eje y los visibles se deslizan a su nueva posición (transición suave), no saltan en seco. Estado reflejado en la URL.
-- Regla ordinal: una marca donde cambia el año entre nodos consecutivos (en el primer nodo de ese año) y los capítulos como tramos que abarcan sus nodos. HUD con nombre, tagline y contador de eventos visibles.
+- **Filtros**: primer nivel = líneas vitales (pulsar aísla una línea); segundo nivel plegado («Más filtros») = categorías (chips de texto neutros, multi-selección, «Mostrar todas / Ocultar todas»); los nodos filtrados salen del eje y los visibles se deslizan a su nueva posición (transición suave), no saltan en seco. Categorías en la URL (la línea aislada no). Con filtro activo, resultado en lenguaje natural junto a los filtros.
+- Regla ordinal: una marca donde cambia el año entre nodos consecutivos (en el primer nodo de ese año) y los capítulos como tramos que abarcan sus nodos. Cabecera con nombre, oficio (`headline`), ubicación y disponibilidad, frase secundaria, acciones de contacto (reel, CV, correo, enlaces) y botón principal de la historia; sin contador.
 - VFX: fondo de acuarela en movimiento con parallax leve (estático con movimiento reducido), bloom contenido, motas de pigmento fluyendo por las ramas, aura de pigmento en los nodos mayores, niebla del color del papel, pulso al seleccionar.
 - Accesibilidad: lista de eventos navegable por teclado/lector de pantalla (fallback DOM), `prefers-reduced-motion` reduce partículas y animación, foco gestionado en el pop-up (role="dialog" no modal: es un panel lateral y el resto sigue operable, así que no lleva `aria-modal` ni atrapa el foco; ver DOC_DISCREPANCIES A6).
-- Responsive (móvil: pop-up a pantalla completa, gestos táctiles). Fallback legible si no hay WebGL.
+- Responsive (móvil: cabecera ≤ 25 % del alto, botón principal fijo abajo, ficha como hoja inferior que deja ver la escena, líneas y filtros en una hoja; apaisado: cabecera de una línea). Fallback legible si no hay WebGL (misma cabecera, capítulos con su introducción).
 - Rendimiento: partículas con `Points`/instancing, pixelRatio limitado a 2, pausar render con la pestaña oculta.
 
 ## Calidad

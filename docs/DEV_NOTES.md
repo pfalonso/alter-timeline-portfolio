@@ -377,7 +377,8 @@ capturas con el ejemplo (apertura, vista general, hover en la leyenda, móvil y 
 
 ## Pendiente / limitaciones conocidas
 
-- No hay enlace profundo a un evento (`?event=id`); solo el filtro vive en la URL.
+- No hay enlace profundo a un evento (`?event=id`); solo el filtro de categorías vive en la URL
+  (la línea aislada no).
 - Textos de interfaz solo en español (`infrastructure/dom/strings.ts`); `meta.locale` se usa para
   el formato de fechas y el atributo `lang`.
 - El ancho de los rótulos de nodo se estima por número de caracteres (no se mide el DOM). Para
@@ -389,7 +390,8 @@ capturas con el ejemplo (apertura, vista general, hover en la leyenda, móvil y 
   podido medir en GPU real. El coste principal son el bloom y la nebulosa procedural a pantalla
   completa.
 - Probado solo en Chrome headless; sin pruebas en Firefox/Safari ni en dispositivos táctiles reales.
-- La leyenda solo resalta líneas en la escena 3D; sin WebGL no se muestra.
+- La leyenda solo resalta líneas en la escena 3D; sin WebGL no se muestra (tampoco el filtro de
+  líneas).
 - Las aristas de los nodos son `LineSegments` de 1 px (WebGL no admite grosor de línea): el brillo
   lo da el bloom. En pantallas de mucha densidad pueden verse finas.
 - En pantallas táctiles el resaltado de la leyenda depende de `pointerenter` (que en táctil llega con
@@ -499,3 +501,47 @@ Sustituye a la decisión 28 (la central ya no es una columna fija: el centro es 
 - Si dos nodos consecutivos de una línea están en la banda (y = 0), a ≤ `bandBridge` pasos (6) y el foco no cambia entre ellos, la línea los une por la banda (por detrás de los nodos ajenos) en lugar de salir a su carril y volver sin pasar por ningún nodo.
 - Un cambio de trenza que cae exactamente en la siguiente estación (p. ej. el inicio de una pausa en ese mismo nodo) ya no genera rampa: provocaba un rizo justo antes del nodo.
 - Arcos causales: una línea que nace en un nodo también lo une con su primer nodo propio, así que ese enlace no lleva arco.
+
+### 33. Revisión UX externa (17/11/2026, `hr/REVIEW_UX.md`; respuesta en `hr/REVIEW_UX_RESPUESTA.md`)
+
+- **«En foco» según los datos (U-04).** La leyenda usaba `braidSpans` (geometría: una línea cuenta si
+  `braid ≥ 0,5`), y las líneas que solo cruzan la banda para tocar una encrucijada o unir dos nodos de
+  la banda (decisión 32) salían «en foco ahora» en HOY (cocina y gestión). Nuevo
+  `TimelineLayout.focusSpans`: tramos entre los bordes de `braidBoundaries` con `braidMembersAt` en
+  su punto medio. La leyenda rotula el momento: «En foco · hoy» si `ProjectedFrame.nowX` está en
+  pantalla (y entonces usa el último tramo), si no el año del momento más cercano a `lookX`; el
+  cambio espera 350 ms de cámara quieta (`settleMs`, reloj inyectable).
+- **Líneas = filtro de primer nivel.** `TimelineViewHandlers.onLineIsolated(id | null)` y
+  `onFiltersReset()`; `EventFilter.visibleEventIds(timeline, selection, lineId)` (un evento cuenta si
+  la línea está en `lineIds`, así entran las encrucijadas). `FilterViewState.isolatedLine`. No se
+  guarda en la URL. Las categorías pasan a un panel plegado (`FilterBar` con `toggle` y `panel`).
+- **Historia corta y cierre.** `StoryMode = 'short' | 'full'`; `onStoryStart(fromEventId?, mode?)`:
+  sin modo, la corta si existe salvo que se entre desde un evento. `StoryViewState` lleva `mode`,
+  `ended` y `path`. Tras el último paso el controlador pasa a `ended` (ficha cerrada, foco en el
+  último); `previous` vuelve al último paso. En la historia, `hasNext` es `!ended` (el último paso
+  dice «Terminar»). La corta no abre tarjetas de capítulo (`newChapter` siempre falso).
+- **Interfaz.** `Hud` (oficio, ubicación, disponibilidad, acciones con `contactActions`: reel →
+  CV → correo → resto), `StoryControls` (botón principal con duración = pasos × 10 s, «Historia
+  completa», tarjeta de capítulo como momento propio con la clase `app--chapter`, pantalla de cierre
+  `#story-end`), `EventPopup` (orden sin repeticiones, barra de progreso por capítulos, asa de hoja
+  inferior en móvil, `popup--more`), `EventList` (saltos por capítulo, solo hitos y medios por
+  defecto, cierre propio; sin 3D, todos), `FilterSummary`, `AppModes` (`app--detail`) e
+  `InteractionHint`, iconos SVG propios (`icons.ts`, sin emojis). `ViewControls` con rótulos
+  (`data-tip`) y panel de atajos tras «?».
+- **Encuadre (U-08, U-59).** `measureSafeInsets` recibe bloques y cada uno reserva arriba o abajo
+  según su mitad: la cabecera reserva siempre su franja (antes solo en móvil), así que la trenza no
+  pasa por debajo de los enlaces y un clic en un nodo nunca cae en un enlace. `detailInsets` mide la
+  hoja de la ficha en pantallas sin panel lateral y el nodo se centra encima (`aboveSheet`).
+- **Escena.** Aro de selección único (`NodeMesh.selectionRing`, ≤ 1,6 veces el nodo), `setMuted`
+  (en la historia todos menos el activo al 45 %), onda de selección de 2 a 3,4 radios, latido más
+  suave. Fuera los meridianos (`YearMarkers` no se registra) y los separadores de capítulo (opacidad 0).
+- **Rótulos.** Apertura sin rótulos durante 2,2 s (0 con movimiento reducido); zonas reservadas
+  medidas en cada fotograma durante los 40 primeros (y tras abrir o cambiar la ficha); el rótulo que
+  se oculta se va al instante (CSS); el paso activo de la historia se fuerza
+  (`LabelCandidate.force`); `GhostLabels` se oculta si pisa algo (`NodeLabels.occupied()`). La ficha
+  muestra el rótulo corto como antetítulo si no es un recorte del título (U-28).
+- **Formato.** Un solo formato de rango con raya «–» y «hoy» como presente (`formatDateRange`,
+  `arcYears`).
+- **CSS.** Bloque «Revisión UX» al final de `main.css`, que manda sobre lo anterior: escala 12 · 14 ·
+  16 · 21 · 40+, zonas pulsables ≥ 32 px (≥ 44 px con `app--touch`), foco blanco de 2 px, sin marco
+  en la escena enfocada; móvil (≤ 720 px) y apaisado bajo (≤ 520 px de alto) con hoja de filtros.
