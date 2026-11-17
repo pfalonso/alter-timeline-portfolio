@@ -1,6 +1,6 @@
 import type { LifeEvent } from '../model/LifeEvent';
 import type { Timeline } from '../model/Timeline';
-import { braidChangesOf, isInBraidAt } from './Braid';
+import { braidBoundaries, braidChangesOf, braidMembersAt, isInBraidAt } from './Braid';
 import { focusIntensityAt } from './LineFocus';
 
 export interface Vec3 {
@@ -142,6 +142,12 @@ export interface TimelineLayoutResult {
   readonly junctions: readonly LayoutJunction[];
   /** Composición de la trenza a lo largo del eje X (tramos contiguos, de `bounds.minX` a `bounds.maxX`). */
   readonly braidSpans: readonly BraidSpan[];
+  /**
+   * Líneas en foco a lo largo del eje X según los datos (periodos `focus`, fusiones y pausas; ver
+   * `braidMembersAt`), no según la geometría: una línea que solo cruza la banda para tocar un nodo no
+   * está en foco. Es lo que dice la leyenda («en foco · 2018»).
+   */
+  readonly focusSpans: readonly BraidSpan[];
   /** «Caminos que no fueron» con origen visible. */
   readonly ghosts: readonly LayoutGhost[];
   /** Proyectos en activo visibles y su prolongación hasta hoy. */
@@ -451,9 +457,32 @@ export class TimelineLayout {
       band: { minY: Math.min(0, ...nodeYs), maxY: Math.max(0, ...nodeYs) },
       junctions: this.junctions(plans),
       braidSpans: this.braidSpans(plans, firstX, endX),
+      focusSpans: this.focusSpans(timeline, firstX, endX, xAtYear, yearAtX),
       ghosts: this.ghosts(timeline, byId),
       actives: this.actives(ordered, nodeX, planById),
     };
+  }
+
+  /** Tramos del eje X con la misma composición de foco (datos, no geometría); contiguos y fusionados. */
+  private focusSpans(
+    timeline: Timeline,
+    fromX: number,
+    toX: number,
+    xAtYear: (year: number) => number,
+    yearAtX: (x: number) => number,
+  ): BraidSpan[] {
+    const cuts = [...new Set(braidBoundaries(timeline).map((year) => round(xAtYear(year))))].filter((x) => x > fromX && x < toX);
+    const edges = [fromX, ...cuts.sort((a, b) => a - b), toX];
+    const spans: BraidSpan[] = [];
+    for (let i = 0; i < edges.length - 1; i += 1) {
+      const [a, b] = [edges[i], edges[i + 1]];
+      if (b - a < EPS) continue;
+      const members = braidMembersAt(timeline, yearAtX((a + b) / 2));
+      const last = spans[spans.length - 1];
+      if (last && last.members.join('|') === members.join('|')) spans[spans.length - 1] = { ...last, endX: round(b) };
+      else spans.push({ startX: round(a), endX: round(b), members });
+    }
+    return spans;
   }
 
   /** Caminos que no fueron: salen del nodo de origen, se alejan de la banda y se acaban enseguida. */

@@ -63,8 +63,10 @@ describe('EventPopup: líneas de un nodo de unión y «En activo»', () => {
     const popup = new EventPopup(mount('div'));
     popup.render(model);
     popup.applySelection(selection('e-accident', true));
-    expect(texts(document.body, '.popup__lines-label')).toEqual(['Líneas:']);
-    expect(texts(document.body, '.popup__lines .badge--line')).toEqual(['Vida', 'Tecnología', 'Arte', 'Cocina']);
+    // Una fila de puntos (las de este cruce encendidas) y «4 de N líneas: …» (U-41).
+    const dots = [...document.querySelectorAll('.popup__dots .dot')];
+    expect(dots.filter((dot) => dot.classList.contains('dot--on'))).toHaveLength(4);
+    expect(document.querySelector('.popup__lines')?.textContent).toMatch(/^4 de \d+ líneas: Vida, Tecnología, Arte, Cocina$/);
     popup.applySelection(selection('e-tech2', true));
     expect(texts(document.body, '.badge--active')).toEqual(['En activo']);
     expect(texts(document.body, '.badge--line')).toEqual(['Línea: Tecnología']);
@@ -75,12 +77,12 @@ describe('LineLegend: claves', () => {
   it('encrucijada, en activo y camino que no fue solo si aparecen en los datos; los ghosts no son líneas', () => {
     const root = mount('div');
     new LineLegend(root, null, { fallbackColor: '#fff' }).render(model);
-    expect(texts(root, '.key__label')).toEqual(['Encrucijada', 'En activo', 'Camino que no fue']);
+    expect(texts(root, '.key__label')).toEqual(['En foco', 'Encrucijada', 'En activo', 'Camino que no fue']);
     expect(root.querySelector('[data-branch="derecho"]')).toBeNull();
     const plain = mount('div');
     const data = makeData();
     data.branches = [{ id: 'main', label: 'Principal' }, { id: 'side', label: 'Lado' }];
     new LineLegend(plain, null, { fallbackColor: '#fff' }).render(buildModel(data));
-    expect(plain.querySelector('.lines__keys')).toBeNull();
+    expect(texts(plain, '.key__label')).toEqual(['En foco']);
   });
 });
