@@ -43,7 +43,11 @@ export interface NodeSpec {
 /** Anillo de la encrucijada: radios interior/exterior (en radios del nodo) y hueco entre segmentos. */
 export const UNION_RING = { inner: 1.38, outer: 1.5, gap: 0.14, opacity: 0.62 } as const;
 /** Latido de un nodo activo: periodo (s) y cuánto sube el aura en cada golpe. */
-export const HEARTBEAT = { period: 2.4, aura: 0.2, ring: 0.35 } as const;
+export const HEARTBEAT = { period: 2.4, aura: 0.15, ring: 0.18 } as const;
+/** Aro de selección: uno solo, fino, a ≤ 1,6 veces el diámetro del nodo (radio en unidades del radio). */
+export const SELECTION_RING = { inner: 1.5, outer: 1.6, opacity: 0.9 } as const;
+/** Brillo de los momentos atenuados (en la historia, todos menos el activo). */
+export const MUTED_GLOW = 0.45;
 
 /** Latido «lub-dub» suave (0..1) en el instante `time`. */
 export function heartbeat(time: number, phase = 0): number {
@@ -152,6 +156,8 @@ export class NodeMesh {
   /** Anillo multicolor (encrucijada o activo), siempre de cara a la cámara; `null` si no lo hay. */
   readonly ring: Group | null = null;
   readonly active: boolean;
+  /** Aro de selección (blanco teñido, de cara a la cámara): solo se ve con el nodo enfocado. */
+  readonly selectionRing: Mesh<RingGeometry, MeshBasicMaterial>;
   /** Nº de líneas que pasan por el nodo (1 si no es de unión). */
   readonly lineCount: number;
 
@@ -161,6 +167,8 @@ export class NodeMesh {
   private hoverTarget = 0;
   private focus = 0;
   private focusTarget = 0;
+  private mute = 1;
+  private muteTarget = 1;
   private readonly tier: NodeTier;
   private readonly phase: number;
   /** Deslizamiento tras un re-layout: de `slide.from` a la posición final, en `SLIDE_SECONDS`. */
@@ -220,6 +228,20 @@ export class NodeMesh {
     // Inclinación inicial distinta por nodo: no se ven todos de la misma cara.
     this.spinner.rotation.set(0.45 + (spec.phase % 0.6), spec.phase % (Math.PI * 2), 0.2);
     this.group.add(this.aura, this.spinner);
+    this.selectionRing = new Mesh(
+      new RingGeometry(SELECTION_RING.inner, SELECTION_RING.outer, 48),
+      new MeshBasicMaterial({
+        color: new Color(spec.color).lerp(new Color('#ffffff'), 0.55),
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: AdditiveBlending,
+      }),
+    );
+    this.selectionRing.name = `selection:${spec.eventId}`;
+    this.selectionRing.renderOrder = 7;
+    this.selectionRing.visible = false;
+    this.group.add(this.selectionRing);
     if (spec.ringColors && spec.ringColors.length > 0) {
       this.ring = createRing(spec.ringColors, this.radius);
       this.ring.name = `ring:${spec.eventId}`;
@@ -277,12 +299,23 @@ export class NodeMesh {
     this.focusTarget = focused ? 1 : 0;
   }
 
+  /** Atenúa el brillo (sin ocultarlo ni quitarle el rótulo): en la historia, todos menos el activo. */
+  setMuted(muted: boolean): void {
+    this.muteTarget = muted ? MUTED_GLOW : 1;
+  }
+
+  get muted(): boolean {
+    return this.muteTarget < 1;
+  }
+
   update(frame: FrameContext): void {
     if (frame.reducedMotion) {
       this.presenceValue = this.presenceTarget;
       this.hover = this.hoverTarget;
       this.focus = this.focusTarget;
+      this.mute = this.muteTarget;
     } else {
+      this.mute = damp(this.mute, this.muteTarget, 5, frame.delta);
       this.presenceValue = damp(this.presenceValue, this.presenceTarget, 4.5, frame.delta);
       this.hover = damp(this.hover, this.hoverTarget, 10, frame.delta);
       this.focus = damp(this.focus, this.focusTarget, 6, frame.delta);
@@ -301,6 +334,7 @@ export class NodeMesh {
     // El aura y el anillo siempre miran a la cámara.
     this.aura.quaternion.copy(frame.camera.quaternion);
     this.ring?.quaternion.copy(frame.camera.quaternion);
+    this.selectionRing.quaternion.copy(frame.camera.quaternion);
     this.beat = this.active && !frame.reducedMotion ? heartbeat(frame.time, this.phase) : 0;
     this.apply(frame.reducedMotion ? 0 : frame.delta, frame.reducedMotion ? 0 : frame.time);
   }
@@ -311,6 +345,8 @@ export class NodeMesh {
     this.inner?.material.dispose();
     this.fill.material.dispose();
     this.aura.material.dispose();
+    this.selectionRing.geometry.dispose();
+    this.selectionRing.material.dispose();
     this.ring?.traverse((child) => {
       if (child instanceof Mesh) {
         child.geometry.dispose();
@@ -332,16 +368,21 @@ export class NodeMesh {
     const breath = 1 + 0.02 * Math.sin(time * 0.9 + this.phase);
     const grow = (0.6 + 0.4 * p) * (1 + this.tier.lift * this.hover + this.tier.lift * 0.8 * this.focus) * breath;
     this.spinner.scale.setScalar(this.radius * grow);
-    const glow = Math.min(1, (this.tier.glow + 0.35 * a) * (0.12 + 0.88 * p));
+    const glow = Math.min(1, (this.tier.glow + 0.35 * a) * (0.12 + 0.88 * p)) * this.mute;
     this.wire.material.opacity = glow;
     if (this.inner) this.inner.material.opacity = glow * 0.7;
     this.fill.material.opacity = (0.7 + 0.15 * a) * (0.15 + 0.85 * p);
     this.aura.scale.setScalar(this.radius * (2.4 + 0.8 * a));
     const base = this.tier.aura || this.active ? 0.22 : 0;
-    this.aura.material.uniforms.uStrength.value = (base + 0.3 * a + HEARTBEAT.aura * this.beat) * p;
+    this.aura.material.uniforms.uStrength.value = (base + 0.3 * a + HEARTBEAT.aura * this.beat) * p * this.mute;
+    // Aro de selección: fijo en tamaño (no crece con el latido) y solo con el nodo enfocado.
+    const selected = this.focus * p;
+    this.selectionRing.visible = selected > 0.01;
+    this.selectionRing.material.opacity = SELECTION_RING.opacity * selected;
+    this.selectionRing.scale.setScalar(this.radius * (1 + this.tier.lift * 0.8));
     if (this.ring) {
       this.ring.scale.setScalar(grow / (0.6 + 0.4 * p) * (1 + 0.04 * this.beat));
-      const opacity = Math.min(1, (UNION_RING.opacity + 0.25 * a + HEARTBEAT.ring * this.beat) * (0.1 + 0.9 * p));
+      const opacity = Math.min(1, (UNION_RING.opacity + 0.25 * a + HEARTBEAT.ring * this.beat) * (0.1 + 0.9 * p)) * this.mute;
       for (const child of this.ring.children) ((child as Mesh).material as MeshBasicMaterial).opacity = opacity;
     }
   }

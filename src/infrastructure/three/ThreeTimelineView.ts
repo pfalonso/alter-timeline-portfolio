@@ -39,6 +39,11 @@ export interface ThreeTimelineViewDeps {
   readonly devicePixelRatio?: () => number;
   /** Franjas (px) tapadas por la cabecera/controles y por filtros/regla; por defecto, ninguna. */
   readonly safeInsets?: () => SafeInsets;
+  /**
+   * Franjas tapadas por la ficha cuando no es un panel lateral (móvil: hoja inferior). El nodo
+   * enfocado se centra en el hueco libre que queda por encima.
+   */
+  readonly detailInsets?: () => SafeInsets;
 }
 
 const DEFAULT_DISTANCE = 44;
@@ -157,7 +162,8 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
       ),
     );
     // El encuadre desplaza la cámara para centrar en la franja libre: los límites admiten ese margen.
-    const shift = Math.abs(bandOffset(this.viewport.height, insets)) * 2 * this.rig.halfHeightAt(this.overviewDistance);
+    // También admite el desplazamiento de la hoja inferior de la ficha en móvil (hasta 0,3 del alto).
+    const shift = Math.max(Math.abs(bandOffset(this.viewport.height, insets)), 0.3) * 2 * this.rig.halfHeightAt(this.overviewDistance);
     this.rig.setBounds({ minX: bounds.minX, maxX: bounds.maxX, minY: bounds.minY - 2 - shift, maxY: bounds.maxY + 2 + shift });
     this.refreshLinks();
   }
@@ -242,6 +248,9 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.focusedId = state.focusedEventId;
     const node = this.nodesById.get(state.focusedEventId ?? '');
     node?.setFocused(true);
+    // En la historia, un único foco: el momento activo brilla y los demás bajan (U-50).
+    const storyStep = state.story && !state.story.ended ? state.story.eventId : null;
+    for (const item of this.nodesById.values()) item.setMuted(storyStep !== null && item.eventId !== storyStep);
     this.refreshLinks();
 
     const sidePanel = state.detailOpen && this.viewport.width >= SIDE_PANEL_MIN_WIDTH;
@@ -251,8 +260,10 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     // Vuelo de cámara + pulso: el momento de la selección. En la historia, el vuelo sigue las líneas.
     const distance = state.detailOpen ? DETAIL_DISTANCE : Math.min(this.rig.target.distance, this.defaultDistance());
     const from = state.story?.fromEventId ? this.nodesById.get(state.story.fromEventId) : undefined;
-    if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance);
-    else this.rig.flyTo(node.group.position, distance);
+    // Ficha como hoja inferior (móvil): el nodo se centra en el hueco que queda por encima.
+    const target = state.detailOpen && !sidePanel ? this.aboveSheet(node.group.position, distance) : node.group.position;
+    if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance, target.y - node.group.position.y);
+    else this.rig.flyTo(target, distance);
     this.built?.pulse.trigger(node.group.position, node.color, node.radius);
     if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.45 : 0.25);
   }
@@ -261,11 +272,12 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
    * Vuelo del modo historia. Los nodos viven en la banda, así que el vuelo la recorre en línea recta;
    * si el paso siguiente es consecuencia del actual (`ledTo`), la cámara sigue la hebra causal.
    */
-  private flyAlongLines(from: NodeMesh, to: NodeMesh, distance: number): void {
+  private flyAlongLines(from: NodeMesh, to: NodeMesh, distance: number, offsetY = 0): void {
     const a = from.group.position;
     const b = to.group.position;
     const link = this.layout?.links?.find((item) => item.from === from.eventId && item.to === to.eventId);
-    const route = link ? routeAlong(link.points) : storyRoute(a, b);
+    const base = link ? routeAlong(link.points) : storyRoute(a, b);
+    const route = offsetY === 0 ? base : base.map((point) => ({ x: point.x, y: point.y + offsetY }));
     const span = Math.abs(b.x - a.x);
     this.rig.flyAlong(route, distance, clamp(1.3 + span / 30, 1.5, 3.4), Math.min(26, 4 + span * 0.35));
   }
@@ -294,6 +306,13 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
         node.x <= this.viewport.width &&
         node.y <= this.viewport.height,
     }));
+  }
+
+  /** Punto al que mirar para que `point` quede centrado en el hueco libre sobre la hoja de la ficha. */
+  private aboveSheet(point: { x: number; y: number }, distance: number): { x: number; y: number } {
+    const insets = this.deps.detailInsets?.() ?? { top: 0, bottom: 0 };
+    const offset = bandOffset(this.viewport.height, insets);
+    return { x: point.x, y: point.y - offset * 2 * this.rig.halfHeightAt(distance) };
   }
 
   private insets(): SafeInsets {

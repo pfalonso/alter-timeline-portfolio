@@ -8,6 +8,11 @@ export interface LabelCandidate {
   readonly height: number;
   /** Mayor = se coloca antes (gana en caso de solape). */
   readonly priority: number;
+  /**
+   * Rótulo que no puede faltar (el momento activo de la historia): si ningún hueco está libre, se
+   * coloca igualmente en el primero que quepa en pantalla, aunque roce un nodo o la interfaz.
+   */
+  readonly force?: boolean;
 }
 
 /** Algo que las etiquetas ajenas no deben tapar (el disco de un nodo). */
@@ -75,8 +80,26 @@ export function layoutLabels(
       result.set(candidate.id, top);
       break;
     }
+    if (candidate.force && !result.has(candidate.id)) {
+      // Sin hueco libre: el primero que quepa en pantalla y no pise otro rótulo ya colocado.
+      const labelBoxes = placed.slice(reserved.length);
+      const top =
+        candidate.ys.find((y) => {
+          const box: Box = { left, right, top: y, bottom: y + candidate.height };
+          return y >= 0 && box.bottom <= viewport.height && !labelBoxes.some((other) => intersects(box, other, padding));
+        }) ?? candidate.ys.find((y) => y >= 0 && y + candidate.height <= viewport.height);
+      if (top !== undefined) {
+        placed.push({ left, right, top, bottom: top + candidate.height });
+        result.set(candidate.id, top);
+      }
+    }
   }
   return result;
+}
+
+/** `true` si dos cajas se tocan (con un margen). */
+export function boxesTouch(a: Box, b: Box, padding = 0): boolean {
+  return intersects(a, b, padding);
 }
 
 /**

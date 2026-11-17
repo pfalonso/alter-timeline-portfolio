@@ -17,7 +17,8 @@ import type { FrameContext } from './types';
 export const ARC_OPACITY = {
   // En el rango oscuro, una suma lineal mínima ya se ve tras el sRGB: el velo solo existe en el arco activo.
   veil: { idle: 0, active: 0.014 },
-  edge: { idle: 0.05, active: 0.1 },
+  // Sin separadores verticales (revisión UX, U-14/U-15): sin rótulo se leían como un defecto de imagen.
+  edge: { idle: 0, active: 0 },
 } as const;
 
 /** Arco (id) que contiene la X del mundo, o `null`. */
@@ -123,6 +124,7 @@ export class ArcBands implements SceneEffect {
       band.veil.material.opacity = veil.idle + (veil.active - veil.idle) * band.level;
       band.veil.visible = band.veil.material.opacity > 0.0005;
       band.edge.material.opacity = edge.idle + (edge.active - edge.idle) * band.level;
+      band.edge.visible = band.edge.material.opacity > 0.0005;
     });
   }
 

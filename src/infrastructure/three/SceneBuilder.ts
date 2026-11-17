@@ -11,7 +11,6 @@ import type { SceneEffect } from './SceneEffect';
 import { SelectionPulse } from './SelectionPulse';
 import { createRingTexture } from './textures';
 import { DEFAULT_WATERCOLOR, WatercolorWash } from './Watercolor';
-import { YearMarkers } from './YearMarkers';
 
 export interface ScenePalette {
   /** Papel: índigo/ciruela muy oscuro (no negro), también color de la niebla. */
@@ -325,11 +324,8 @@ export class SceneBuilder {
     for (const strand of strands) strand.setEmphasisValue(STRAND_EMPHASIS.rest);
     const effects: SceneEffect[] = [
       backdrop,
-      // Meridianos entre años: medio paso antes del primer nodo de cada año (no cruzan los símbolos).
-      new YearMarkers(
-        layout.years.map((mark) => ({ ...mark, x: mark.x - layout.nodeStep / 2 })),
-        layout.bounds,
-      ),
+      // Sin meridianos de año en la escena (revisión UX, U-14): una línea vertical sin rótulo no
+      // significa nada y cruzaba la interfaz. Los años viven en la regla.
       arcs,
       ...branches.flatMap(({ curve, fibers }) => [curve, ...fibers]),
       ...spans,

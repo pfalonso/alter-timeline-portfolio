@@ -49,8 +49,10 @@ describe('SelectionPulse', () => {
     expect(third.sprite.visible).toBe(false);
     const scale1 = first.sprite.scale.x;
     const opacity1 = first.sprite.material.opacity;
-    expect(scale1).toBeGreaterThan(2 * 3);
-    expect(opacity1).toBeCloseTo(0.81 * 0.9, 5);
+    // Onda contenida: empieza en 2 radios y nunca pasa de 3,4 (U-39).
+    expect(scale1).toBeGreaterThan(2 * 2);
+    expect(scale1).toBeLessThan(2 * 3.4);
+    expect(opacity1).toBeCloseTo(0.81 * 0.6, 5);
 
     pulse.update(frameContext({ delta: 0.25 }));
     expect(first.sprite.scale.x).toBeGreaterThan(scale1);
@@ -80,7 +82,7 @@ describe('SelectionPulse', () => {
     pulse.trigger({ x: 9, y: 0, z: 0 }, '#ffffff', 1);
     pulse.update(frameContext({ delta: 0.1 }));
     expect(pulse.rings[0].sprite.position.x).toBe(9);
-    expect(pulse.rings[0].sprite.material.opacity).toBeCloseTo(0.81 * 0.9, 5);
+    expect(pulse.rings[0].sprite.material.opacity).toBeCloseTo(0.81 * 0.6, 5);
   });
 
   it('con movimiento reducido no hay onda', () => {

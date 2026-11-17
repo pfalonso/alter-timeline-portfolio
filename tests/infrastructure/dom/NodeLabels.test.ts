@@ -176,7 +176,7 @@ describe('NodeLabels', () => {
     expect(shown(label('Primer trabajo'))).toBe(true);
   });
 
-  it('las zonas reservadas se vuelven a medir solo cada 20 fotogramas', () => {
+  it('las zonas reservadas se miden en cada fotograma de la apertura (40) y después solo cada 20', () => {
     const hud = mount('div');
     let measured = 0;
     hud.getBoundingClientRect = (): DOMRect => {
@@ -184,8 +184,9 @@ describe('NodeLabels', () => {
       return new DOMRect(0, 0, 10, 10);
     };
     const { labels } = setup([hud]);
-    for (let i = 0; i < 41; i += 1) labels.onProjected(frame([]));
-    expect(measured).toBe(3);
+    for (let i = 0; i < 81; i += 1) labels.onProjected(frame([]));
+    // 40 de la apertura + los fotogramas 40, 60 y 80.
+    expect(measured).toBe(43);
   });
 
   it('el ancho estimado crece con el título y tiene un máximo (se nota al apartarlo del borde)', () => {
@@ -270,14 +271,14 @@ describe('NodeLabels', () => {
     const root = mount('div');
     const labels = new NodeLabels(root, [blocker]);
     labels.render(buildModel());
-    labels.onProjected(frame([]));
-    labels.onProjected(frame([]));
-    expect(calls).toBe(1);
+    for (let i = 0; i < 42; i += 1) labels.onProjected(frame([]));
+    expect(calls).toBe(41);
     labels.applySelection(selection('a-school', true));
     labels.onProjected(frame([]));
-    expect(calls).toBe(2);
+    expect(calls).toBe(42);
+    // Tras el cambio se vuelve a la medición intensiva de los primeros fotogramas (la ficha entra animada).
     labels.applySelection(selection('a-school', true));
     labels.onProjected(frame([]));
-    expect(calls).toBe(2);
+    expect(calls).toBe(43);
   });
 });

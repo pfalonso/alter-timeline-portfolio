@@ -70,10 +70,11 @@ export class SelectionPulse implements SceneEffect {
       }
       if (progress < 0) continue;
       const eased = 1 - Math.pow(1 - progress, 3);
-      const scale = this.baseRadius * (3 + eased * 22);
+      // Onda contenida (revisión UX, U-39): de 2 a 3,4 radios, nunca cruza la interfaz.
+      const scale = this.baseRadius * (2 + eased * 1.4);
       ring.sprite.visible = true;
       ring.sprite.scale.set(scale, scale, 1);
-      ring.sprite.material.opacity = Math.pow(1 - progress, 2) * 0.9;
+      ring.sprite.material.opacity = Math.pow(1 - progress, 2) * 0.6;
     }
   }
 

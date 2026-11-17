@@ -10,16 +10,16 @@ interface Segment {
   readonly caption: HTMLElement;
 }
 
-/** Ancho mínimo (px) del tramo visible de un capítulo para rotular su título. */
-export const ARC_CAPTION_MIN_WIDTH = 96;
+/** Ancho mínimo (px) del tramo visible de un capítulo para rotular su número. */
+export const ARC_CAPTION_MIN_WIDTH = 24;
 /** Por debajo de este ancho se omiten los años y queda solo el título. */
 export const ARC_YEARS_MIN_WIDTH = 200;
 const EDGE = 8;
 
 /**
- * Franja de capítulos encima de la regla de años: un corchete fino por arco con su título y sus
- * años, alineados con la escena. El capítulo en el que está la cámara se ilumina. Decorativa
- * (aria-hidden): los capítulos accesibles están en el índice.
+ * Franja de capítulos encima de la regla de años: un segmento por arco alineado con la escena. El
+ * capítulo en el que está la cámara se ilumina y lleva su nombre completo (nunca recortado); los
+ * demás, solo su número. Decorativa (aria-hidden): los capítulos accesibles están en el índice.
  */
 export class ArcStrip implements TimelineViewPart, ProjectionListener {
   private readonly segments = new Map<string, Segment>();
@@ -34,8 +34,9 @@ export class ArcStrip implements TimelineViewPart, ProjectionListener {
     this.segments.clear();
     const { arcs } = model.timeline;
     this.root.hidden = arcs.length === 0;
-    for (const arc of arcs) {
+    arcs.forEach((arc, index) => {
       const caption = el('span', { class: 'arc-strip__caption' }, [
+        el('span', { class: 'arc-strip__number', text: String(index + 1) }),
         el('span', { class: 'arc-strip__title', text: arc.title }),
         el('span', { class: 'arc-strip__years', text: arcYears(arc, STRINGS.today) }),
       ]);
@@ -43,7 +44,7 @@ export class ArcStrip implements TimelineViewPart, ProjectionListener {
       element.dataset.arc = arc.id;
       this.segments.set(arc.id, { element, caption });
       this.root.append(element);
-    }
+    });
   }
 
   onProjected(frame: ProjectedFrame): void {
