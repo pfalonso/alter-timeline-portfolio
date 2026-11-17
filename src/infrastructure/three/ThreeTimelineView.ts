@@ -92,6 +92,7 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   private overviewDistance = 80;
   private distanceBeforeDetail: number | null = null;
   private highlightedBranch: string | null = null;
+  private isolatedLine: string | null = null;
 
   constructor(private readonly deps: ThreeTimelineViewDeps) {
     const canvas = deps.backend.renderer.domElement;
@@ -219,8 +220,11 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
   applyFilter(state: FilterViewState): void {
     const fresh = this.fresh;
     this.fresh = false;
+    // Aislar una línea (o soltarla) es otra vista: se encuadra de nuevo en vez de deslizar.
+    const isolation = (state.isolatedLine ?? null) !== this.isolatedLine;
+    this.isolatedLine = state.isolatedLine ?? null;
     if (state.layout && this.model && !sameNodes(state.layout, this.layout)) {
-      if (fresh) {
+      if (fresh || isolation) {
         this.mount(state.layout);
         this.frameOpening();
       } else {
@@ -240,8 +244,10 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     this.detailOpen = state.detailOpen;
     if (opened) this.distanceBeforeDetail = this.rig.target.distance;
     if (closed && this.distanceBeforeDetail !== null) {
-      // Al cerrar el detalle la cámara recupera la distancia que tenía.
-      this.rig.setDistance(Math.max(this.distanceBeforeDetail, DETAIL_DISTANCE * 1.5));
+      // Al cerrar el detalle la cámara recupera la distancia que tenía y vuelve a centrar la banda
+      // en el hueco libre (la cabecera reaparece: la trenza no puede quedar bajo sus enlaces).
+      const distance = Math.max(this.distanceBeforeDetail, DETAIL_DISTANCE * 1.5);
+      this.rig.flyTo({ x: this.rig.target.x, y: this.bandCenterY(0, distance) }, distance);
       this.distanceBeforeDetail = null;
     }
     this.nodesById.get(this.focusedId ?? '')?.setFocused(false);
@@ -261,8 +267,15 @@ export class ThreeTimelineView implements TimelineViewPart, CameraControls {
     const distance = state.detailOpen ? DETAIL_DISTANCE : Math.min(this.rig.target.distance, this.defaultDistance());
     const from = state.story?.fromEventId ? this.nodesById.get(state.story.fromEventId) : undefined;
     // Ficha como hoja inferior (móvil): el nodo se centra en el hueco que queda por encima.
-    const target = state.detailOpen && !sidePanel ? this.aboveSheet(node.group.position, distance) : node.group.position;
-    if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance, target.y - node.group.position.y);
+    // Sin ficha, el nodo se centra en la franja libre entre cabecera y filtros; con la ficha como
+    // hoja inferior (móvil), en el hueco que queda por encima; con panel lateral, en el centro.
+    const position = node.group.position;
+    const target = !state.detailOpen
+      ? { x: position.x, y: this.bandCenterY(position.y, distance) }
+      : sidePanel
+        ? position
+        : this.aboveSheet(position, distance);
+    if (from && from !== node && !this.deps.reducedMotion()) this.flyAlongLines(from, node, distance, target.y - position.y);
     else this.rig.flyTo(target, distance);
     this.built?.pulse.trigger(node.group.position, node.color, node.radius);
     if (!this.deps.reducedMotion()) this.post.kick(state.detailOpen ? 0.45 : 0.25);

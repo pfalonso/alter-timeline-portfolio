@@ -6,7 +6,6 @@ import {
   IcosahedronGeometry,
   OctahedronGeometry,
   SphereGeometry,
-  TetrahedronGeometry,
   TorusGeometry,
   TorusKnotGeometry,
   WireframeGeometry,
@@ -96,12 +95,13 @@ const wireframe = (geometry: BufferGeometry): BufferGeometry => {
 /** Forma de un nodo según el lenguaje de su línea y su peso. Se distinguen por peso de un vistazo. */
 export function createNodeShape(style: LineStyle, importance: 1 | 2 | 3): NodeShape {
   if (style === 'geometric') {
-    // Poliedros rectilíneos: icosaedro con cubo inscrito, octaedro, tetraedro.
+    // Poliedros rectilíneos: icosaedro con cubo inscrito, octaedro y cubo (el tetraedro de antes,
+    // visto de lado, parecía la flecha del ratón: U-56).
     if (importance === 3) {
       return { wire: edges(new IcosahedronGeometry(1, 0)), inner: edges(new BoxGeometry(1.05, 1.05, 1.05)), fill: new IcosahedronGeometry(0.97, 0) };
     }
     if (importance === 2) return { wire: edges(new OctahedronGeometry(1, 0)), inner: null, fill: new OctahedronGeometry(0.96, 0) };
-    return { wire: edges(new TetrahedronGeometry(1, 0)), inner: null, fill: new TetrahedronGeometry(0.95, 0) };
+    return { wire: edges(new BoxGeometry(1.25, 1.25, 1.25)), inner: null, fill: new BoxGeometry(1.2, 1.2, 1.2) };
   }
   if (style === 'organic') {
     // Formas curvas: nudo toroidal, esfera deformada, esfera pequeña de baja resolución.

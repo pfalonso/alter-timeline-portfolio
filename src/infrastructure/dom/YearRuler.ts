@@ -3,6 +3,7 @@ import type { YearMark } from '../../domain/services';
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
+import { PartialDate } from '../../domain/model';
 import { STRINGS } from './strings';
 
 /** Separación mínima (px) entre dos años rotulados. */
@@ -24,6 +25,10 @@ export class YearRuler implements TimelineViewPart, ProjectionListener {
   }
 
   render(model: TimelineViewModel): void {
+    // «Hoy · nov 2026»: el presente lleva su fecha (U-24).
+    const { now, meta } = model.timeline;
+    const month = now.month === null ? null : PartialDate.parse(`${now.year}-${String(now.month).padStart(2, '0')}`);
+    this.now.textContent = `${STRINGS.today} · ${(month ?? now).format(meta.locale)}`;
     this.paint(model.layout.years);
   }
 

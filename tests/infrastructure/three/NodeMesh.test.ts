@@ -66,8 +66,9 @@ describe('NodeMesh: sólido 3D en wireframe', () => {
     for (const style of ['geometric', 'organic', 'neutral'] as const) {
       expect(segments(style, 1)).toBeLessThan(segments(style, 3));
     }
-    // Geométrico: tetraedro (6 aristas), octaedro (12), icosaedro (30) + cubo inscrito (12).
-    expect([segments('geometric', 1), segments('geometric', 2), segments('geometric', 3)]).toEqual([6, 12, 42]);
+    // Geométrico: cubo (12 aristas), octaedro (12), icosaedro (30) + cubo inscrito (12). El menor
+    // ya no es un tetraedro: de lado parecía el puntero del ratón (U-56); el peso lo da el tamaño.
+    expect([segments('geometric', 1), segments('geometric', 2), segments('geometric', 3)]).toEqual([12, 12, 42]);
     expect(createNodeShape('geometric', 3).inner).not.toBeNull();
     expect(createNodeShape('neutral', 3).inner).not.toBeNull();
     expect(createNodeShape('organic', 2).inner).toBeNull();

@@ -244,6 +244,10 @@ describe('EventPopup: hoja inferior (móvil) y «hay más abajo»', () => {
 
   it('el asa amplía y reduce; arrastrar hacia abajo con la hoja reducida la cierra', () => {
     const { root, handlers, handle, drag } = setup();
+    // El clic sintético de un toque que empezó fuera del asa no cuenta.
+    click(handle, { detail: 1 });
+    expect(root.classList.contains('popup--expanded')).toBe(false);
+    // Con teclado (detail 0), sí.
     click(handle);
     expect(root.classList.contains('popup--expanded')).toBe(true);
     expect(handle.getAttribute('aria-expanded')).toBe('true');
@@ -251,6 +255,12 @@ describe('EventPopup: hoja inferior (móvil) y «hay más abajo»', () => {
     expect(root.classList.contains('popup--expanded')).toBe(false);
     drag(-80);
     expect(root.classList.contains('popup--expanded')).toBe(true);
+    // Toque corto sobre el asa (sin arrastre): alterna.
+    handle.dispatchEvent(Object.assign(new Event('pointerdown'), { clientY: 300 }));
+    handle.dispatchEvent(Object.assign(new Event('pointerup'), { clientY: 302 }));
+    click(handle, { detail: 1 });
+    expect(root.classList.contains('popup--expanded')).toBe(false);
+    click(handle);
     drag(120);
     drag(120);
     expect(handlers.onDetailClosed).toHaveBeenCalledTimes(1);

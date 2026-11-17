@@ -78,6 +78,8 @@ export class EventList implements TimelineViewPart {
     this.root.prepend(el('p', { class: 'index__fallback', text: message, attrs: { role: 'status' } }));
     this.closeButton.hidden = true;
     if (this.toggleButton) this.toggleButton.hidden = true;
+    // Sin escena, la lista es el CV narrado: todos los momentos, con su peso tipográfico.
+    this.showAll(true);
   }
 
   setOpen(open: boolean): void {

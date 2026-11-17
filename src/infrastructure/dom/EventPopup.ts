@@ -26,6 +26,7 @@ export class EventPopup implements TimelineViewPart {
   private returnFocus: HTMLElement | null = null;
   private inStory = false;
   private dragged = false;
+  private handlePressed = false;
 
   private readonly body = el('div', { class: 'popup__body' });
   private readonly handle = el('button', {
@@ -79,10 +80,14 @@ export class EventPopup implements TimelineViewPart {
     this.prevButton.addEventListener('click', () => this.handlers?.onNavigate('previous'));
     this.nextButton.addEventListener('click', () => this.handlers?.onNavigate('next'));
     this.body.addEventListener('scroll', () => this.updateMore(), { passive: true });
-    this.handle.addEventListener('click', () => {
-      // Un arrastre ya ha decidido; el clic que lo sigue no vuelve a cambiar el tamaño.
+    this.handle.addEventListener('click', (event) => {
+      // Un arrastre ya ha decidido; el clic que lo sigue no vuelve a cambiar el tamaño. Tampoco
+      // cuenta el clic sintético de un toque que empezó fuera del asa (p. ej. el que abrió la ficha
+      // y cae sobre el asa mientras la hoja entra); con teclado (detail 0) siempre vale.
+      const pressedHere = this.handlePressed;
+      this.handlePressed = false;
       if (this.dragged) this.dragged = false;
-      else this.setExpanded(!root.classList.contains('popup--expanded'));
+      else if (pressedHere || event.detail === 0) this.setExpanded(!root.classList.contains('popup--expanded'));
     });
     this.bindSwipe();
     document.addEventListener('pointerdown', (event) => this.onOutsidePointer(event));
@@ -383,6 +388,7 @@ export class EventPopup implements TimelineViewPart {
     let startY: number | null = null;
     this.handle.addEventListener('pointerdown', (event) => {
       startY = event.clientY;
+      this.handlePressed = true;
     });
     this.handle.addEventListener('pointerup', (event) => {
       if (startY === null) return;

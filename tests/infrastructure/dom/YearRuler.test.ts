@@ -30,7 +30,7 @@ describe('YearRuler', () => {
     expect(root.getAttribute('aria-hidden')).toBe('true');
     expect(texts(root, '.ruler__tick')).toEqual(['2010', '2015', '2016', '2018']);
     expect(root.lastElementChild?.className).toBe('ruler__now');
-    expect(root.lastElementChild?.textContent).toBe('hoy');
+    expect(root.lastElementChild?.textContent).toMatch(/^hoy · ene\.? 2020$/);
   });
 
   it('volver a pintar (o filtrar) no duplica marcas', () => {

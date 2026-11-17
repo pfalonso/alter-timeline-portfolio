@@ -2103,6 +2103,22 @@ a {
 .hud {
   max-width: min(660px, 54vw);
   pointer-events: none;
+  isolation: isolate;
+}
+
+/* Velo tras la cabecera: si una hebra pasa por detrás, el texto sigue leyéndose (U-08). */
+.hud::before {
+  content: '';
+  position: absolute;
+  inset: -60px -90px -40px -80px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(10, 8, 24, 0.82) 55%, rgba(10, 8, 24, 0));
+  pointer-events: none;
+}
+
+.app--detail .hud::before,
+.app--story .hud::before {
+  opacity: 0;
 }
 
 .hud__main > * {
@@ -2700,11 +2716,23 @@ a {
   border-radius: 2px;
 }
 
+.chip__check {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Marcada: casilla rellena con ✓ (no solo color). */
 .chip[aria-pressed='true'] .chip__check {
   border-color: #fff;
-  background:
-    linear-gradient(135deg, transparent 0 40%, #fff 40% 55%, transparent 55%) 2px 4px / 5px 6px no-repeat,
-    linear-gradient(45deg, transparent 0 45%, #fff 45% 60%, transparent 60%) 5px 1px / 7px 10px no-repeat;
+  background: #fff;
+  color: #0b0f24;
+}
+
+.chip[aria-pressed='true'] .chip__check::after {
+  content: '✓';
+  font-weight: 700;
 }
 
 .chip__count {
@@ -2934,8 +2962,10 @@ a {
 
 .popup__progress {
   flex: 1;
-  flex-wrap: wrap;
-  gap: 4px 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
   font-family: var(--font-body);
   font-size: 14px;
   letter-spacing: 0;
@@ -2949,7 +2979,7 @@ a {
 }
 
 .popup__arc::before {
-  margin-right: 10px;
+  content: none;
 }
 
 .popup__close {
@@ -3087,8 +3117,11 @@ a {
 }
 
 .badge {
+  font-family: var(--font-body);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .popup__links {
@@ -3519,10 +3552,7 @@ a {
 }
 
 .index__jump-title {
-  max-width: 14ch;
-  overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .index__list {
@@ -3661,6 +3691,17 @@ a {
 .app--no-webgl .chapter,
 .app--no-webgl .story-end {
   position: fixed;
+}
+
+/* Tableta y portátil estrecho: la cabecera puede usar casi todo el ancho (los controles van a la derecha). */
+@media (min-width: 721px) and (max-width: 1100px) {
+  .hud {
+    max-width: calc(100vw - 2 * var(--pad) - 200px);
+  }
+}
+
+.app--no-webgl .arc-strip {
+  display: none;
 }
 
 /* ───────── Monitor grande: la letra pequeña sube un escalón (U-60) ───────── */
@@ -3840,6 +3881,20 @@ a {
     min-height: 44px;
   }
 
+  .filters--open .filters__chips {
+    flex-wrap: wrap;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .filters--open .key {
+    grid-template-columns: 20px 1fr;
+  }
+
+  .filters--open .key__hint {
+    grid-column: 2;
+  }
+
   .app--sheet .hud__cta {
     visibility: hidden;
   }
@@ -3873,12 +3928,9 @@ a {
   }
 
   .hud__where {
-    display: -webkit-box;
     margin-top: 4px;
-    overflow: hidden;
     font-size: 13px;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    line-height: 1.4;
   }
 
   .hud__where > span {
@@ -3923,6 +3975,12 @@ a {
 
   .hud__contact .action-group .action {
     border-radius: 3px;
+  }
+
+  /* Un transform en la cabecera convertiría el botón fijo en relativo a ella (aparecía arriba). */
+  .app--loading .hud,
+  .hud {
+    transform: none;
   }
 
   /* Botón principal fijo abajo, a todo el ancho (U-63). */
@@ -4024,6 +4082,16 @@ a {
 
   .popup__story {
     padding: 6px 20px 4px;
+  }
+
+  .popup__progress {
+    flex-direction: column;
+    gap: 0;
+    font-size: 13px;
+  }
+
+  .popup__arc::before {
+    content: none;
   }
 
   .popup__bridge {
