@@ -85,6 +85,7 @@ async function bootstrap(): Promise<void> {
     [
       byId('hud-main'),
       byId('hud-cta'),
+      byId('hud-contact'),
       byId('filters'),
       byId('controls'),
       byId('shortcuts'),
@@ -105,7 +106,7 @@ async function bootstrap(): Promise<void> {
 
   const parts: TimelineViewPart[] = [
     new AppModes(app),
-    new Hud(byId('hud-main')),
+    new Hud(byId('hud-main'), byId('hud-contact')),
     new FilterBar(byId('filter-bar'), { toggle: byId<HTMLButtonElement>('more-toggle'), panel: byId('more-filters') }),
     new FilterSummary(byId('filter-result')),
     new EventPopup(byId('popup')),
@@ -149,7 +150,8 @@ async function bootstrap(): Promise<void> {
       projectionListeners: [labels, ghostLabels, ruler, arcStrip, legend],
       // La cabecera, la fila de controles, la barra de líneas y (en móvil) el botón principal fijo
       // reservan su franja: la trenza nunca pasa por debajo de un enlace (U-08, U-59).
-      safeInsets: () => measureSafeInsets(stage, [byId('hud-main'), byId('hud-cta'), byId('controls'), byId('filters'), byId('ruler')]),
+      safeInsets: () =>
+        measureSafeInsets(stage, [byId('hud-main'), byId('hud-cta'), byId('hud-contact'), byId('controls'), byId('filters'), byId('ruler')]),
       detailInsets: () => measureSafeInsets(stage, [byId('popup')]),
     });
     parts.push(three);

@@ -24,11 +24,19 @@ export function eyebrowOf(owner: string, title: string): string | null {
  * va justo debajo, fuera de este bloque (lo gestiona `StoryControls`).
  */
 export class Hud implements TimelineViewPart {
-  constructor(private readonly root: HTMLElement) {}
+  constructor(
+    private readonly root: HTMLElement,
+    /**
+     * Dónde van las acciones de contacto. En la página van después del botón principal (orden de
+     * lectura y de tabulación: oficio → botón principal → enlaces, U-75); por defecto, en `root`.
+     */
+    private readonly contactRoot: HTMLElement | null = null,
+  ) {}
 
   render(model: TimelineViewModel): void {
     const { meta } = model.timeline;
     clear(this.root);
+    if (this.contactRoot) clear(this.contactRoot);
     document.title = meta.headline ? `${meta.owner} — ${meta.headline}` : `${meta.owner} — ${meta.title}`;
     document.documentElement.lang = meta.locale;
 
@@ -45,7 +53,7 @@ export class Hud implements TimelineViewPart {
         ? el('p', { class: 'hud__where' }, where.map((part, i) => el('span', { class: i === 0 && meta.location ? 'hud__location' : 'hud__availability', text: part })))
         : null,
       meta.tagline ? el('p', { class: 'hud__tagline', text: meta.tagline }) : null,
-      actions.length > 0 ? el('ul', { class: 'hud__contact actions' }, actions.map((action) => el('li', {}, [action]))) : null,
+      actions.length > 0 && !this.contactRoot ? this.contactList(actions) : null,
       model.source === 'example'
         ? el('p', {
             class: 'hud__notice',
@@ -54,10 +62,16 @@ export class Hud implements TimelineViewPart {
           })
         : null,
     );
+    if (this.contactRoot && actions.length > 0) this.contactRoot.append(this.contactList(actions));
+  }
+
+  private contactList(actions: readonly HTMLElement[]): HTMLElement {
+    return el('ul', { class: 'hud__contact actions' }, actions.map((action) => el('li', {}, [action])));
   }
 
   showLoadError(message: string): void {
     clear(this.root);
+    if (this.contactRoot) clear(this.contactRoot);
     this.root.append(
       el('h1', { class: 'hud__owner', text: STRINGS.loadError }),
       el('p', { class: 'hud__tagline', text: message, attrs: { role: 'alert' } }),

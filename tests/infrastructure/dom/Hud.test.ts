@@ -131,4 +131,17 @@ describe('Hud', () => {
     expect(links[0].textContent).toBe('<i>bueno</i>');
     expect(document.title).toContain('<img');
   });
+
+  it('con contactRoot, las acciones van en su propio bloque (después del botón principal)', () => {
+    const root = mount('header');
+    const links = mount('div');
+    const hud = new Hud(root, links);
+    hud.render(buildModel());
+    expect(root.querySelector('.hud__contact')).toBeNull();
+    expect(links.querySelectorAll('.hud__contact a')).toHaveLength(1);
+    hud.render(buildModel());
+    expect(links.querySelectorAll('.hud__contact')).toHaveLength(1);
+    hud.showLoadError('x');
+    expect(links.childElementCount).toBe(0);
+  });
 });

@@ -2121,8 +2121,21 @@ a {
   opacity: 0;
 }
 
-.hud__main > * {
+.hud__main > *,
+.hud__links {
   pointer-events: auto;
+}
+
+/* Detalle y historia: los enlaces se retiran con el resto de la cabecera. */
+.app--detail .hud__links,
+.app--story .hud__links {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud__links .actions {
+  margin-top: 14px;
 }
 
 .hud__eyebrow {
@@ -3295,10 +3308,19 @@ a {
   margin-left: auto;
 }
 
+/* El nombre del vecino se ve entero (U-27): como mucho dos líneas, nunca recortado con «…». */
 .popup__nav-label {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.popup__nav--prev {
+  text-align: left;
+}
+
+.popup__nav--next {
+  text-align: right;
 }
 
 .popup__nav-arrow {
@@ -4204,9 +4226,14 @@ a {
   }
 
   .hud__cta {
+    order: 2;
     flex-wrap: nowrap;
     gap: 12px;
     margin: 0 0 0 auto;
+  }
+
+  .hud__links {
+    order: 1;
   }
 
   .cta {
@@ -4239,4 +4266,63 @@ a {
   .filters--open {
     animation: none;
   }
+}
+
+/* Apertura en tiempos (U-05): primero nombre y oficio; la escena se dibuja sin rótulos; lo último,
+   la barra de líneas, los controles y la pista. Animación de una sola vez al terminar la carga (no
+   se repite al cerrar una ficha). */
+@keyframes opening-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.app:not(.app--loading) .hud__cta,
+.app:not(.app--loading) .hud__links {
+  animation: opening-in 0.8s var(--ease) 0.5s both;
+}
+
+.app:not(.app--loading) .filters {
+  animation: opening-in 0.8s var(--ease) 1.6s both;
+}
+
+.app:not(.app--loading) .toolbar {
+  animation: opening-in 0.8s var(--ease) 2s both;
+}
+
+@media (max-width: 720px) {
+  /* El botón fijo no se anima con transform (lo sacaría del borde inferior un instante). */
+  .app:not(.app--loading) .hud__cta {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px), (max-height: 520px) {
+  /* La hoja de filtros reaparece de display: none: sin la espera de la apertura. */
+  .app:not(.app--loading) .filters {
+    animation: none;
+  }
+
+  .app:not(.app--loading) .filters.filters--open {
+    animation: rise-in 0.3s var(--ease) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app:not(.app--loading) .hud__cta,
+  .app:not(.app--loading) .hud__links,
+  .app:not(.app--loading) .filters,
+  .app:not(.app--loading) .toolbar {
+    animation: none;
+  }
+}
+
+/* Sin 3D la cabecera va en el flujo: el velo (pensado para la escena) sobra y oscurecería la lista. */
+.app--no-webgl .hud {
+  position: relative;
+}
+
+.app--no-webgl .hud::before {
+  display: none;
 }
