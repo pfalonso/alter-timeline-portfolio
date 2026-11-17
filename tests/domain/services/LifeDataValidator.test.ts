@@ -492,3 +492,45 @@ describe('LifeDataValidator: estilo de línea', () => {
     expectSingleIssue(withStyle('cuadrado'), 'branches[0].style', /geometric/);
   });
 });
+
+describe('LifeDataValidator: cabecera profesional y recorrido corto', () => {
+  it('acepta headline, location, availability, email y cv', () => {
+    expect(
+      issuesAfter((data) => {
+        Object.assign(data.meta, {
+          headline: 'Technical Artist · VFX',
+          location: 'Donostia',
+          availability: 'Incorporación inmediata',
+          email: 'ada@example.com',
+          cv: [{ label: 'CV (PDF)', url: '/cv/ada.pdf' }, { label: 'CV en inglés', url: 'https://example.com/cv-en.pdf' }],
+        });
+      }),
+    ).toEqual([]);
+  });
+
+  it('acumula los errores de la cabecera con su ruta', () => {
+    const issues = issuesAfter((data) => {
+      Object.assign(data.meta, {
+        headline: 3,
+        email: 'no-es-un-correo',
+        cv: [{ label: '', url: '/cv/../secreto.pdf' }, 'x'],
+      });
+    });
+    expect(issues.map((issue) => issue.path)).toEqual(['meta.headline', 'meta.email', 'meta.cv[0].label', 'meta.cv[0].url', 'meta.cv[1]']);
+  });
+
+  it('meta.cv debe ser una lista', () => {
+    expectSingleIssue((data) => (data.meta.cv = 'cv.pdf'), 'meta.cv', /lista/);
+  });
+
+  it('storyShort admite cualquier orden pero exige ids existentes, sin repetir y no vacío', () => {
+    const data = makeData() as unknown as Loose;
+    const ids = (data.events as { id: string }[]).map((event) => event.id);
+    data.storyShort = { title: 'En 1 minuto', path: [ids[ids.length - 1], ids[0]] };
+    expect(validator.validate(data).ok).toBe(true);
+    expectSingleIssue((d) => (d.storyShort = { path: [] }), 'storyShort.path', /vacío/);
+    expectSingleIssue((d) => (d.storyShort = { path: ['no-existe'] }), 'storyShort.path[0]', /no existe/);
+    expectSingleIssue((d) => (d.storyShort = 'x'), 'storyShort', /objeto/);
+    expectSingleIssue((d) => (d.storyShort = { path: [ids[0], ids[0]] }), 'storyShort.path[1]', /repetido/);
+  });
+});

@@ -9,3 +9,8 @@ export function isHttpUrl(value: unknown): value is string {
     return false;
   }
 }
+
+/** Ruta relativa al propio sitio (`/cv/Pablo.pdf`): sin `//`, sin `..` y sin caracteres raros. */
+export function isSitePath(url: string): boolean {
+  return /^\/(?!\/)[A-Za-z0-9._~%/-]+$/.test(url) && !url.split('/').includes('..');
+}

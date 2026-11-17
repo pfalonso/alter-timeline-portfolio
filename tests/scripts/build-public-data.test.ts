@@ -42,6 +42,15 @@ describe('toPublicData()', () => {
     expect('story' in toPublicData(asRaw(makeData()))).toBe(false);
   });
 
+  it('quita del recorrido corto los pasos privados y lo elimina si se queda vacío', () => {
+    const data = makeStoryData((d) => (d.storyShort = { title: 'En 1 minuto', path: ['e-side-two', 'd-secret', 'a-school'] }));
+    const output = toPublicData(asRaw(data));
+    expect(output.storyShort).toEqual({ title: 'En 1 minuto', path: ['e-side-two', 'a-school'] });
+    expect(new LifeDataValidator().validate(output).ok).toBe(true);
+    const onlySecret = toPublicData(asRaw(makeStoryData((d) => (d.storyShort = { path: ['d-secret'] }))));
+    expect('storyShort' in onlySecret).toBe(false);
+  });
+
   it('quita los eventos privados y el campo visibility, sin tocar el original', () => {
     const data = makeData();
     const before = JSON.stringify(data);

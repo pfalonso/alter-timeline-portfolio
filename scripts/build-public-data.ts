@@ -36,6 +36,7 @@ interface RawData {
   events: RawEvent[];
   branches?: RawLine[];
   story?: { title?: string; path: string[]; [key: string]: unknown };
+  storyShort?: { title?: string; path: string[]; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -79,7 +80,14 @@ export function toPublicData(data: RawData): RawData {
   if (data.branches) result.branches = publicLines(data.branches, events, byId, publicAncestor, data.meta?.mainBranch ?? 'main');
   cleanUnions(result);
   // El recorrido de la historia pierde los pasos privados; los arcos (capítulos) se conservan.
-  if (data.story) result.story = { ...data.story, path: data.story.path.filter((id) => byId.has(id) && !isPrivate(byId.get(id))) };
+  const publicPath = (path: string[]): string[] => path.filter((id) => byId.has(id) && !isPrivate(byId.get(id)));
+  if (data.story) result.story = { ...data.story, path: publicPath(data.story.path) };
+  // El recorrido corto igual; si se queda sin pasos se quita (el botón principal usará la historia completa).
+  if (data.storyShort) {
+    const path = publicPath(data.storyShort.path);
+    if (path.length > 0) result.storyShort = { ...data.storyShort, path };
+    else delete result.storyShort;
+  }
   return result;
 }
 

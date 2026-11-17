@@ -6,7 +6,7 @@ import { DEFAULT_FOCUS_LEVEL, type LifeLine } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
 import { Timeline } from '../model/Timeline';
 import { PRESENT } from './LifeDataValidator';
-import { isHttpUrl } from './safeUrl';
+import { isHttpUrl, isSitePath } from './safeUrl';
 
 export interface TimelineFactoryOptions {
   /** Incluye los eventos `visibility: "private"`. */
@@ -26,7 +26,11 @@ export class TimelineFactory {
     const lines = (data.branches ?? []).map((line) => this.toLine(line, starts));
     const arcs = (data.arcs ?? []).map((arc) => this.toArc(arc));
     const story = data.story ? { title: data.story.title, path: [...data.story.path] } : undefined;
-    return new Timeline({ ...data.meta }, categories, events, PartialDate.fromDate(options.now), lines, { arcs, story });
+    const storyShort = data.storyShort ? { title: data.storyShort.title, path: [...data.storyShort.path] } : undefined;
+    // Defensa en profundidad: solo CV con URL http(s) o ruta del propio sitio.
+    const meta = { ...data.meta, cv: data.meta.cv?.filter((link) => isHttpUrl(link.url) || isSitePath(link.url)) };
+    if (!meta.cv) delete meta.cv;
+    return new Timeline(meta, categories, events, PartialDate.fromDate(options.now), lines, { arcs, story, storyShort });
   }
 
   private toArc(raw: ArcData): LifeArc {

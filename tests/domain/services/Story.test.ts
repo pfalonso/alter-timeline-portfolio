@@ -117,6 +117,15 @@ describe('Timeline: arcos y recorrido', () => {
     expect(timelineOf(makeStoryData(), true).storyPath).toContain('d-secret');
     expect(timeline.getEvent('b-job')?.bridge).toBe('Al salir de la escuela, el primer trabajo.');
     expect(timeline.getEvent('a-school')?.bridge).toBeUndefined();
+    expect(timeline.storyShortPath).toEqual([]);
+  });
+
+  it('recorrido corto: conserva el orden declarado y quita los privados ocultos', () => {
+    const data = makeStoryData((d) => (d.storyShort = { title: 'En 1 minuto', path: ['e-side-two', 'd-secret', 'a-school'] }));
+    const timeline = timelineOf(data);
+    expect(timeline.storyShortTitle).toBe('En 1 minuto');
+    expect(timeline.storyShortPath).toEqual(['e-side-two', 'a-school']);
+    expect(timelineOf(data, true).storyShortPath).toEqual(['e-side-two', 'd-secret', 'a-school']);
   });
 
   it('arcOf asigna cada evento al capítulo que lo contiene (el posterior gana en la frontera)', () => {

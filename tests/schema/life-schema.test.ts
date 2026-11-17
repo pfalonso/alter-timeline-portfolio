@@ -80,7 +80,7 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
     );
     expect(Object.keys(defs.category.properties ?? {}).sort()).toEqual(['color', 'description', 'icon', 'id', 'label']);
     expect(Object.keys(schema.properties?.meta.properties ?? {}).sort()).toEqual([
-      'contact', 'locale', 'mainBranch', 'owner', 'tagline', 'title',
+      'availability', 'contact', 'cv', 'email', 'headline', 'locale', 'location', 'mainBranch', 'owner', 'tagline', 'title',
     ]);
     expect(Object.keys(defs.branch.properties ?? {}).sort()).toEqual(
       ['color', 'description', 'focus', 'ghost', 'id', 'label', 'mergeInto', 'origin', 'pauses', 'style', 'until'].sort(),
@@ -88,6 +88,30 @@ describe('schema/life.schema.json ↔ validador del dominio', () => {
     expect(Object.keys(defs.focusPeriod.properties ?? {}).sort()).toEqual(['end', 'level', 'start']);
     expect(Object.keys(defs.arc.properties ?? {}).sort()).toEqual(['end', 'id', 'start', 'subtitle', 'summary', 'title']);
     expect(Object.keys(defs.story.properties ?? {}).sort()).toEqual(['path', 'title']);
+    expect(Object.keys(defs.storyShort.properties ?? {}).sort()).toEqual(['path', 'title']);
+    expect(schema.properties?.storyShort.$ref).toBe('#/$defs/storyShort');
+  });
+
+  it('meta.email y meta.cv: los patrones del schema aceptan y rechazan lo mismo que el dominio', () => {
+    const meta = schema.properties?.meta.properties ?? {};
+    const email = new RegExp(meta.email.pattern ?? '');
+    const cvUrl = new RegExp(meta.cv.items?.properties?.url.pattern ?? '');
+    for (const value of ['ada@example.com', 'a.b+c@sub.example.org']) {
+      expect(email.test(value)).toBe(true);
+      expect(domainAccepts((data) => (data.meta.email = value))).toBe(true);
+    }
+    for (const value of ['ada', 'ada@', '@example.com', 'ada @example.com']) {
+      expect(email.test(value)).toBe(false);
+      expect(domainAccepts((data) => (data.meta.email = value))).toBe(false);
+    }
+    for (const url of ['https://example.com/cv.pdf', '/cv/Ada.pdf']) {
+      expect(cvUrl.test(url)).toBe(true);
+      expect(domainAccepts((data) => (data.meta.cv = [{ label: 'CV', url }]))).toBe(true);
+    }
+    for (const url of ['javascript:alert(1)', '//evil.example/cv.pdf', 'cv.pdf']) {
+      expect(cvUrl.test(url)).toBe(false);
+      expect(domainAccepts((data) => (data.meta.cv = [{ label: 'CV', url }]))).toBe(false);
+    }
   });
 
   it('arcos e historia: lo obligatorio del schema es lo que exige el dominio', () => {

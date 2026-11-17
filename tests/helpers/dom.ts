@@ -45,7 +45,11 @@ export function unsafeModel(
     events,
     base.timeline.now,
     base.timeline.lines,
-    { arcs: base.timeline.arcs, story: { title: base.timeline.storyTitle, path: base.timeline.storyPath } },
+    {
+      arcs: base.timeline.arcs,
+      story: { title: base.timeline.storyTitle, path: base.timeline.storyPath },
+      storyShort: { title: base.timeline.storyShortTitle, path: base.timeline.storyShortPath },
+    },
   );
   return { ...base, timeline };
 }

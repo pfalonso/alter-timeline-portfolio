@@ -61,6 +61,16 @@ export interface LifeMetaData {
   owner: string;
   title: string;
   tagline?: string;
+  /** Oficio en una línea, bajo el nombre («Technical Artist · VFX en tiempo real · Desarrollo backend»). */
+  headline?: string;
+  /** Ciudad o zona («Donostia / San Sebastián»). */
+  location?: string;
+  /** Situación y disponibilidad en una línea. */
+  availability?: string;
+  /** Correo de contacto (texto copiable + mailto). */
+  email?: string;
+  /** Enlaces al CV en PDF: URL http(s) o ruta relativa al sitio (`/cv/…`). */
+  cv?: LinkData[];
   locale: string;
   contact?: LinkData[];
   /** Línea vital central (carril y = 0, la más brillante hoy). Por defecto "main". */
@@ -122,4 +132,6 @@ export interface LifeData {
   branches?: BranchInfoData[];
   arcs?: ArcData[];
   story?: StoryData;
+  /** Recorrido corto (6–9 pasos) que lanza el botón principal; puede no ser cronológico. */
+  storyShort?: StoryData;
 }
