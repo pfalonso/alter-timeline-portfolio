@@ -162,9 +162,9 @@ describe('NavigateEvents', () => {
   });
 
   it('neighbours indica si hay vecino visible en cada sentido', () => {
-    expect(navigate.neighbours(timeline, ALL, 'a-school')).toEqual({ hasPrevious: false, hasNext: true });
-    expect(navigate.neighbours(timeline, ALL, 'b-job')).toEqual({ hasPrevious: true, hasNext: true });
-    expect(navigate.neighbours(timeline, ALL, 'e-side-two')).toEqual({ hasPrevious: true, hasNext: false });
+    expect(navigate.neighbours(timeline, ALL, 'a-school')).toEqual({ hasPrevious: false, hasNext: true, nextId: 'b-job' });
+    expect(navigate.neighbours(timeline, ALL, 'b-job')).toEqual({ hasPrevious: true, hasNext: true, previousId: 'a-school', nextId: 'c-side' });
+    expect(navigate.neighbours(timeline, ALL, 'e-side-two')).toEqual({ hasPrevious: true, hasNext: false, previousId: 'c-side' });
     expect(navigate.neighbours(timeline, ALL, null)).toEqual({ hasPrevious: true, hasNext: true });
     expect(navigate.neighbours(timeline, new Set(), null)).toEqual({ hasPrevious: false, hasNext: false });
     expect(navigate.neighbours(timeline, new Set(['b-job']), 'b-job')).toEqual({ hasPrevious: false, hasNext: false });

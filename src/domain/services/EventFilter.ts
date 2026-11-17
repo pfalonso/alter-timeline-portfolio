@@ -9,11 +9,12 @@ export class EventFilter {
     return event.hasAnyCategory(selection.activeIds);
   }
 
-  visibleEvents(timeline: Timeline, selection: CategorySelection): LifeEvent[] {
-    return timeline.events.filter((event) => this.matches(event, selection));
+  /** Con `lineId`, además, solo los momentos de esa línea (los nodos de unión por los que pasa cuentan). */
+  visibleEvents(timeline: Timeline, selection: CategorySelection, lineId: string | null = null): LifeEvent[] {
+    return timeline.events.filter((event) => this.matches(event, selection) && (lineId === null || event.lineIds.includes(lineId)));
   }
 
-  visibleEventIds(timeline: Timeline, selection: CategorySelection): Set<string> {
-    return new Set(this.visibleEvents(timeline, selection).map((event) => event.id));
+  visibleEventIds(timeline: Timeline, selection: CategorySelection, lineId: string | null = null): Set<string> {
+    return new Set(this.visibleEvents(timeline, selection, lineId).map((event) => event.id));
   }
 }

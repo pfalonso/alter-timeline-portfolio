@@ -102,6 +102,9 @@ describe('TimelineController: modo historia', () => {
       fromEventId: 'a-school',
       arcId: 'oficio',
       newChapter: true,
+      mode: 'full',
+      ended: false,
+      path: ['a-school', 'b-job', 'c-side', 'e-side-two'],
     });
     // ←/→ en modo historia siguen el recorrido.
     controller.onNavigate('next', 'major');
@@ -110,13 +113,21 @@ describe('TimelineController: modo historia', () => {
     expect(view.lastSelection.story).toMatchObject({ index: 1, eventId: 'b-job', fromEventId: 'c-side' });
   });
 
-  it('no pasa de los extremos y sale con onStoryExit (cierra el detalle)', async () => {
+  it('tras el último paso, pantalla de cierre; «anterior» vuelve al último y onStoryExit sale (cierra el detalle)', async () => {
     const { controller, view } = await started();
     controller.onStoryStart('e-side-two');
+    // En el último paso, «Siguiente» es «Terminar»: sigue activo.
+    expect(view.lastSelection).toMatchObject({ hasNext: true, hasPrevious: true });
+    controller.onStoryStep('next');
+    expect(view.lastSelection).toMatchObject({ focusedEventId: 'e-side-two', detailOpen: false, hasNext: false });
+    expect(view.lastSelection.story).toMatchObject({ ended: true, newChapter: false, eventId: 'e-side-two' });
     const before = view.count('selection');
     controller.onStoryStep('next');
     expect(view.count('selection')).toBe(before);
-    expect(view.lastSelection).toMatchObject({ hasNext: false, hasPrevious: true });
+    controller.onStoryStep('previous');
+    expect(view.lastSelection).toMatchObject({ detailOpen: true });
+    expect(view.lastSelection.story).toMatchObject({ ended: false, eventId: 'e-side-two' });
+    controller.onStoryStep('next');
     controller.onStoryExit();
     expect(view.lastSelection).toMatchObject({ focusedEventId: 'e-side-two', detailOpen: false });
     expect(view.lastSelection.story).toBeUndefined();
@@ -188,5 +199,52 @@ describe('TimelineController: modo historia', () => {
       idle.onStoryStart();
       idle.onStoryStep('next');
     }).not.toThrow();
+  });
+});
+
+describe('TimelineController: versión corta y aislar una línea', () => {
+  const withShort = (): LifeData => makeStoryData((d) => (d.storyShort = { title: 'En 1 minuto', path: ['e-side-two', 'a-school'] }));
+
+  it('sin modo, el botón principal lanza la versión corta (en su orden, sin tarjetas de capítulo)', async () => {
+    const { controller, view } = await started(withShort());
+    controller.onStoryStart();
+    expect(view.lastSelection.story).toMatchObject({ mode: 'short', index: 0, total: 2, eventId: 'e-side-two', newChapter: false, path: ['e-side-two', 'a-school'] });
+    controller.onStoryStep('next');
+    expect(view.lastSelection.story).toMatchObject({ mode: 'short', index: 1, eventId: 'a-school', newChapter: false });
+    controller.onStoryStep('next');
+    expect(view.lastSelection.story).toMatchObject({ mode: 'short', ended: true });
+    // Desde la pantalla de cierre, la historia completa empieza por el principio.
+    controller.onStoryStart(undefined, 'full');
+    expect(view.lastSelection.story).toMatchObject({ mode: 'full', index: 0, eventId: 'a-school', newChapter: true, ended: false });
+  });
+
+  it('entrar desde un momento concreto sigue la historia completa; sin versión corta, también', async () => {
+    const short = await started(withShort());
+    short.controller.onStoryStart('b-job');
+    expect(short.view.lastSelection.story).toMatchObject({ mode: 'full', eventId: 'b-job' });
+    const none = await started();
+    none.controller.onStoryStart(undefined, 'short');
+    expect(none.view.lastSelection.story).toMatchObject({ mode: 'full', eventId: 'a-school' });
+  });
+
+  it('aislar una línea filtra sus momentos (y lo dice el estado); «mostrar todo» lo deshace', async () => {
+    const { controller, view } = await started(makeStoryData());
+    const filters = () => view.calls.filter((call) => call.type === 'filter');
+    controller.onLineIsolated('side');
+    let last = view.lastFilter;
+    expect(last.isolatedLine).toBe('side');
+    expect([...last.visibleEventIds].sort()).toEqual(['c-side', 'e-side-two']);
+    const count = filters().length;
+    controller.onLineIsolated('side');
+    expect(filters()).toHaveLength(count);
+    controller.onLineIsolated('no-existe');
+    last = view.lastFilter;
+    expect(last.isolatedLine).toBeNull();
+    controller.onLineIsolated('side');
+    controller.onCategoryToggled('play');
+    controller.onFiltersReset();
+    last = view.lastFilter;
+    expect(last.isolatedLine).toBeNull();
+    expect(last.visibleEventIds.size).toBe(4);
   });
 });

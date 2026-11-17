@@ -159,6 +159,8 @@ export function fakeHandlers(): FakeHandlers {
     onStoryStart: vi.fn<TimelineViewHandlers['onStoryStart']>(),
     onStoryStep: vi.fn<TimelineViewHandlers['onStoryStep']>(),
     onStoryExit: vi.fn<TimelineViewHandlers['onStoryExit']>(),
+    onLineIsolated: vi.fn<TimelineViewHandlers['onLineIsolated']>(),
+    onFiltersReset: vi.fn<TimelineViewHandlers['onFiltersReset']>(),
   };
 }
 
@@ -166,9 +168,16 @@ export function fakeHandlers(): FakeHandlers {
 export function selection(
   focusedEventId: string | null,
   detailOpen = false,
-  neighbours: { hasPrevious?: boolean; hasNext?: boolean } = {},
-): { focusedEventId: string | null; detailOpen: boolean; hasPrevious: boolean; hasNext: boolean } {
-  return { focusedEventId, detailOpen, hasPrevious: neighbours.hasPrevious ?? true, hasNext: neighbours.hasNext ?? true };
+  neighbours: { hasPrevious?: boolean; hasNext?: boolean; previousId?: string; nextId?: string } = {},
+): { focusedEventId: string | null; detailOpen: boolean; hasPrevious: boolean; hasNext: boolean; previousId?: string; nextId?: string } {
+  return {
+    focusedEventId,
+    detailOpen,
+    hasPrevious: neighbours.hasPrevious ?? true,
+    hasNext: neighbours.hasNext ?? true,
+    ...(neighbours.previousId ? { previousId: neighbours.previousId } : {}),
+    ...(neighbours.nextId ? { nextId: neighbours.nextId } : {}),
+  };
 }
 
 /**

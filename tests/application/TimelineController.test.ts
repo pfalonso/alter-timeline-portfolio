@@ -173,7 +173,7 @@ describe('TimelineController: filtro', () => {
     controller.onEventActivated('b-job');
     expect(view.lastSelection).toMatchObject({ hasPrevious: true, hasNext: true });
     controller.onCategorySoloed('work'); // quedan b-job y e-side-two
-    expect(view.lastSelection).toEqual({ focusedEventId: 'b-job', detailOpen: true, hasPrevious: false, hasNext: true });
+    expect(view.lastSelection).toEqual({ focusedEventId: 'b-job', detailOpen: true, hasPrevious: false, hasNext: true, nextId: 'e-side-two' });
   });
 });
 
@@ -181,9 +181,9 @@ describe('TimelineController: selección y navegación', () => {
   it('activar un evento abre su detalle con los vecinos correctos', async () => {
     const { controller, view } = await started();
     controller.onEventActivated('a-school');
-    expect(view.lastSelection).toEqual({ focusedEventId: 'a-school', detailOpen: true, hasPrevious: false, hasNext: true });
+    expect(view.lastSelection).toEqual({ focusedEventId: 'a-school', detailOpen: true, hasPrevious: false, hasNext: true, nextId: 'b-job' });
     controller.onEventActivated('e-side-two');
-    expect(view.lastSelection).toEqual({ focusedEventId: 'e-side-two', detailOpen: true, hasPrevious: true, hasNext: false });
+    expect(view.lastSelection).toEqual({ focusedEventId: 'e-side-two', detailOpen: true, hasPrevious: true, hasNext: false, previousId: 'c-side' });
   });
 
   it('activar un evento inexistente, privado oculto o filtrado no cambia nada', async () => {
@@ -228,7 +228,7 @@ describe('TimelineController: selección y navegación', () => {
   it('navegar sin selección enfoca (sin abrir) el primero o el último', async () => {
     const first = await started();
     first.controller.onNavigate('next');
-    expect(first.view.lastSelection).toEqual({ focusedEventId: 'a-school', detailOpen: false, hasPrevious: false, hasNext: true });
+    expect(first.view.lastSelection).toEqual({ focusedEventId: 'a-school', detailOpen: false, hasPrevious: false, hasNext: true, nextId: 'b-job' });
     const last = await started();
     last.controller.onNavigate('previous');
     expect(last.view.lastSelection).toMatchObject({ focusedEventId: 'e-side-two', detailOpen: false, hasNext: false });
