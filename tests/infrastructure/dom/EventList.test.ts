@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventList } from '../../../src/infrastructure/dom/EventList';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, click, mount, press, texts, unsafeModel } from '../../helpers/dom';
-import { buildModel, fakeHandlers, selection } from '../../helpers/fixtures';
+import { buildModel, fakeHandlers, makeStoryData, selection } from '../../helpers/fixtures';
 
 afterEach(cleanupDom);
 
@@ -32,14 +32,18 @@ describe('EventList (índice accesible)', () => {
     expect(root.querySelector('ol.index__list')?.children).toHaveLength(4);
   });
 
-  it('cada evento es un botón con fecha, título, categoría principal y resumen, en orden cronológico', () => {
+  it('cada momento es un botón compacto (punto de color, fecha, título, resumen), en orden cronológico', () => {
     const { root } = setup();
     expect(texts(root, '.index__name')).toEqual(['Escuela', 'Primer trabajo', 'Proyecto paralelo', 'Segunda parte']);
-    expect(texts(root, '.index__category')).toEqual(['Estudios', 'Trabajo', 'Juego', 'Juego']);
+    expect(root.querySelectorAll('.index__dot')).toHaveLength(4);
     expect(texts(root, '.index__summary')[0]).toBe('Cuatro años de estudio.');
-    expect(texts(root, '.index__date')[0]).toBe('2010 — 2014');
-    expect(texts(root, '.index__date')[1]).toMatch(/— actualidad$/);
-    expect(buttons(root).map((button) => button.style.getPropertyValue('--accent'))).toEqual(['#6EA8FF', '#FFB454', '#B48CFF', '#B48CFF']);
+    expect(texts(root, '.index__date')[0]).toBe('2010 – 2014');
+    expect(texts(root, '.index__date')[1]).toMatch(/– hoy$/);
+    // El punto lleva el color de la línea del momento (el mismo que en la escena).
+    const model = buildModel();
+    expect(buttons(root).map((button) => button.style.getPropertyValue('--accent'))).toEqual(
+      model.timeline.events.map((event) => model.timeline.lineColorOf(event.branch)),
+    );
     for (const button of buttons(root)) expect(button.type).toBe('button');
   });
 
@@ -73,7 +77,7 @@ describe('EventList (índice accesible)', () => {
   it('un evento sin categoría conocida se lista igualmente, con acento neutro', () => {
     const root = mount('nav');
     new EventList(root).render(unsafeModel(buildModel(), { categories: [] }));
-    expect(texts(root, '.index__category')).toEqual(['', '', '', '']);
+    expect(texts(root, '.index__name')).toHaveLength(4);
     expect(buttons(root)[0].style.getPropertyValue('--accent')).toBe('#ffffff');
   });
 
@@ -198,5 +202,48 @@ describe('EventList: abrir y cerrar', () => {
     const { root, list } = setup({ withToggle: false });
     expect(() => list.showAsMainContent('aviso')).not.toThrow();
     expect(root.hidden).toBe(false);
+  });
+});
+
+describe('EventList: cabecera con capítulos, solo hitos y cierre', () => {
+  it('por defecto oculta los momentos menores; el interruptor los muestra', () => {
+    const root = mount('nav');
+    const list = new EventList(root);
+    list.render(buildModel());
+    const toggle = root.querySelector<HTMLButtonElement>('.index__all') as HTMLButtonElement;
+    expect(root.classList.contains('index--major')).toBe(true);
+    expect(root.querySelectorAll('.index__item--minor').length).toBeGreaterThan(0);
+    expect(toggle.hidden).toBe(false);
+    click(toggle);
+    expect(root.classList.contains('index--major')).toBe(false);
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.textContent).toBe(STRINGS.indexMajor);
+    click(toggle);
+    expect(root.classList.contains('index--major')).toBe(true);
+  });
+
+  it('un salto por capítulo que lleva el foco a su grupo; ✕ cierra y devuelve el foco al botón', () => {
+    const toggle = mount('button');
+    const root = mount('nav');
+    const list = new EventList(root, toggle);
+    list.render(buildModel(makeStoryData()));
+    const jumps = [...root.querySelectorAll<HTMLButtonElement>('.index__jump')];
+    expect(jumps.map((jump) => jump.querySelector('.index__jump-title')?.textContent)).toEqual(['Aprender', 'Oficio', 'Desvío']);
+    Element.prototype.scrollIntoView = vi.fn();
+    click(jumps[1]);
+    expect(document.activeElement?.id).toBe('index-arc-oficio');
+    list.setOpen(true);
+    click(root.querySelector('.index__close') as HTMLElement);
+    expect(root.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  it('en modo principal (sin 3D) no se cierra y muestra la introducción de cada capítulo', () => {
+    const root = mount('nav');
+    const list = new EventList(root);
+    list.render(buildModel(makeStoryData()));
+    list.showAsMainContent(STRINGS.noWebgl);
+    expect((root.querySelector('.index__close') as HTMLElement).hidden).toBe(true);
+    expect(texts(root, '.index__group-summary')).toContain('Años de estudio.');
   });
 });

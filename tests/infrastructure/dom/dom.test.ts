@@ -98,7 +98,10 @@ describe('safeLink()', () => {
 
 describe('STRINGS', () => {
   it('formatea el contador y el origen de una rama', () => {
-    expect(STRINGS.eventsVisible(3, 12)).toBe('3 / 12 eventos');
+    expect(STRINGS.eventsVisible(3, 12)).toBe('3 de 12 momentos');
+    expect(STRINGS.storyDuration(90)).toBe('90 s');
+    expect(STRINGS.storyDuration(20)).toBe('30 s');
+    expect(STRINGS.storyDuration(300)).toBe('5 min');
     expect(STRINGS.branchFrom('Un semestre')).toBe('Rama que nace de «Un semestre»');
   });
 });

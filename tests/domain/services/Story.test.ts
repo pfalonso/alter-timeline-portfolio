@@ -149,7 +149,7 @@ describe('Timeline: arcos y recorrido', () => {
 
   it('arcYears da el rango legible', () => {
     const timeline = timelineOf(makeStoryData());
-    expect(timeline.arcs.map((arc) => arcYears(arc, 'hoy'))).toEqual(['2010 — 2014', '2015 — 2017', '2018 — hoy']);
+    expect(timeline.arcs.map((arc) => arcYears(arc, 'hoy'))).toEqual(['2010 – 2014', '2015 – 2017', '2018 – hoy']);
     const single = timelineOf(makeStoryData((d) => (d.arcs = [{ id: 'a', title: 'A', start: '2012-03', end: '2012-09' }])));
     expect(arcYears(single.arcs[0], 'hoy')).toBe('2012');
   });

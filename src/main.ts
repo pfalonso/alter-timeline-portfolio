@@ -10,9 +10,12 @@ import { LoadTimeline, NavigateEvents, SelectEvent, ToggleCategoryFilter } from 
 import { EventFilter, LifeDataValidator, TimelineFactory, TimelineLayout } from './domain/services';
 import { CompositeTimelineView, type TimelineViewPart } from './infrastructure/dom/CompositeTimelineView';
 import { ArcStrip } from './infrastructure/dom/ArcStrip';
+import { AppModes, InteractionHint } from './infrastructure/dom/AppModes';
 import { EventList } from './infrastructure/dom/EventList';
 import { EventPopup } from './infrastructure/dom/EventPopup';
 import { FilterBar } from './infrastructure/dom/FilterBar';
+import { FilterSummary } from './infrastructure/dom/FilterSummary';
+import { icon } from './infrastructure/dom/icons';
 import { Hud } from './infrastructure/dom/Hud';
 import { KeyboardShortcuts } from './infrastructure/dom/KeyboardShortcuts';
 import { LineLegend } from './infrastructure/dom/LineLegend';
@@ -56,8 +59,11 @@ async function bootstrap(): Promise<void> {
   const app = byId('app');
   const loading = byId('loading');
   loading.textContent = STRINGS.loading;
-  // En pantallas táctiles no hay teclado ni rueda: se explican los gestos.
-  byId('help').textContent = window.matchMedia('(pointer: coarse)').matches ? STRINGS.helpTouch : STRINGS.helpKeys;
+  const touch = window.matchMedia('(pointer: coarse)').matches;
+  app.classList.toggle('app--touch', touch);
+  // Una sola pista de acción, que desaparece tras la primera interacción (los atajos, tras «?»).
+  new InteractionHint(byId('help'), touch ? STRINGS.hintTouch : STRINGS.hintKeys, byId('stage'));
+  const filtersSheet = bindSheet(app, byId('filters'), byId<HTMLButtonElement>('filters-open'), byId<HTMLButtonElement>('filters-close'));
 
   const href = window.location.href;
   const debug = readUrlFlag(href, 'debug');
@@ -74,24 +80,34 @@ async function bootstrap(): Promise<void> {
   );
   const filterStore = new UrlFilterStateStore(window.location, window.history);
   const tooltip = new Tooltip(byId('tooltip'));
-  const labels = new NodeLabels(byId('labels'), [
-    byId('hud'),
-    byId('filters'),
-    byId('controls'),
-    byId('ruler'),
-    byId('arc-strip'),
-    byId('chapter'),
-    byId('story-toggle'),
-    byId('popup'),
-    byId('index'),
-  ]);
+  const labels = new NodeLabels(
+    byId('labels'),
+    [
+      byId('hud-main'),
+      byId('hud-cta'),
+      byId('filters'),
+      byId('controls'),
+      byId('shortcuts'),
+      byId('ruler'),
+      byId('arc-strip'),
+      byId('chapter'),
+      byId('story-end'),
+      byId('popup'),
+      byId('index'),
+      byId('help'),
+    ],
+    // La apertura dibuja la línea sin rótulos; entran cuando la cámara se detiene.
+    { openingHoldMs: reducedMotion() ? 0 : 2200 },
+  );
   const ruler = new YearRuler(byId('ruler'));
   const arcStrip = new ArcStrip(byId('arc-strip'));
   const eventList = new EventList(byId('index'), byId<HTMLButtonElement>('index-toggle'));
 
   const parts: TimelineViewPart[] = [
-    new Hud(byId('hud')),
-    new FilterBar(byId('filter-bar')),
+    new AppModes(app),
+    new Hud(byId('hud-main')),
+    new FilterBar(byId('filter-bar'), { toggle: byId<HTMLButtonElement>('more-toggle'), panel: byId('more-filters') }),
+    new FilterSummary(byId('filter-result')),
     new EventPopup(byId('popup')),
     new LiveAnnouncer(byId('announcer')),
     new KeyboardShortcuts(window),
@@ -103,8 +119,12 @@ async function bootstrap(): Promise<void> {
     new StoryControls(byId<HTMLButtonElement>('story-toggle'), byId('chapter'), {
       app,
       focusAfterCard: () => document.getElementById('popup'),
+      fullButton: byId<HTMLButtonElement>('story-full'),
+      endCard: byId('story-end'),
     }),
   ];
+  // Abrir una ficha o entrar en la historia cierra la hoja de filtros (móvil).
+  parts.push({ applySelection: (state) => (state.detailOpen || state.story ? filtersSheet.close() : undefined) });
 
   const backend = readUrlFlag(href, 'nowebgl') ? null : createWebGLBackend();
   let three: ThreeTimelineView | null = null;
@@ -113,8 +133,12 @@ async function bootstrap(): Promise<void> {
     stage.setAttribute('role', 'application');
     stage.setAttribute('aria-label', STRINGS.stageLabel);
     stage.tabIndex = 0;
-    const ghostLabels = new GhostLabels(byId('ghost-labels'));
-    const legend = new LineLegend(byId('lines'), { highlightBranch: (id) => three?.highlightBranch(id) }, { fallbackColor: DEFAULT_PALETTE.trunk });
+    const ghostLabels = new GhostLabels(byId('ghost-labels'), () => labels.occupied());
+    const legend = new LineLegend(
+      byId('lines'),
+      { highlightBranch: (id) => three?.highlightBranch(id) },
+      { fallbackColor: DEFAULT_PALETTE.trunk, keysRoot: byId('scene-keys') },
+    );
     three = new ThreeTimelineView({
       container: stage,
       backend,
@@ -123,15 +147,13 @@ async function bootstrap(): Promise<void> {
       reducedMotion,
       hoverListener: tooltip,
       projectionListeners: [labels, ghostLabels, ruler, arcStrip, legend],
-      safeInsets: () =>
-        measureSafeInsets(
-          stage,
-          { always: byId('controls'), ifWide: byId('hud') },
-          { always: byId('filters'), ifWide: byId('help') },
-        ),
+      // La cabecera, la fila de controles, la barra de líneas y (en móvil) el botón principal fijo
+      // reservan su franja: la trenza nunca pasa por debajo de un enlace (U-08, U-59).
+      safeInsets: () => measureSafeInsets(stage, [byId('hud-main'), byId('hud-cta'), byId('controls'), byId('filters'), byId('ruler')]),
+      detailInsets: () => measureSafeInsets(stage, [byId('popup')]),
     });
     parts.push(three);
-    new ViewControls(byId('controls'), three);
+    new ViewControls(byId('controls'), three, window, byId('shortcuts'));
     parts.push(legend, ghostLabels);
   } else {
     app.classList.add('app--no-webgl');
@@ -174,26 +196,54 @@ async function bootstrap(): Promise<void> {
 void bootstrap();
 
 /**
- * Franjas de la escena tapadas por la interfaz. Arriba cuenta siempre la fila de controles; abajo,
- * el borde superior de los filtros. Los bloques que ocupan casi todo el ancho (en móvil, la cabecera
- * y la ayuda) también reservan su franja: la escena no tiene un hueco lateral por el que asomar.
- * Se miden al encuadrar, no cada fotograma.
+ * Franjas de la escena tapadas por la interfaz. Cada bloque visible cuenta arriba si está en la mitad
+ * superior y abajo si está en la inferior (en móvil, el botón principal va fijo abajo). Se miden al
+ * encuadrar, no cada fotograma.
  */
-function measureSafeInsets(
-  stage: HTMLElement,
-  top: { always: HTMLElement; ifWide: HTMLElement },
-  bottom: { always: HTMLElement; ifWide: HTMLElement },
-): { top: number; bottom: number } {
+function measureSafeInsets(stage: HTMLElement, blocks: readonly HTMLElement[]): { top: number; bottom: number } {
   const area = stage.getBoundingClientRect();
-  const gap = 12;
-  const rects = (pair: { always: HTMLElement; ifWide: HTMLElement }): DOMRect[] =>
-    [pair.always, pair.ifWide]
-      .map((element) => element.getBoundingClientRect())
-      .filter((rect, i) => rect.height > 0 && (i === 0 || rect.width >= area.width * 0.6));
-  const topRects = rects(top);
-  const bottomRects = rects(bottom);
-  return {
-    top: topRects.length ? Math.max(0, Math.max(...topRects.map((rect) => rect.bottom)) - area.top + gap) : 0,
-    bottom: bottomRects.length ? Math.max(0, area.bottom - Math.min(...bottomRects.map((rect) => rect.top)) + gap) : 0,
+  const gap = 16;
+  let top = 0;
+  let bottom = 0;
+  for (const block of blocks) {
+    if (block.hidden || block.getClientRects().length === 0) continue;
+    const rect = block.getBoundingClientRect();
+    if (rect.height <= 0 || rect.width <= 0) continue;
+    const middle = (rect.top + rect.bottom) / 2 - area.top;
+    if (middle < area.height / 2) top = Math.max(top, rect.bottom - area.top + gap);
+    else bottom = Math.max(bottom, area.bottom - rect.top + gap);
+  }
+  return { top: Math.max(0, top), bottom: Math.max(0, bottom) };
+}
+
+/**
+ * Hoja de «Líneas y filtros» en móvil: se abre con un botón, se superpone (no empuja la escena) y se
+ * cierra con su botón, con Esc o al abrir una ficha. En escritorio no tiene efecto visual.
+ */
+function bindSheet(
+  app: HTMLElement,
+  sheet: HTMLElement,
+  open: HTMLButtonElement,
+  close: HTMLButtonElement,
+): { close(): void } {
+  close.append(icon('close'));
+  const set = (value: boolean): void => {
+    sheet.classList.toggle('filters--open', value);
+    app.classList.toggle('app--sheet', value);
+    open.setAttribute('aria-expanded', String(value));
+    if (value) close.focus({ preventScroll: true });
   };
+  open.addEventListener('click', () => set(!sheet.classList.contains('filters--open')));
+  close.addEventListener('click', () => {
+    set(false);
+    open.focus({ preventScroll: true });
+  });
+  sheet.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sheet.classList.contains('filters--open')) {
+      event.stopPropagation();
+      set(false);
+      open.focus({ preventScroll: true });
+    }
+  });
+  return { close: () => (sheet.classList.contains('filters--open') ? set(false) : undefined) };
 }

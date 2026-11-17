@@ -24,17 +24,17 @@ describe('Tooltip', () => {
     tooltip.onNodeHover('a-school', { x: 120.4, y: 80.6 });
     expect(root.hidden).toBe(false);
     expect(root.querySelector('.tooltip__title')?.textContent).toBe('Escuela');
-    expect(root.querySelector('.tooltip__dates')?.textContent).toBe('2010 — 2014');
+    expect(root.querySelector('.tooltip__dates')?.textContent).toBe('2010 – 2014');
     expect(root.querySelector('.tooltip__category')?.textContent).toBe('Estudios');
     expect(root.style.getPropertyValue('--accent')).toBe('#6EA8FF');
     expect(root.style.transform).toMatch(/^translate3d\(120px, 81px, 0(px)?\)$/);
     expect(root.classList.contains('tooltip--flip')).toBe(false);
   });
 
-  it('un evento en curso muestra "actualidad"', () => {
+  it('un evento en curso muestra "hoy"', () => {
     const { root, tooltip } = setup();
     tooltip.onNodeHover('b-job', { x: 0, y: 0 });
-    expect(root.querySelector('.tooltip__dates')?.textContent).toMatch(/— actualidad$/);
+    expect(root.querySelector('.tooltip__dates')?.textContent).toMatch(/– hoy$/);
   });
 
   it('cerca del borde derecho se voltea para no salirse de la ventana', () => {

@@ -109,10 +109,10 @@ export class LifeEvent implements LifeEventProps {
   }
 
   /** Texto legible del periodo: "mar 2019 — actualidad". */
-  formatDateRange(locale = 'es', presentLabel = 'actualidad'): string {
+  formatDateRange(locale = 'es', presentLabel = 'hoy'): string {
     const start = this.start.format(locale);
-    if (this.ongoing) return `${start} — ${presentLabel}`;
-    if (this.end && !this.end.equals(this.start)) return `${start} — ${this.end.format(locale)}`;
+    if (this.ongoing) return `${start} – ${presentLabel}`;
+    if (this.end && !this.end.equals(this.start)) return `${start} – ${this.end.format(locale)}`;
     return start;
   }
 }

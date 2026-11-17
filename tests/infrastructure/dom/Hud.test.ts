@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Hud } from '../../../src/infrastructure/dom/Hud';
+import { eyebrowOf, Hud } from '../../../src/infrastructure/dom/Hud';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, mount, texts, unsafeModel } from '../../helpers/dom';
-import { buildModel, makeData, selection } from '../../helpers/fixtures';
+import { buildModel, makeData } from '../../helpers/fixtures';
 
 afterEach(cleanupDom);
 
@@ -33,16 +33,38 @@ describe('Hud', () => {
     expect(root.querySelector('.hud__contact')).toBeNull();
   });
 
-  it('contador de eventos visibles, en una región aria-live', () => {
+  it('oficio, ubicación y disponibilidad bajo el nombre; el antetítulo no repite el nombre (U-01)', () => {
     const root = mount('header');
-    const hud = new Hud(root);
-    hud.render(buildModel());
-    hud.applyFilter({ activeCategoryIds: new Set(['work']), visibleEventIds: new Set(['b-job', 'e-side-two']), totalEvents: 4 });
-    const counter = root.querySelector('.hud__counter');
-    expect(counter?.textContent).toBe('2 / 4 eventos');
-    expect(counter?.getAttribute('aria-live')).toBe('polite');
-    hud.applyFilter({ activeCategoryIds: new Set(), visibleEventIds: new Set(), totalEvents: 4 });
-    expect(counter?.textContent).toBe('0 / 4 eventos');
+    const data = makeData();
+    data.meta = { ...data.meta, title: 'Ada Test · línea a línea', headline: 'Ingeniera de pruebas', location: 'Bilbao', availability: 'Disponible ya' };
+    new Hud(root).render(buildModel(data));
+    expect(texts(root, '.hud__eyebrow')).toEqual(['línea a línea']);
+    expect(texts(root, '.hud__headline')).toEqual(['Ingeniera de pruebas']);
+    expect(texts(root, '.hud__where > span')).toEqual(['Bilbao', 'Disponible ya']);
+    expect(document.title).toBe('Ada Test — Ingeniera de pruebas');
+    // Sin contador en la cabecera (U-09): el recuento va junto a los filtros.
+    expect(root.querySelector('.hud__counter')).toBeNull();
+  });
+
+  it('acciones de contacto: reel primero, CV (también ruta del sitio), correo copiable y el resto', () => {
+    const root = mount('header');
+    const data = makeData();
+    data.meta = {
+      ...data.meta,
+      email: 'ada@example.com',
+      cv: [{ label: 'CV (PDF)', url: '/cv/ada.pdf' }],
+      contact: [
+        { label: 'GitHub', url: 'https://github.com/ada' },
+        { label: 'Demo reel', url: 'https://youtu.be/x' },
+      ],
+    };
+    new Hud(root).render(buildModel(data));
+    const actions = [...root.querySelectorAll<HTMLAnchorElement>('.hud__contact a')];
+    expect(actions.map((link) => link.getAttribute('href'))).toEqual(['https://youtu.be/x', '/cv/ada.pdf', 'mailto:ada@example.com', 'https://github.com/ada']);
+    expect(actions[0].classList.contains('action--primary')).toBe(true);
+    expect(texts(root, '.action__text')).toEqual(['ada@example.com']);
+    expect(root.querySelectorAll('.action__copy')).toHaveLength(1);
+    expect(root.querySelectorAll('.hud__contact svg.icon')).toHaveLength(5);
   });
 
   it('avisa de "datos de ejemplo" solo cuando la fuente es el ejemplo', () => {
@@ -64,16 +86,14 @@ describe('Hud', () => {
     hud.render(buildModel());
     hud.render(buildModel());
     expect(root.querySelectorAll('h1')).toHaveLength(1);
-    expect(root.querySelectorAll('.hud__counter')).toHaveLength(1);
+    expect(root.querySelectorAll('.hud__contact')).toHaveLength(1);
   });
 
-  it('se atenúa mientras el detalle está abierto', () => {
-    const root = mount('header');
-    const hud = new Hud(root);
-    hud.applySelection(selection('b-job', true));
-    expect(root.classList.contains('hud--dimmed')).toBe(true);
-    hud.applySelection(selection('b-job', false));
-    expect(root.classList.contains('hud--dimmed')).toBe(false);
+  it('eyebrowOf: quita el nombre del antetítulo y no deja nada si solo es el nombre', () => {
+    expect(eyebrowOf('Ada', 'Ada · línea a línea')).toBe('línea a línea');
+    expect(eyebrowOf('Ada', 'ada')).toBeNull();
+    expect(eyebrowOf('Ada', 'Ada ·')).toBeNull();
+    expect(eyebrowOf('Ada', 'Otra cosa')).toBe('Otra cosa');
   });
 
   it('showLoadError sustituye la cabecera por el error con role="alert"', () => {

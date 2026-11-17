@@ -4,7 +4,9 @@ import { EventFilter, LifeDataValidator, TimelineFactory, TimelineLayout } from 
 import { CompositeTimelineView } from '../../src/infrastructure/dom/CompositeTimelineView';
 import { EventList } from '../../src/infrastructure/dom/EventList';
 import { EventPopup } from '../../src/infrastructure/dom/EventPopup';
+import { AppModes } from '../../src/infrastructure/dom/AppModes';
 import { FilterBar } from '../../src/infrastructure/dom/FilterBar';
+import { FilterSummary } from '../../src/infrastructure/dom/FilterSummary';
 import { Hud } from '../../src/infrastructure/dom/Hud';
 import { KeyboardShortcuts } from '../../src/infrastructure/dom/KeyboardShortcuts';
 import { LiveAnnouncer } from '../../src/infrastructure/dom/LiveAnnouncer';
@@ -18,6 +20,8 @@ export interface TestApp {
   readonly app: HTMLElement;
   readonly hud: HTMLElement;
   readonly filters: HTMLElement;
+  /** Resultado del filtro en lenguaje natural («Mostrando 3 de 4 momentos»). */
+  readonly result: HTMLElement;
   readonly popup: HTMLElement;
   readonly announcer: HTMLElement;
   readonly index: HTMLElement;
@@ -56,6 +60,7 @@ export async function mountApp(fetchFn: FetchLike): Promise<TestApp> {
   };
   const hud = make('header', 'hud');
   const filters = make('nav', 'filters', true);
+  const result = make('p', 'filter-result', true);
   const stage = make('div', 'stage', true);
   const indexToggle = make('button', 'index-toggle', true);
   const index = make('nav', 'index', true);
@@ -71,8 +76,10 @@ export async function mountApp(fetchFn: FetchLike): Promise<TestApp> {
   const filterStore = new UrlFilterStateStore(window.location, window.history);
   const tooltip = new Tooltip(tooltipRoot);
   const view = new CompositeTimelineView([
+    new AppModes(app),
     new Hud(hud),
     new FilterBar(filters),
+    new FilterSummary(result),
     new EventPopup(popup),
     new LiveAnnouncer(announcer),
     new KeyboardShortcuts(app),
@@ -95,5 +102,5 @@ export async function mountApp(fetchFn: FetchLike): Promise<TestApp> {
     navigateEvents: new NavigateEvents(),
   });
   const started = await controller.start();
-  return { app, hud, filters, popup, announcer, index, indexToggle, stage, tooltip, tooltipRoot, labels, controller, started, warnings };
+  return { app, hud, filters, result, popup, announcer, index, indexToggle, stage, tooltip, tooltipRoot, labels, controller, started, warnings };
 }

@@ -54,10 +54,10 @@ describe('LifeEvent', () => {
 
   it('formatDateRange: puntual, en curso, con fin y con fin igual al inicio', () => {
     expect(event({ start: PartialDate.parse('2019') }).formatDateRange('es')).toBe('2019');
-    expect(event({ start: PartialDate.parse('2019'), ongoing: true }).formatDateRange('es')).toBe('2019 — actualidad');
-    expect(event({ start: PartialDate.parse('2019'), ongoing: true }).formatDateRange('en', 'present')).toBe('2019 — present');
-    expect(event({ start: PartialDate.parse('2019'), end: PartialDate.parse('2021') }).formatDateRange()).toBe('2019 — 2021');
+    expect(event({ start: PartialDate.parse('2019'), ongoing: true }).formatDateRange('es')).toBe('2019 – hoy');
+    expect(event({ start: PartialDate.parse('2019'), ongoing: true }).formatDateRange('en', 'present')).toBe('2019 – present');
+    expect(event({ start: PartialDate.parse('2019'), end: PartialDate.parse('2021') }).formatDateRange()).toBe('2019 – 2021');
     expect(event({ start: PartialDate.parse('2019'), end: PartialDate.parse('2019') }).formatDateRange()).toBe('2019');
-    expect(event({ end: PartialDate.parse('2020-01') }).formatDateRange('en')).toBe('Mar 2019 — Jan 2020');
+    expect(event({ end: PartialDate.parse('2020-01') }).formatDateRange('en')).toBe('Mar 2019 – Jan 2020');
   });
 });

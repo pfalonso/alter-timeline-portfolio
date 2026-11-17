@@ -1,52 +1,59 @@
-import type { FilterViewState, SelectionViewState, TimelineViewModel } from '../../application/ports';
+import type { TimelineViewModel } from '../../application/ports';
 import type { TimelineViewPart } from './CompositeTimelineView';
-import { append, clear, el, safeLink } from './dom';
+import { contactActions } from './contactActions';
+import { append, clear, el } from './dom';
 import { STRINGS } from './strings';
 
-/** Cabecera: nombre, titular, tagline, contacto, contador de eventos y aviso de datos de ejemplo. */
-export class Hud implements TimelineViewPart {
-  private readonly counter = el('p', { class: 'hud__counter', attrs: { 'aria-live': 'polite' } });
+/**
+ * Antetítulo sin repetir el nombre: si `meta.title` empieza por el nombre («Ada Test · línea a
+ * línea») queda lo que sigue al separador; si es solo el nombre, nada.
+ */
+export function eyebrowOf(owner: string, title: string): string | null {
+  const clean = title.trim();
+  if (clean.toLowerCase() === owner.trim().toLowerCase()) return null;
+  if (clean.toLowerCase().startsWith(owner.trim().toLowerCase())) {
+    const rest = clean.slice(owner.trim().length).replace(/^[\s·:—–|-]+/, '').trim();
+    return rest.length > 0 ? rest : null;
+  }
+  return clean;
+}
 
+/**
+ * Cabecera: nombre, oficio (`headline`), ubicación y disponibilidad, frase (secundaria, 2 líneas
+ * como mucho) y acciones de contacto (reel, CV, correo, GitHub…). El botón principal de la historia
+ * va justo debajo, fuera de este bloque (lo gestiona `StoryControls`).
+ */
+export class Hud implements TimelineViewPart {
   constructor(private readonly root: HTMLElement) {}
 
   render(model: TimelineViewModel): void {
     const { meta } = model.timeline;
     clear(this.root);
-    document.title = `${meta.owner} — ${meta.title}`;
+    document.title = meta.headline ? `${meta.owner} — ${meta.headline}` : `${meta.owner} — ${meta.title}`;
     document.documentElement.lang = meta.locale;
 
-    const contact = el('ul', { class: 'hud__contact' });
-    for (const item of meta.contact ?? []) {
-      const link = safeLink(item.label, item.url);
-      if (link) contact.append(el('li', {}, [link]));
-    }
+    const eyebrow = eyebrowOf(meta.owner, meta.title);
+    const where = [meta.location, meta.availability].filter((part): part is string => Boolean(part?.trim()));
+    const actions = contactActions(meta, 'action');
 
     append(
       this.root,
-      el('p', { class: 'hud__eyebrow', text: meta.title }),
+      eyebrow ? el('p', { class: 'hud__eyebrow', text: eyebrow }) : null,
       el('h1', { class: 'hud__owner', text: meta.owner }),
+      meta.headline ? el('p', { class: 'hud__headline', text: meta.headline }) : null,
+      where.length > 0
+        ? el('p', { class: 'hud__where' }, where.map((part, i) => el('span', { class: i === 0 && meta.location ? 'hud__location' : 'hud__availability', text: part })))
+        : null,
       meta.tagline ? el('p', { class: 'hud__tagline', text: meta.tagline }) : null,
-      el('div', { class: 'hud__meta' }, [
-        this.counter,
-        model.source === 'example'
-          ? el('p', {
-              class: 'hud__notice',
-              text: STRINGS.exampleData,
-              attrs: { title: STRINGS.exampleDataHint, role: 'status', 'data-testid': 'example-notice' },
-            })
-          : null,
-      ]),
-      contact.childElementCount > 0 ? contact : null,
+      actions.length > 0 ? el('ul', { class: 'hud__contact actions' }, actions.map((action) => el('li', {}, [action]))) : null,
+      model.source === 'example'
+        ? el('p', {
+            class: 'hud__notice',
+            text: STRINGS.exampleData,
+            attrs: { title: STRINGS.exampleDataHint, role: 'status', 'data-testid': 'example-notice' },
+          })
+        : null,
     );
-  }
-
-  applyFilter(state: FilterViewState): void {
-    this.counter.textContent = STRINGS.eventsVisible(state.visibleEventIds.size, state.totalEvents);
-  }
-
-  /** Con el detalle abierto la cabecera se retira para no competir con la escena. */
-  applySelection(state: SelectionViewState): void {
-    this.root.classList.toggle('hud--dimmed', state.detailOpen);
   }
 
   showLoadError(message: string): void {

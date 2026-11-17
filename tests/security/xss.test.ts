@@ -55,7 +55,8 @@ function hostileData(): LifeData {
 
 /** Elementos con manejadores en línea o que solo pueden venir de HTML inyectado. */
 function injected(root: ParentNode): Element[] {
-  const suspicious = [...root.querySelectorAll('script, svg, iframe, object, embed, style, link, form, [srcdoc]')];
+  // Los iconos de la interfaz (`svg.icon`) los crea el código, nunca el JSON.
+  const suspicious = [...root.querySelectorAll('script, svg:not(.icon), iframe, object, embed, style, link, form, [srcdoc]')];
   const inline = [...root.querySelectorAll('*')].filter((node) => node.getAttributeNames().some((name) => name.startsWith('on')));
   return [...suspicious, ...inline];
 }
