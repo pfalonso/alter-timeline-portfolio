@@ -36,7 +36,7 @@ describe('NodeMesh: sólido 3D en wireframe', () => {
     expect(node.group.name).toBe('node:e1');
     expect(node.eventId).toBe('e1');
     expect(node.color).toBe('#ff0000');
-    expect(node.group.children).toEqual([node.aura, node.spinner]);
+    expect(node.group.children).toEqual([node.aura, node.spinner, node.selectionRing]);
     expect(node.wire).toBeInstanceOf(LineSegments);
     expect(node.fill).toBeInstanceOf(Mesh);
   });
@@ -66,8 +66,9 @@ describe('NodeMesh: sólido 3D en wireframe', () => {
     for (const style of ['geometric', 'organic', 'neutral'] as const) {
       expect(segments(style, 1)).toBeLessThan(segments(style, 3));
     }
-    // Geométrico: tetraedro (6 aristas), octaedro (12), icosaedro (30) + cubo inscrito (12).
-    expect([segments('geometric', 1), segments('geometric', 2), segments('geometric', 3)]).toEqual([6, 12, 42]);
+    // Geométrico: cubo (12 aristas), octaedro (12), icosaedro (30) + cubo inscrito (12). El menor
+    // ya no es un tetraedro: de lado parecía el puntero del ratón (U-56); el peso lo da el tamaño.
+    expect([segments('geometric', 1), segments('geometric', 2), segments('geometric', 3)]).toEqual([12, 12, 42]);
     expect(createNodeShape('geometric', 3).inner).not.toBeNull();
     expect(createNodeShape('neutral', 3).inner).not.toBeNull();
     expect(createNodeShape('organic', 2).inner).toBeNull();
@@ -216,5 +217,33 @@ describe('NodeMesh / NodeAssets: liberación', () => {
     const spies = [vi.spyOn(shared.quad, 'dispose'), vi.spyOn(shared.ring, 'dispose'), vi.spyOn(shape.wire, 'dispose'), vi.spyOn(shape.fill, 'dispose')];
     shared.dispose();
     for (const spy of spies) expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('NodeMesh: aro de selección y atenuado de la historia', () => {
+  it('el aro de selección solo se ve con el nodo enfocado y no pasa de 1,6 veces su tamaño', () => {
+    const node = make();
+    node.update(frameContext({ reducedMotion: true }));
+    expect(node.selectionRing.visible).toBe(false);
+    node.setFocused(true);
+    node.update(frameContext({ reducedMotion: true }));
+    expect(node.selectionRing.visible).toBe(true);
+    const outer = node.selectionRing.geometry.parameters.outerRadius * node.selectionRing.scale.x;
+    const size = node.spinner.scale.x;
+    expect(outer / size).toBeLessThanOrEqual(1.6 + 1e-6);
+  });
+
+  it('atenuado baja el brillo de aristas y aura sin tocar la presencia', () => {
+    const node = make();
+    node.update(frameContext({ reducedMotion: true }));
+    const glow = node.wire.material.opacity;
+    node.setMuted(true);
+    expect(node.muted).toBe(true);
+    node.update(frameContext({ reducedMotion: true }));
+    expect(node.wire.material.opacity).toBeCloseTo(glow * 0.45, 5);
+    expect(node.presence).toBe(1);
+    node.setMuted(false);
+    node.update(frameContext({ reducedMotion: true }));
+    expect(node.wire.material.opacity).toBeCloseTo(glow, 5);
   });
 });

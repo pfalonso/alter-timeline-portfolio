@@ -5,6 +5,7 @@ export type {
   NavigationDirection,
   NavigationGranularity,
   SelectionViewState,
+  StoryMode,
   StoryViewState,
   TimelineView,
   TimelineViewHandlers,

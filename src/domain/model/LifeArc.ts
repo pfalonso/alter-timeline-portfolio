@@ -26,5 +26,5 @@ export const arcEndYear = (arc: LifeArc): number => (arc.end ? arc.end.toDecimal
 export function arcYears(arc: LifeArc, presentLabel: string): string {
   const start = String(arc.start.year);
   const end = arc.end ? String(arc.end.year) : presentLabel;
-  return start === end ? start : `${start} — ${end}`;
+  return start === end ? start : `${start} – ${end}`;
 }

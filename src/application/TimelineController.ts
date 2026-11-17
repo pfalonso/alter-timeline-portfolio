@@ -4,6 +4,7 @@ import type {
   FilterStateStore,
   NavigationDirection,
   NavigationGranularity,
+  StoryMode,
   StoryViewState,
   TimelineView,
   TimelineViewHandlers,
@@ -36,6 +37,9 @@ interface StoryState {
   readonly eventId: string;
   readonly fromEventId: string | null;
   readonly newChapter: boolean;
+  readonly mode: StoryMode;
+  /** Tras el último paso: pantalla de cierre. */
+  readonly ended?: boolean;
 }
 
 /** Orquesta casos de uso ↔ vista. Mantiene el estado de sesión (filtro y selección). */
@@ -45,6 +49,8 @@ export class TimelineController implements TimelineViewHandlers {
   private visibleIds: ReadonlySet<string> = new Set();
   private selection: SelectionState = NO_SELECTION;
   private story: StoryState | null = null;
+  /** Línea vital aislada (filtro de primer nivel), o `null`. */
+  private isolatedLine: string | null = null;
   private readonly followStory: FollowStory;
 
   constructor(private readonly deps: TimelineControllerDeps) {
@@ -87,6 +93,19 @@ export class TimelineController implements TimelineViewHandlers {
     this.changeFilter({ type: 'none' });
   }
 
+  onLineIsolated(lineId: string | null): void {
+    if (!this.timeline || lineId === this.isolatedLine) return;
+    this.isolatedLine = lineId !== null && this.timeline.branchIds.includes(lineId) ? lineId : null;
+    this.afterFilterChange();
+  }
+
+  onFiltersReset(): void {
+    if (!this.timeline) return;
+    this.isolatedLine = null;
+    this.filter = this.deps.toggleCategoryFilter.execute(this.filter, { type: 'all' });
+    this.afterFilterChange();
+  }
+
   onEventActivated(eventId: string): void {
     this.select(eventId, true);
   }
@@ -121,18 +140,36 @@ export class TimelineController implements TimelineViewHandlers {
     if (target !== null) this.select(target, this.selection.detailOpen);
   }
 
-  onStoryStart(fromEventId?: string): void {
+  onStoryStart(fromEventId?: string, mode?: StoryMode): void {
     if (!this.timeline) return;
-    const step = this.followStory.start(this.followStory.path(this.timeline, this.visibleIds), fromEventId);
-    if (step) this.goToStory(step.eventId, null);
+    // Desde un evento concreto se sigue la historia completa (la cronológica); si no, la corta.
+    let chosen = mode ?? (fromEventId !== undefined ? 'full' : this.followStory.defaultMode(this.timeline));
+    if (this.followStory.path(this.timeline, this.visibleIds, chosen).length === 0) chosen = chosen === 'short' ? 'full' : 'short';
+    const step = this.followStory.start(this.followStory.path(this.timeline, this.visibleIds, chosen), fromEventId);
+    if (step) this.goToStory(step.eventId, this.story?.ended ? null : (this.story?.eventId ?? null), chosen);
   }
 
   onStoryStep(direction: NavigationDirection): void {
     if (!this.timeline) return;
-    const path = this.followStory.path(this.timeline, this.visibleIds);
+    const mode = this.story?.mode ?? 'full';
+    const path = this.followStory.path(this.timeline, this.visibleIds, mode);
     const current = this.story?.eventId ?? this.selection.focusedEventId;
+    if (this.story?.ended) {
+      // Desde la pantalla de cierre, «anterior» vuelve al último paso.
+      if (direction === 'previous' && current !== null) this.goToStory(current, null, mode);
+      return;
+    }
     const step = this.followStory.step(path, current, direction);
-    if (step) this.goToStory(step.eventId, current);
+    if (step) {
+      this.goToStory(step.eventId, current, mode);
+      return;
+    }
+    // Tras el último paso: pantalla de cierre (la ficha se cierra; la cámara se queda donde está).
+    if (this.story && direction === 'next' && current !== null && path.indexOf(current) === path.length - 1) {
+      this.story = { ...this.story, ended: true };
+      this.selection = { ...this.selection, detailOpen: false };
+      this.pushSelection();
+    }
   }
 
   onStoryExit(): void {
@@ -142,9 +179,11 @@ export class TimelineController implements TimelineViewHandlers {
     this.pushSelection();
   }
 
-  private goToStory(eventId: string, fromEventId: string | null): void {
+  private goToStory(eventId: string, fromEventId: string | null, mode: StoryMode): void {
     const timeline = this.timeline as Timeline;
-    this.story = { eventId, fromEventId, newChapter: this.followStory.isNewChapter(timeline, fromEventId, eventId) };
+    // La versión corta salta entre capítulos: no lleva tarjetas de capítulo.
+    const newChapter = mode === 'full' && this.followStory.isNewChapter(timeline, fromEventId, eventId);
+    this.story = { eventId, fromEventId, newChapter, mode };
     this.selection = { focusedEventId: eventId, detailOpen: true };
     this.pushSelection();
   }
@@ -154,13 +193,12 @@ export class TimelineController implements TimelineViewHandlers {
     const next = this.deps.selectEvent.execute(this.timeline, this.visibleIds, this.selection, eventId, openDetail);
     if (next.focusedEventId === this.selection.focusedEventId && next.detailOpen === this.selection.detailOpen) return;
     // Elegir otro evento durante la historia: si está en el recorrido, se sigue desde él; si no, se sale.
-    if (this.story && next.focusedEventId !== this.story.eventId) {
-      const path = this.followStory.path(this.timeline, this.visibleIds);
+    if (this.story && (next.focusedEventId !== this.story.eventId || this.story.ended)) {
+      const mode = this.story.mode;
+      const path = this.followStory.path(this.timeline, this.visibleIds, mode);
       const id = next.focusedEventId;
-      this.story =
-        id !== null && path.includes(id)
-          ? { eventId: id, fromEventId: this.story.eventId, newChapter: this.followStory.isNewChapter(this.timeline, this.story.eventId, id) }
-          : null;
+      const newChapter = mode === 'full' && id !== null && this.followStory.isNewChapter(this.timeline, this.story.eventId, id);
+      this.story = id !== null && path.includes(id) ? { eventId: id, fromEventId: this.story.eventId, newChapter, mode } : null;
     }
     this.selection = next;
     this.pushSelection();
@@ -169,6 +207,10 @@ export class TimelineController implements TimelineViewHandlers {
   private changeFilter(action: FilterAction): void {
     if (!this.timeline) return;
     this.filter = this.deps.toggleCategoryFilter.execute(this.filter, action);
+    this.afterFilterChange();
+  }
+
+  private afterFilterChange(): void {
     this.pushFilter();
     const reconciled = this.deps.selectEvent.reconcile(this.visibleIds, this.selection);
     if (reconciled !== this.selection) this.selection = reconciled;
@@ -178,12 +220,13 @@ export class TimelineController implements TimelineViewHandlers {
 
   private pushFilter(): void {
     if (!this.timeline) return;
-    this.visibleIds = this.deps.eventFilter.visibleEventIds(this.timeline, this.filter);
+    this.visibleIds = this.deps.eventFilter.visibleEventIds(this.timeline, this.filter, this.isolatedLine);
     this.deps.view.applyFilter({
       activeCategoryIds: this.filter.activeIds,
       visibleEventIds: this.visibleIds,
       totalEvents: this.timeline.events.length,
       layout: this.deps.loadTimeline.relayout(this.timeline, this.visibleIds),
+      isolatedLine: this.isolatedLine,
     });
   }
 
@@ -194,7 +237,7 @@ export class TimelineController implements TimelineViewHandlers {
       this.visibleIds,
       this.selection.focusedEventId,
     );
-    const path = this.followStory.path(this.timeline, this.visibleIds);
+    const path = this.followStory.path(this.timeline, this.visibleIds, this.story?.mode ?? 'full');
     const story = this.storyView(path);
     const focused = this.selection.focusedEventId;
     const next = story || focused === null ? null : this.followStory.step(path, focused, 'next');
@@ -202,7 +245,8 @@ export class TimelineController implements TimelineViewHandlers {
       this.deps.view.applySelection({
         ...this.selection,
         hasPrevious: story.index > 0,
-        hasNext: story.index < story.total - 1,
+        // En el último paso, «Siguiente» es «Terminar»: lleva a la pantalla de cierre.
+        hasNext: !story.ended,
         story,
       });
       return;
@@ -221,7 +265,10 @@ export class TimelineController implements TimelineViewHandlers {
       eventId: this.story.eventId,
       fromEventId: this.story.fromEventId,
       arcId: (event && this.timeline.arcOf(event)?.id) ?? null,
-      newChapter: this.story.newChapter,
+      newChapter: this.story.newChapter && !this.story.ended,
+      mode: this.story.mode,
+      ended: this.story.ended === true,
+      path,
     };
   }
 }

@@ -2056,3 +2056,2275 @@ a {
     animation: none;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════════════════════
+   Revisión UX (17/11/2026, hr/REVIEW_UX.md). Este bloque manda sobre lo anterior.
+   Escala tipográfica cerrada: 12 · 14 · 16 · 21 · 40+ (mínimo absoluto 12 px). Versalitas
+   espaciadas solo para títulos de sección. Zonas pulsables ≥ 32 px en escritorio y ≥ 44 px en
+   táctil. Contraste ≥ 4,5:1 en texto informativo.
+   ═════════════════════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --muted: #9aa6c8;
+  --ink-soft: #c3cce6;
+  --cta-from: #b9dcff;
+  --cta-to: #d9c6ff;
+  --bar-h: 0px;
+}
+
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+/* La escena enfocada no dibuja un marco en toda la pantalla: el foco se ve en el momento (aro). */
+.stage:focus-visible {
+  outline: none;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon--play {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ───────── Cabecera ───────── */
+
+.hud {
+  max-width: min(660px, 54vw);
+  pointer-events: none;
+  isolation: isolate;
+}
+
+/* Velo tras la cabecera: si una hebra pasa por detrás, el texto sigue leyéndose (U-08). */
+.hud::before {
+  content: '';
+  position: absolute;
+  inset: -60px -90px -40px -80px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(10, 8, 24, 0.82) 55%, rgba(10, 8, 24, 0));
+  pointer-events: none;
+}
+
+.app--detail .hud::before,
+.app--story .hud::before {
+  opacity: 0;
+}
+
+.hud__main > *,
+.hud__links {
+  pointer-events: auto;
+}
+
+/* Detalle y historia: los enlaces se retiran con el resto de la cabecera. */
+.app--detail .hud__links,
+.app--story .hud__links {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud__links .actions {
+  margin-top: 14px;
+}
+
+.hud__eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+}
+
+.hud__eyebrow::before {
+  width: 20px;
+}
+
+.hud__owner {
+  font-size: clamp(2.2rem, 3.2vw, 3.4rem);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.hud__headline {
+  margin: 10px 0 0;
+  font-size: clamp(17px, 1.45vw, 22px);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
+  text-wrap: balance;
+  text-shadow: 0 0 14px rgba(4, 5, 13, 0.95);
+}
+
+.hud__where {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.hud__where > span + span::before {
+  content: '·';
+  margin: 0 8px;
+  color: var(--muted);
+}
+
+.hud__location {
+  color: var(--ink);
+}
+
+.hud__tagline {
+  display: -webkit-box;
+  margin: 10px 0 0;
+  max-width: 64ch;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.hud__notice {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hud__contact {
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.action,
+.hud__contact a.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: rgba(8, 10, 26, 0.78);
+  backdrop-filter: blur(8px);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: none;
+  text-shadow: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.action:hover {
+  border-color: #fff;
+  background: rgba(30, 40, 80, 0.8);
+}
+
+.action--primary,
+.hud__contact a.action--primary {
+  border-color: color-mix(in srgb, var(--glow) 70%, transparent);
+  color: #fff;
+}
+
+.action-group {
+  display: inline-flex;
+}
+
+.action-group .action {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.action__copy {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-left: 0;
+  border-radius: 0 3px 3px 0;
+  background: rgba(8, 10, 26, 0.78);
+  color: var(--ink-soft);
+}
+
+.action__copy:hover {
+  color: #fff;
+}
+
+.action__copy--done {
+  color: #8affd9;
+}
+
+.action--large {
+  min-height: 44px;
+  padding: 0 16px;
+}
+
+.hud__cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-top: 18px;
+  pointer-events: auto;
+}
+
+/* El botón principal: el único elemento con relleno de color de la pantalla (U-02). */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  box-shadow: 0 10px 30px -12px var(--cta-from);
+  font-size: 16px;
+  font-weight: 600;
+  color: #0b0f24;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s;
+}
+
+.cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 36px -10px var(--cta-from);
+}
+
+.cta:focus-visible {
+  outline-color: #fff;
+}
+
+.cta__meta {
+  padding-left: 10px;
+  border-left: 1px solid rgba(11, 15, 36, 0.3);
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(11, 15, 36, 0.78);
+}
+
+.cta__icon {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.hud__secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.link-button {
+  min-height: 36px;
+  padding: 0 2px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.link-button:hover,
+.link-button[aria-expanded='true'] {
+  color: #fff;
+  text-decoration-color: #fff;
+}
+
+.link-button--sheet {
+  display: none;
+}
+
+@media (max-height: 820px) and (min-width: 721px) {
+  .hud__tagline {
+    display: none;
+  }
+}
+
+@media (max-height: 740px) and (min-width: 721px) {
+  .hud__eyebrow {
+    display: none;
+  }
+
+  .hud__owner {
+    font-size: clamp(2rem, 2.8vw, 2.8rem);
+  }
+
+  .actions {
+    margin-top: 10px;
+  }
+
+  .hud__cta {
+    margin-top: 12px;
+  }
+}
+
+/* Con una ficha abierta, o en la historia, la interfaz se retira del todo; el nombre queda como firma. */
+.app--detail .hud,
+.app--story .hud {
+  opacity: 1;
+}
+
+.app--detail .hud__main > :not(.hud__owner),
+.app--story .hud__main > :not(.hud__owner),
+.app--detail .hud__cta,
+.app--story .hud__cta,
+.app--detail .filters,
+.app--story .filters,
+.app--detail .help,
+.app--story .help,
+.app--story .toolbar {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.app--detail .hud__owner,
+.app--story .hud__owner {
+  font-size: 20px;
+  text-shadow: none;
+  opacity: 0.8;
+  transition: font-size 0.4s var(--ease);
+}
+
+/* ───────── Controles de cámara y atajos ───────── */
+
+.controls__button {
+  min-width: 40px;
+  height: 40px;
+  color: var(--ink-soft);
+}
+
+.controls__button .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Rótulo al pasar el ratón o con el foco (U-13). */
+.controls__button[data-tip] {
+  position: relative;
+}
+
+.controls__button[data-tip]:hover::after,
+.controls__button[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  background: rgba(6, 9, 22, 0.95);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--ink);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.shortcuts {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 22;
+  width: 330px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-strong);
+  background: rgba(6, 9, 22, 0.95);
+  backdrop-filter: blur(16px);
+}
+
+.shortcuts__title {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.shortcuts__list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.shortcuts__list dt {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: #fff;
+}
+
+.shortcuts__list dd {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* Pista de una sola acción, junto a la escena; desaparece tras la primera interacción (U-10). */
+.help {
+  right: auto;
+  left: 50%;
+  bottom: calc(var(--pad) + 150px);
+  max-width: none;
+  translate: -50% 0;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(6, 9, 22, 0.72);
+  backdrop-filter: blur(8px);
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  transition: opacity 0.6s ease 1.2s;
+}
+
+.app--loading .help {
+  opacity: 0;
+}
+
+/* ───────── Líneas vitales (primer nivel) y filtros (segundo nivel) ───────── */
+
+.filters {
+  left: var(--pad);
+  right: var(--pad);
+  bottom: calc(var(--pad) + 46px);
+  max-width: none;
+  pointer-events: none;
+}
+
+.filters > * {
+  pointer-events: auto;
+}
+
+.filters__sheet-head {
+  display: none;
+}
+
+.filters__bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px 16px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.lines {
+  position: relative;
+  display: block;
+  margin: 0;
+}
+
+.lines__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0 0 8px;
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.lines__title {
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.lines__now {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* Rejilla fija: el estado cambia brillo y grosor del trazo, nunca la posición (U-31). */
+.lines__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.line {
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(8, 10, 26, 0.72);
+  backdrop-filter: blur(8px);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-shadow: none;
+}
+
+.line__swatch {
+  width: 18px;
+  height: 2px;
+  box-shadow: none;
+  transition: height 0.3s, box-shadow 0.3s;
+}
+
+.line--braided .line__swatch {
+  height: 6px;
+  box-shadow: 0 0 10px var(--line-color);
+}
+
+.line--braided .line__label {
+  font-weight: 500;
+  color: #fff;
+}
+
+.line--closed .line__swatch {
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--line-color) 0 4px, transparent 4px 7px);
+}
+
+.line__status {
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.line:hover,
+.line:focus-visible,
+.line--active {
+  border-color: color-mix(in srgb, var(--line-color) 70%, transparent);
+  color: #fff;
+}
+
+.line[aria-pressed='true'] {
+  border-color: var(--line-color);
+  background: color-mix(in srgb, var(--line-color) 22%, rgba(8, 10, 26, 0.8));
+  color: #fff;
+}
+
+.lines--isolating .line[aria-pressed='false'] {
+  opacity: 0.6;
+}
+
+.lines--highlighting .line:not(.line--active) {
+  opacity: 0.6;
+}
+
+.lines__desc {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 3;
+  max-width: min(640px, 80vw);
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  background: rgba(6, 9, 22, 0.94);
+  font-size: 14px;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.filters__toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(8, 10, 26, 0.72);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.filters__toggle:hover,
+.filters__toggle--open {
+  border-color: #fff;
+  color: #fff;
+}
+
+.filters__more {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 4;
+  width: min(700px, calc(100vw - 2 * var(--pad)));
+  max-height: 60vh;
+  overflow: auto;
+  padding: 16px 18px;
+  border: 1px solid var(--line-strong);
+  background: rgba(6, 9, 22, 0.95);
+  backdrop-filter: blur(18px);
+}
+
+.filters__head {
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.filters__title,
+.keys__title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.filters__bulk {
+  min-height: 32px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.chip {
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: rgba(14, 18, 40, 0.8);
+  clip-path: none;
+  font-size: 14px;
+}
+
+.chip:hover {
+  transform: none;
+  border-color: #fff;
+  background: rgba(30, 40, 80, 0.8);
+}
+
+.chip__check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--ink-soft);
+  border-radius: 2px;
+}
+
+.chip__check {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Marcada: casilla rellena con ✓ (no solo color). */
+.chip[aria-pressed='true'] .chip__check {
+  border-color: #fff;
+  background: #fff;
+  color: #0b0f24;
+}
+
+.chip[aria-pressed='true'] .chip__check::after {
+  content: '✓';
+  font-weight: 700;
+}
+
+.chip__count {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink-soft);
+  opacity: 1;
+}
+
+.chip[aria-pressed='false'] {
+  background: rgba(6, 9, 22, 0.5);
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+
+.keys {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.keys .lines__keys {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.key {
+  display: grid;
+  grid-template-columns: 20px auto 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.key__hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.key__icon--focus {
+  width: 18px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #7fd8ff, #f7a8d8, #fef075);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.key__icon--link {
+  width: 18px;
+  height: 10px;
+  border: 1.5px solid rgba(220, 220, 235, 0.8);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+.key__icon--ghost {
+  background: repeating-linear-gradient(90deg, rgba(220, 220, 235, 0.8) 0 3px, transparent 3px 6px);
+}
+
+.filters__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--ink);
+  text-shadow: 0 0 10px rgba(4, 5, 13, 0.95);
+}
+
+.filters__reset {
+  min-height: 32px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.filters__reset:hover {
+  color: #fff;
+}
+
+/* ───────── Regla, capítulos y «hoy» ───────── */
+
+.ruler__tick span {
+  font-size: 12px;
+}
+
+.ruler__now {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.arc-strip {
+  height: 22px;
+  bottom: calc(var(--pad) + 22px);
+}
+
+.arc-strip__caption {
+  bottom: 5px;
+  left: 6px;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ink-soft);
+  opacity: 1;
+}
+
+/* Fuera del capítulo actual solo se ve su número: nunca un título recortado (U-12). */
+.arc-strip__segment:not(.arc-strip__segment--active) .arc-strip__title,
+.arc-strip__segment:not(.arc-strip__segment--active) .arc-strip__years {
+  display: none;
+}
+
+.arc-strip__number {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.arc-strip__segment--active .arc-strip__caption {
+  overflow: visible;
+  right: auto;
+  color: #fff;
+  font-size: 13px;
+}
+
+.arc-strip__segment--active .arc-strip__title {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.arc-strip__segment--narrow .arc-strip__years {
+  display: inline;
+}
+
+/* ───────── Rótulos de los momentos ───────── */
+
+/* Al ocultarse se va al instante: dos rótulos nunca conviven en el mismo hueco (U-26). */
+.node-label {
+  transition: opacity 0s;
+}
+
+.node-label--shown {
+  transition: opacity 0.35s ease;
+}
+
+.node-label__date {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--accent) 45%, white);
+  opacity: 1;
+}
+
+.node-label__active {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+}
+
+.node-label--i1 .node-label__title {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+/* En la historia, el momento activo manda; el resto de rótulos baja (U-50). */
+.app--story .node-label:not(.node-label--focused) {
+  opacity: 0;
+}
+
+.app--story .node-label--shown:not(.node-label--focused) {
+  opacity: 0.45;
+}
+
+.node-label--focused .node-label__title {
+  color: #fff;
+}
+
+.app--story .node-label--focused .node-label__title {
+  font-size: 15px;
+}
+
+.app--story .node-label--focused.node-label--i3 .node-label__title {
+  font-size: 23px;
+}
+
+.ghost-label {
+  font-size: 14px;
+  color: color-mix(in srgb, var(--accent) 35%, white);
+}
+
+.ghost-label--shown {
+  opacity: 0.92;
+}
+
+.tooltip__category {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.tooltip__dates {
+  font-size: 12px;
+}
+
+/* ───────── Ficha ───────── */
+
+.popup {
+  bottom: calc(var(--pad) + 46px);
+  z-index: 24;
+}
+
+.popup__handle {
+  display: none;
+}
+
+.popup__bar {
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px 18px 0 32px;
+}
+
+.popup__progress {
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+.popup__step {
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.popup__arc::before {
+  content: none;
+}
+
+.popup__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+
+.popup__close .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.popup__exit-story {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-color: var(--line-strong);
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.popup__story {
+  padding: 4px 30px 6px 32px;
+}
+
+.progress {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress__chapter {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.progress__steps {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress__steps > li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.progress__step {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 20px;
+}
+
+.progress__step::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(170, 190, 240, 0.22);
+  transition: background 0.3s;
+}
+
+.progress__step--done::before {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.progress__step--current::before {
+  top: 6px;
+  height: 8px;
+  background: #fff;
+  box-shadow: 0 0 10px var(--accent);
+}
+
+.progress__step:hover::before {
+  background: color-mix(in srgb, var(--accent) 85%, white);
+}
+
+/* La frase puente es el hilo de la historia: lo primero que se lee y el estilo más grande (U-52). */
+.popup__bridge {
+  margin: 12px 0 0;
+  padding-left: 16px;
+  border-left: 2px solid var(--accent);
+  font-size: clamp(22px, 1.8vw, 26px);
+  line-height: 1.28;
+  color: #fff;
+  text-wrap: pretty;
+}
+
+.popup__body {
+  padding: 10px 30px 28px 32px;
+}
+
+.popup--story .popup__body {
+  padding-top: 14px;
+}
+
+.popup__context {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.popup__kicker {
+  margin: 10px 0 0;
+  font-size: 14px;
+  color: color-mix(in srgb, var(--accent) 40%, white);
+}
+
+.popup__title {
+  margin: 8px 0 0;
+}
+
+.popup__context + .popup__title {
+  margin-top: 8px;
+}
+
+.popup__subtitle {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.badge {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.popup__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.popup__links--top {
+  margin-top: 14px;
+}
+
+.popup__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.popup__link:hover {
+  border-color: #fff;
+}
+
+/* Entradilla en redonda (la cursiva queda para la frase puente, U-42). */
+.popup__summary {
+  margin: 18px 0 0;
+  font-family: var(--font-body);
+  font-style: normal;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.popup__skills {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.popup__skills li {
+  font-size: 13px;
+  border-radius: 999px;
+}
+
+.popup__paragraph {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.popup__section h3 {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+.popup__meta {
+  display: grid;
+  gap: 6px;
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.popup__meta p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0;
+}
+
+.popup__meta .popup__lines {
+  display: flex;
+}
+
+.popup__dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--dot, #9fd8ff);
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+.dot--on {
+  background: var(--dot, #9fd8ff);
+  opacity: 1;
+}
+
+.popup__meta .badge--line,
+.popup__meta .badge--branch {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.popup__chapter::before {
+  content: '·';
+  margin-right: 12px;
+}
+
+.popup__categories:empty + .popup__chapter::before {
+  display: none;
+}
+
+/* Hay más contenido debajo: degradado sobre el pie e indicador (U-43). */
+.popup__more {
+  display: none;
+}
+
+.popup--more .popup__body {
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 44px), transparent);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 44px), transparent);
+}
+
+.popup--more .popup__more {
+  display: block;
+  align-self: center;
+  margin: -30px 0 6px;
+  padding: 3px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(6, 9, 22, 0.9);
+  font-size: 12px;
+  color: var(--ink-soft);
+  pointer-events: none;
+  position: relative;
+  z-index: 1;
+}
+
+.popup__footer {
+  align-items: center;
+  padding: 10px 24px 14px 32px;
+}
+
+.popup__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 48%;
+  min-height: 40px;
+  padding: 0 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+.popup__nav--next {
+  margin-left: auto;
+}
+
+/* El nombre del vecino se ve entero (U-27): como mucho dos líneas, nunca recortado con «…». */
+.popup__nav-label {
+  white-space: normal;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.popup__nav--prev {
+  text-align: left;
+}
+
+.popup__nav--next {
+  text-align: right;
+}
+
+.popup__nav-arrow {
+  flex: none;
+}
+
+.popup__nav--primary {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  font-weight: 600;
+  color: #0b0f24;
+}
+
+.popup__nav--primary:hover {
+  color: #0b0f24;
+  filter: brightness(1.05);
+}
+
+.popup__story-next {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ───────── Historia: tarjeta de capítulo como momento propio y pantalla de cierre ───────── */
+
+.app--chapter .popup {
+  display: none;
+}
+
+.chapter {
+  left: auto;
+  right: var(--pad);
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 26;
+  width: min(480px, calc(100vw - 2 * var(--pad)));
+  padding: 30px 32px 26px;
+}
+
+.chapter__kicker {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+.chapter__summary {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.chapter__actions {
+  justify-content: flex-start;
+}
+
+.chapter__continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #0b0f24;
+}
+
+.chapter__continue:hover,
+.chapter__continue:focus-visible {
+  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  filter: brightness(1.06);
+}
+
+.story-end {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 26;
+  width: min(640px, calc(100vw - 2 * var(--pad)));
+  max-height: calc(100% - 2 * var(--pad));
+  overflow-y: auto;
+  translate: -50% -50%;
+  padding: 34px 36px 30px;
+  border: 1px solid var(--line-strong);
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--glow) 16%, transparent), transparent 70%),
+    rgba(6, 9, 22, 0.94);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
+}
+
+.story-end--enter {
+  animation: rise-in 0.7s var(--ease) both;
+}
+
+.story-end__kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--glow);
+}
+
+.story-end__title {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.08;
+}
+
+.story-end__where {
+  margin: 10px 0 0;
+  font-size: 16px;
+  color: var(--ink-soft);
+}
+
+.story-end__actions {
+  margin-top: 22px;
+}
+
+.story-end__next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.story-end__button {
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 15px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.story-end__button--primary {
+  padding: 0 18px;
+  border-radius: 4px;
+  background: linear-gradient(100deg, var(--cta-from), var(--cta-to));
+  font-weight: 600;
+  color: #0b0f24;
+  text-decoration: none;
+}
+
+.story-end__button:hover {
+  color: #fff;
+}
+
+.story-end__button--primary:hover {
+  color: #0b0f24;
+  filter: brightness(1.06);
+}
+
+.app--story-end .ruler,
+.app--story-end .arc-strip {
+  opacity: 0.4;
+}
+
+/* ───────── Índice ───────── */
+
+.index {
+  top: var(--pad);
+  z-index: 23;
+  width: min(440px, calc(100vw - 2 * var(--pad)));
+  padding: 0 20px 20px;
+}
+
+.index__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -20px 12px;
+  padding: 16px 20px 10px;
+  background: rgba(6, 9, 22, 0.97);
+  border-bottom: 1px solid var(--line);
+}
+
+.index__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.index__title {
+  flex: 1;
+  margin: 0;
+  font-size: 24px;
+}
+
+.index__all {
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.index__close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.index__chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.index__jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.index__jump:hover {
+  border-color: #fff;
+  color: #fff;
+}
+
+.index__jump-number {
+  font-family: var(--font-mono);
+  color: var(--glow);
+}
+
+.index__jump-title {
+  white-space: nowrap;
+}
+
+.index__list {
+  border-left: 0;
+}
+
+.index__group-title {
+  scroll-margin-top: 140px;
+}
+
+.index__group-years {
+  font-size: 12px;
+}
+
+.index__group-summary {
+  display: none;
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.index--major .index__item--minor {
+  display: none;
+}
+
+.index__button {
+  grid-template-columns: 12px 92px 1fr;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-height: 40px;
+  padding: 8px 6px;
+}
+
+.index__button::before {
+  display: none;
+}
+
+.index__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  align-self: center;
+}
+
+.index__item--i1 .index__dot {
+  width: 7px;
+  height: 7px;
+  justify-self: center;
+}
+
+.index__date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+.index__name {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.index__item--i3 .index__name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.index__item--i1 .index__name {
+  font-size: 14px;
+}
+
+.index__subtitle,
+.index__summary {
+  grid-column: 3;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* ───────── Sin 3D: un CV narrado, no un parche (U-69) ───────── */
+
+.app--no-webgl .hud {
+  max-width: 820px;
+  padding-top: calc(var(--pad) + 8px);
+}
+
+.app--no-webgl .hud__owner {
+  white-space: normal;
+}
+
+.app--no-webgl .filters {
+  display: none;
+}
+
+.app--no-webgl .index {
+  max-width: 820px;
+  padding: 20px var(--pad) 80px;
+  animation: none;
+}
+
+.app--no-webgl .index__head {
+  position: static;
+  margin: 0 0 16px;
+  padding: 0 0 12px;
+  background: none;
+}
+
+.app--no-webgl .index__fallback {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.app--no-webgl .index__group-summary {
+  display: block;
+}
+
+.app--no-webgl .index__group {
+  margin-top: 28px;
+}
+
+.app--no-webgl .index__group-title {
+  font-size: 26px;
+}
+
+.app--no-webgl .index__summary {
+  display: block;
+}
+
+.app--no-webgl .chapter,
+.app--no-webgl .story-end {
+  position: fixed;
+}
+
+/* Tableta y portátil estrecho: la cabecera puede usar casi todo el ancho (los controles van a la derecha). */
+@media (min-width: 721px) and (max-width: 1100px) {
+  .hud {
+    max-width: calc(100vw - 2 * var(--pad) - 200px);
+  }
+}
+
+.app--no-webgl .arc-strip {
+  display: none;
+}
+
+/* ───────── Monitor grande: la letra pequeña sube un escalón (U-60) ───────── */
+
+@media (min-width: 1900px) {
+  .line,
+  .chip,
+  .filters__toggle,
+  .action,
+  .link-button,
+  .hud__where,
+  .lines__now,
+  .help,
+  .popup__context,
+  .popup__nav {
+    font-size: 15px;
+  }
+
+  .lines__title,
+  .ruler__tick span,
+  .arc-strip__caption,
+  .node-label__date {
+    font-size: 13px;
+  }
+
+  .hud {
+    max-width: 720px;
+  }
+}
+
+/* ───────── Táctil: zonas de 44 px ───────── */
+
+.app--touch .line,
+.app--touch .chip,
+.app--touch .filters__toggle,
+.app--touch .filters__bulk,
+.app--touch .filters__reset,
+.app--touch .link-button,
+.app--touch .action,
+.app--touch .action__copy,
+.app--touch .popup__nav,
+.app--touch .popup__link,
+.app--touch .index__jump,
+.app--touch .index__all {
+  min-height: 44px;
+}
+
+.app--touch .action__copy {
+  width: 44px;
+}
+
+/* ───────── Móvil vertical y apaisado: filtros en hoja, botón principal al alcance del pulgar ───────── */
+
+@media (max-width: 720px), (max-height: 520px) {
+  .toolbar {
+    display: none;
+  }
+
+  .link-button--sheet {
+    display: inline-block;
+  }
+
+  .help {
+    bottom: calc(var(--bar-h) + 70px);
+    font-size: 13px;
+  }
+
+  .filters {
+    display: none;
+  }
+
+  .filters.filters--open {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: block;
+    max-height: 82vh;
+    overflow-y: auto;
+    padding: 0 var(--pad) calc(20px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line-strong);
+    border-radius: 14px 14px 0 0;
+    background: rgba(5, 7, 18, 0.97);
+    backdrop-filter: blur(20px);
+    pointer-events: auto;
+    animation: rise-in 0.3s var(--ease) both;
+  }
+
+  .filters--open .filters__sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 calc(-1 * var(--pad));
+    padding: 10px var(--pad);
+    background: rgba(5, 7, 18, 0.98);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .filters__sheet-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+  }
+
+  .filters__close {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    color: var(--ink);
+  }
+
+  .filters--open .filters__bar {
+    display: block;
+    width: auto;
+    margin-top: 14px;
+  }
+
+  .filters--open .filters__toggle {
+    display: none;
+  }
+
+  .filters--open .filters__more,
+  .filters--open .filters__more[hidden] {
+    position: static;
+    display: block !important;
+    width: auto;
+    max-height: none;
+    margin-top: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .filters--open {
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  .filters--open .filters__sheet-head {
+    order: 0;
+  }
+
+  .filters--open .filters__bar {
+    order: 1;
+  }
+
+  .filters--open .filters__result {
+    order: 2;
+  }
+
+  .filters--open .filters__more {
+    order: 3;
+  }
+
+  /* Una línea por fila, ≥ 44 px (U-65). */
+  .filters--open .lines__list {
+    display: grid;
+    gap: 6px;
+  }
+
+  .filters--open .line {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 6px;
+  }
+
+  .filters--open .lines__desc {
+    position: static;
+    margin-top: 8px;
+  }
+
+  .filters--open .chip {
+    min-height: 44px;
+  }
+
+  .filters--open .filters__chips {
+    flex-wrap: wrap;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .filters--open .key {
+    grid-template-columns: 20px 1fr;
+  }
+
+  .filters--open .key__hint {
+    grid-column: 2;
+  }
+
+  .app--sheet .hud__cta {
+    visibility: hidden;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --bar-h: calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .hud {
+    top: calc(12px + env(safe-area-inset-top));
+    left: var(--pad);
+    right: var(--pad);
+    max-width: none;
+  }
+
+  .hud__eyebrow,
+  .hud__tagline {
+    display: none;
+  }
+
+  .hud__owner {
+    font-size: clamp(1.6rem, 7.4vw, 2.1rem);
+    white-space: nowrap;
+  }
+
+  .hud__headline {
+    margin-top: 4px;
+    font-size: 15px;
+  }
+
+  .hud__where {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .hud__where > span {
+    display: inline;
+  }
+
+  .hud__where > span + span::before {
+    margin: 0 6px;
+  }
+
+  /* Enlaces como fila de iconos de 44 px (el nombre va en aria-label/title). */
+  .hud__contact {
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .hud__contact .action {
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+  }
+
+  .hud__contact .action span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .hud__contact .action .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .hud__contact .action__copy {
+    display: none;
+  }
+
+  .hud__contact .action-group .action {
+    border-radius: 3px;
+  }
+
+  /* Un transform en la cabecera convertiría el botón fijo en relativo a ella (aparecía arriba). */
+  .app--loading .hud,
+  .hud {
+    transform: none;
+  }
+
+  /* Botón principal fijo abajo, a todo el ancho (U-63). */
+  .hud__cta {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 21;
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 12px var(--pad) calc(6px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(4, 5, 13, 0), rgba(4, 5, 13, 0.92) 30%);
+  }
+
+  .cta {
+    justify-content: center;
+    width: 100%;
+    min-height: 52px;
+  }
+
+  .hud__secondary {
+    justify-content: center;
+    gap: 0 18px;
+  }
+
+  .link-button {
+    min-height: 44px;
+  }
+
+  .ruler {
+    bottom: var(--bar-h);
+    height: 34px;
+    border-top: 0;
+    background: none;
+  }
+
+  .arc-strip {
+    bottom: calc(var(--bar-h) + 30px);
+  }
+
+  /* Ficha: hoja inferior que deja ver la escena (U-61). */
+  .popup {
+    inset: auto 0 0;
+    height: 56vh;
+    max-height: 56vh;
+    width: auto;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border: 0;
+    border-top: 1px solid var(--line-strong);
+    border-radius: 16px 16px 0 0;
+    clip-path: none;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, transparent) 0, transparent 140px),
+      rgba(5, 7, 18, 0.97);
+    transition: height 0.3s var(--ease), max-height 0.3s var(--ease);
+  }
+
+  .popup::before {
+    display: none;
+  }
+
+  .popup--expanded {
+    height: calc(100vh - 56px);
+    max-height: calc(100vh - 56px);
+  }
+
+  .popup__handle {
+    display: block;
+    flex: none;
+    width: 100%;
+    height: 28px;
+    touch-action: none;
+  }
+
+  .popup__handle::before {
+    content: '';
+    display: block;
+    width: 44px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 2px;
+    background: var(--ink-soft);
+    opacity: 0.6;
+  }
+
+  /* Barra superior opaca con el cierre: el texto nunca pasa por debajo del ✕ (U-66). */
+  .popup__bar {
+    min-height: 44px;
+    padding: 0 12px 6px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .popup__close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .popup__story {
+    padding: 6px 20px 4px;
+  }
+
+  .popup__progress {
+    flex-direction: column;
+    gap: 0;
+    font-size: 13px;
+  }
+
+  .popup__arc::before {
+    content: none;
+  }
+
+  .popup__bridge {
+    font-size: 19px;
+  }
+
+  .popup__body {
+    padding: 10px 20px 20px;
+  }
+
+  .popup__title {
+    font-size: 30px;
+  }
+
+  .popup__footer {
+    padding: 8px 14px 10px 16px;
+  }
+
+  .popup__nav {
+    min-height: 48px;
+  }
+
+  .popup__nav--primary {
+    min-height: 48px;
+  }
+
+  .chapter,
+  .story-end {
+    left: var(--pad);
+    right: var(--pad);
+    top: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    width: auto;
+    translate: none;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .story-end {
+    padding: 24px 22px 20px;
+  }
+
+  .index {
+    inset: 0;
+    width: auto;
+    padding: 0 var(--pad) var(--pad);
+    z-index: 30;
+  }
+
+  .index__head {
+    margin: 0 calc(-1 * var(--pad)) 12px;
+    padding: calc(12px + env(safe-area-inset-top)) var(--pad) 10px;
+  }
+}
+
+/* Apaisado bajo (móvil girado): cabecera de una sola línea (U-67). */
+@media (max-height: 520px) and (min-width: 721px) {
+  :root {
+    --bar-h: 0px;
+  }
+
+  .hud {
+    top: 10px;
+    left: var(--pad);
+    right: var(--pad);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: none;
+  }
+
+  .hud__main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  .hud__eyebrow,
+  .hud__where,
+  .hud__tagline,
+  .hud__notice {
+    display: none;
+  }
+
+  .hud__owner {
+    font-size: 24px;
+  }
+
+  .hud__headline {
+    display: none;
+  }
+
+  .hud__contact {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin: 0;
+  }
+
+  .hud__contact .action {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0 9px;
+  }
+
+  .hud__contact .action span,
+  .hud__contact .action__copy {
+    display: none;
+  }
+
+  .hud__cta {
+    order: 2;
+    flex-wrap: nowrap;
+    gap: 12px;
+    margin: 0 0 0 auto;
+  }
+
+  .hud__links {
+    order: 1;
+  }
+
+  .cta {
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 15px;
+  }
+
+  .cta__meta {
+    display: none;
+  }
+
+  #story-full,
+  #index-toggle {
+    display: none;
+  }
+
+  .help {
+    bottom: 64px;
+  }
+
+  .popup {
+    top: 8px;
+    bottom: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-end--enter,
+  .filters--open {
+    animation: none;
+  }
+}
+
+/* Apertura en tiempos (U-05): primero nombre y oficio; la escena se dibuja sin rótulos; lo último,
+   la barra de líneas, los controles y la pista. Animación de una sola vez al terminar la carga (no
+   se repite al cerrar una ficha). */
+@keyframes opening-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.app:not(.app--loading) .hud__cta,
+.app:not(.app--loading) .hud__links {
+  animation: opening-in 0.8s var(--ease) 0.5s both;
+}
+
+.app:not(.app--loading) .filters {
+  animation: opening-in 0.8s var(--ease) 1.6s both;
+}
+
+.app:not(.app--loading) .toolbar {
+  animation: opening-in 0.8s var(--ease) 2s both;
+}
+
+@media (max-width: 720px) {
+  /* El botón fijo no se anima con transform (lo sacaría del borde inferior un instante). */
+  .app:not(.app--loading) .hud__cta {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px), (max-height: 520px) {
+  /* La hoja de filtros reaparece de display: none: sin la espera de la apertura. */
+  .app:not(.app--loading) .filters {
+    animation: none;
+  }
+
+  .app:not(.app--loading) .filters.filters--open {
+    animation: rise-in 0.3s var(--ease) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app:not(.app--loading) .hud__cta,
+  .app:not(.app--loading) .hud__links,
+  .app:not(.app--loading) .filters,
+  .app:not(.app--loading) .toolbar {
+    animation: none;
+  }
+}
+
+/* Sin 3D la cabecera va en el flujo: el velo (pensado para la escena) sobra y oscurecería la lista. */
+.app--no-webgl .hud {
+  position: relative;
+  top: auto;
+  left: auto;
+}
+
+.app--no-webgl .hud::before {
+  display: none;
+}

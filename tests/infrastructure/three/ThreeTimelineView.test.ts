@@ -206,7 +206,7 @@ describe('ThreeTimelineView: render y bucle', () => {
     const h = harness();
     const scene = h.scene();
     for (const id of ['a-school', 'b-job', 'c-side', 'e-side-two']) expect(scene.getObjectByName(`node:${id}`)).toBeDefined();
-    for (const name of ['branch:main', 'branch:side', 'particle-flow', 'year-markers']) {
+    for (const name of ['branch:main', 'branch:side', 'particle-flow']) {
       expect(scene.getObjectByName(name)).toBeDefined();
     }
     expect(scene.fog).not.toBeNull();

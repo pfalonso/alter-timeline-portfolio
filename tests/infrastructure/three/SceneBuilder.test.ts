@@ -69,7 +69,8 @@ describe('SceneBuilder', () => {
     const built = new SceneBuilder().build(model);
     expect(count(built.effects, WatercolorWash)).toBe(1);
     expect(built.effects).toContain(built.backdrop);
-    expect(count(built.effects, YearMarkers)).toBe(1);
+    // Sin meridianos de año en la escena (U-14): los años viven en la regla.
+    expect(count(built.effects, YearMarkers)).toBe(0);
     // 2 líneas + sus fibras (las dos pasan por la trenza: side nace en ella) + 1 tramo.
     expect(count(built.effects, BranchCurve)).toBe(2 + 2 * BRAID_FIBERS.length + 1);
     // Motas de la trenza y motas (pocas) de las ramas exteriores.

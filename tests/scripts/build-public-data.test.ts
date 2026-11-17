@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -40,6 +40,15 @@ describe('toPublicData()', () => {
     expect(data.story?.path).toContain('d-secret');
     expect(new LifeDataValidator().validate(output).ok).toBe(true);
     expect('story' in toPublicData(asRaw(makeData()))).toBe(false);
+  });
+
+  it('quita del recorrido corto los pasos privados y lo elimina si se queda vacío', () => {
+    const data = makeStoryData((d) => (d.storyShort = { title: 'En 1 minuto', path: ['e-side-two', 'd-secret', 'a-school'] }));
+    const output = toPublicData(asRaw(data));
+    expect(output.storyShort).toEqual({ title: 'En 1 minuto', path: ['e-side-two', 'a-school'] });
+    expect(new LifeDataValidator().validate(output).ok).toBe(true);
+    const onlySecret = toPublicData(asRaw(makeStoryData((d) => (d.storyShort = { path: ['d-secret'] }))));
+    expect('storyShort' in onlySecret).toBe(false);
   });
 
   it('quita los eventos privados y el campo visibility, sin tocar el original', () => {
@@ -242,5 +251,29 @@ describe('toPublicData con nodos de unión, caminos que no fueron y pausas', () 
     const cleaned = toPublicData(ended);
     expect(eventOf(cleaned, 'e-cook2').alsoBranches).toBeUndefined();
     expect(validator.validate(cleaned).issues).toEqual([]);
+  });
+});
+
+describe('copyCvFiles (despliegue público)', () => {
+  it('copia solo los PDF de data/cv a data/public/cv; sin origen no hace nada', async () => {
+    const { copyCvFiles } = await import('../../scripts/build-public-data');
+    const root = mkdtempSync(join(tmpdir(), 'cvpub-'));
+    try {
+      expect(copyCvFiles(join(root, 'no-hay'), join(root, 'out'))).toEqual([]);
+      const from = join(root, 'cv');
+      mkdirSync(from);
+      writeFileSync(join(from, 'CV_Ada.pdf'), '%PDF');
+      writeFileSync(join(from, 'notas.txt'), 'x');
+      mkdirSync(join(from, 'sub.pdf'));
+      expect(copyCvFiles(from, join(root, 'public', 'cv'))).toEqual(['CV_Ada.pdf']);
+      expect(readFileSync(join(root, 'public', 'cv', 'CV_Ada.pdf'), 'utf8')).toBe('%PDF');
+      expect(existsSync(join(root, 'public', 'cv', 'notas.txt'))).toBe(false);
+      expect(copyCvFiles(join(root, 'public', 'cv', 'CV_Ada.pdf'), join(root, 'x'))).toEqual([]);
+      const empty = join(root, 'vacio');
+      mkdirSync(empty);
+      expect(copyCvFiles(empty, join(root, 'y'))).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

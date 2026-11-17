@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { NEUTRAL_CHIP } from '../../../src/infrastructure/dom/dom';
 import { FilterBar } from '../../../src/infrastructure/dom/FilterBar';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, click, mount, unsafeModel } from '../../helpers/dom';
-import { buildModel, fakeHandlers, makeData } from '../../helpers/fixtures';
+import { buildModel, fakeHandlers, makeData, makeLifeLinesData } from '../../helpers/fixtures';
 
 afterEach(cleanupDom);
 
@@ -28,7 +27,7 @@ const bulk = (root: HTMLElement, label: string): HTMLButtonElement => {
 };
 
 describe('FilterBar', () => {
-  it('pinta un chip por categoría, en el orden de los datos, con etiqueta, icono, recuento y color', () => {
+  it('pinta un chip por categoría, en el orden de los datos, con etiqueta y recuento (sin emojis ni color)', () => {
     const { root } = setup();
     expect(root.getAttribute('role')).toBe('group');
     expect(root.getAttribute('aria-label')).toBe(STRINGS.filtersLabel);
@@ -38,9 +37,10 @@ describe('FilterBar', () => {
     expect(chips.map((node) => node.querySelector('.chip__label')?.textContent)).toEqual(['Trabajo', 'Estudios', 'Juego']);
     // El evento privado (play) no cuenta mientras está oculto.
     expect(chips.map((node) => node.querySelector('.chip__count')?.textContent)).toEqual(['2', '2', '2']);
-    // Las categorías filtran pero no colorean: el color es de las líneas vitales.
-    expect(chips.map((node) => node.style.getPropertyValue('--chip-color'))).toEqual([NEUTRAL_CHIP, NEUTRAL_CHIP, NEUTRAL_CHIP]);
-    expect(chips.map((node) => node.querySelector('.chip__icon')?.textContent ?? null)).toEqual(['▲', null, '✦']);
+    // Las categorías filtran pero no colorean (el color es de las líneas) y no llevan emojis (U-37).
+    expect(chips.map((node) => node.style.getPropertyValue('--chip-color'))).toEqual(['', '', '']);
+    expect(root.querySelector('.chip__icon')).toBeNull();
+    expect(root.textContent).not.toContain('▲');
     for (const node of chips) {
       expect(node.type).toBe('button');
       expect(node.getAttribute('aria-pressed')).toBe('true');
@@ -82,7 +82,7 @@ describe('FilterBar', () => {
     expect(handlers.onNoCategories).toHaveBeenCalledTimes(1);
   });
 
-  it('applyFilter refleja el estado en aria-pressed y desactiva el botón redundante', () => {
+  it('applyFilter refleja el estado en aria-pressed y oculta la acción que no aplica', () => {
     const { root, bar } = setup();
     const state = (active: string[]): Parameters<FilterBar['applyFilter']>[0] => ({
       activeCategoryIds: new Set(active),
@@ -92,16 +92,16 @@ describe('FilterBar', () => {
 
     bar.applyFilter(state(['work', 'play']));
     expect(['work', 'study', 'play'].map((id) => chip(root, id).getAttribute('aria-pressed'))).toEqual(['true', 'false', 'true']);
-    expect(bulk(root, STRINGS.all).disabled).toBe(false);
-    expect(bulk(root, STRINGS.none).disabled).toBe(false);
+    expect(bulk(root, STRINGS.all).hidden).toBe(false);
+    expect(bulk(root, STRINGS.none).hidden).toBe(false);
 
     bar.applyFilter(state(['work', 'study', 'play']));
-    expect(bulk(root, STRINGS.all).disabled).toBe(true);
-    expect(bulk(root, STRINGS.none).disabled).toBe(false);
+    expect(bulk(root, STRINGS.all).hidden).toBe(true);
+    expect(bulk(root, STRINGS.none).hidden).toBe(false);
 
     bar.applyFilter(state([]));
-    expect(bulk(root, STRINGS.all).disabled).toBe(false);
-    expect(bulk(root, STRINGS.none).disabled).toBe(true);
+    expect(bulk(root, STRINGS.all).hidden).toBe(false);
+    expect(bulk(root, STRINGS.none).hidden).toBe(true);
     expect(root.querySelectorAll('.chip[aria-pressed="true"]')).toHaveLength(0);
   });
 
@@ -152,5 +152,37 @@ describe('dominantStyles', () => {
       expect(['organic', 'neutral']).toContain(styles.get(category.id));
     }
     expect([...styles.values()]).toContain('organic');
+  });
+});
+
+describe('FilterBar: segundo nivel plegado tras «Más filtros»', () => {
+  it('el panel empieza plegado; el botón lo despliega (aria-expanded) y Esc lo pliega', () => {
+    const toggle = mount('button');
+    const panel = mount('div', { id: 'more' });
+    const root = document.createElement('div');
+    panel.append(root);
+    const bar = new FilterBar(root, { toggle, panel });
+    bar.render(buildModel());
+    expect(panel.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-controls')).toBe('more');
+    // Con datos sin líneas vitales, el botón es «Filtrar»; con líneas, «Más filtros».
+    expect(toggle.textContent).toBe(STRINGS.filtersOnly);
+    bar.render(buildModel(makeLifeLinesData()));
+    expect(toggle.textContent).toBe(STRINGS.moreFilters);
+    click(toggle);
+    expect(bar.open).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(bar.open).toBe(false);
+    expect(document.activeElement).toBe(toggle);
+    panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(bar.open).toBe(false);
+  });
+
+  it('sin botón, setOpen no hace nada y el panel sigue a la vista', () => {
+    const root = mount('div');
+    const bar = new FilterBar(root);
+    bar.setOpen(false);
+    expect(root.hidden).toBe(false);
   });
 });

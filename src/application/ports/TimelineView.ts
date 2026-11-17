@@ -14,7 +14,12 @@ export interface FilterViewState {
   readonly totalEvents: number;
   /** Disposición de los eventos visibles (eje ordinal): cambia con los filtros. */
   readonly layout?: TimelineLayoutResult;
+  /** Línea vital aislada (solo sus momentos); `null`/ausente si no hay. */
+  readonly isolatedLine?: string | null;
 }
+
+/** `short`: versión corta (`storyShort`, botón principal); `full`: historia completa (`story`). */
+export type StoryMode = 'short' | 'full';
 
 /** Estado del modo historia (recorrido guiado por `story.path`). */
 export interface StoryViewState {
@@ -28,6 +33,12 @@ export interface StoryViewState {
   readonly arcId: string | null;
   /** `true` si este paso entra en un arco distinto del anterior (tarjeta de capítulo). */
   readonly newChapter: boolean;
+  /** Recorrido en curso (por defecto, `full`). */
+  readonly mode?: StoryMode;
+  /** `true` tras el último paso: pantalla de cierre (sin ficha abierta). */
+  readonly ended?: boolean;
+  /** Ids del recorrido visible, en orden (para la barra de progreso). */
+  readonly path?: readonly string[];
 }
 
 export interface SelectionViewState {
@@ -37,6 +48,9 @@ export interface SelectionViewState {
   readonly detailOpen: boolean;
   readonly hasPrevious: boolean;
   readonly hasNext: boolean;
+  /** Vecinos cronológicos visibles (fuera de la historia), para rotular los botones. */
+  readonly previousId?: string;
+  readonly nextId?: string;
   /** Presente solo en modo historia. */
   readonly story?: StoryViewState;
   /** Fuera del modo historia: siguiente evento del recorrido si el enfocado forma parte de él. */
@@ -59,11 +73,18 @@ export interface TimelineViewHandlers {
   /** Quitar el foco del evento actual (clic en el vacío). */
   onSelectionCleared(): void;
   onNavigate(direction: NavigationDirection, granularity?: NavigationGranularity): void;
-  /** Entra en el modo historia (desde el principio o desde un evento del recorrido). */
-  onStoryStart(fromEventId?: string): void;
+  /**
+   * Entra en el modo historia (desde el principio o desde un evento del recorrido). Sin `mode`:
+   * la versión corta si existe, salvo que se entre desde un evento (historia completa).
+   */
+  onStoryStart(fromEventId?: string, mode?: StoryMode): void;
   /** Paso del recorrido; fuera del modo historia entra en él desde el evento enfocado. */
   onStoryStep(direction: NavigationDirection): void;
   onStoryExit(): void;
+  /** Aísla una línea vital (solo sus momentos); `null` vuelve a mostrarlas todas. */
+  onLineIsolated(lineId: string | null): void;
+  /** Quita todos los filtros (categorías y línea aislada). */
+  onFiltersReset(): void;
 }
 
 /** Puerto de salida: todo lo que la aplicación necesita pintar. */

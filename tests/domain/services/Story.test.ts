@@ -117,6 +117,15 @@ describe('Timeline: arcos y recorrido', () => {
     expect(timelineOf(makeStoryData(), true).storyPath).toContain('d-secret');
     expect(timeline.getEvent('b-job')?.bridge).toBe('Al salir de la escuela, el primer trabajo.');
     expect(timeline.getEvent('a-school')?.bridge).toBeUndefined();
+    expect(timeline.storyShortPath).toEqual([]);
+  });
+
+  it('recorrido corto: conserva el orden declarado y quita los privados ocultos', () => {
+    const data = makeStoryData((d) => (d.storyShort = { title: 'En 1 minuto', path: ['e-side-two', 'd-secret', 'a-school'] }));
+    const timeline = timelineOf(data);
+    expect(timeline.storyShortTitle).toBe('En 1 minuto');
+    expect(timeline.storyShortPath).toEqual(['e-side-two', 'a-school']);
+    expect(timelineOf(data, true).storyShortPath).toEqual(['e-side-two', 'd-secret', 'a-school']);
   });
 
   it('arcOf asigna cada evento al capítulo que lo contiene (el posterior gana en la frontera)', () => {
@@ -140,7 +149,7 @@ describe('Timeline: arcos y recorrido', () => {
 
   it('arcYears da el rango legible', () => {
     const timeline = timelineOf(makeStoryData());
-    expect(timeline.arcs.map((arc) => arcYears(arc, 'hoy'))).toEqual(['2010 — 2014', '2015 — 2017', '2018 — hoy']);
+    expect(timeline.arcs.map((arc) => arcYears(arc, 'hoy'))).toEqual(['2010 – 2014', '2015 – 2017', '2018 – hoy']);
     const single = timelineOf(makeStoryData((d) => (d.arcs = [{ id: 'a', title: 'A', start: '2012-03', end: '2012-09' }])));
     expect(arcYears(single.arcs[0], 'hoy')).toBe('2012');
   });

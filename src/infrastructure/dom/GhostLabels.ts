@@ -4,7 +4,7 @@ import type { LayoutGhost } from '../../domain/services';
 import type { ProjectedFrame, ProjectionListener } from '../three/types';
 import type { TimelineViewPart } from './CompositeTimelineView';
 import { clear, el } from './dom';
-import { labelDistanceLimit } from './labelLayout';
+import { boxesTouch, labelDistanceLimit, type Box } from './labelLayout';
 
 /** Separación vertical (px) entre la hebra y su rótulo. */
 const OFFSET = 12;
@@ -17,7 +17,11 @@ export class GhostLabels implements TimelineViewPart, ProjectionListener {
   private readonly labels = new Map<string, HTMLElement>();
   private timeline: Timeline | null = null;
 
-  constructor(private readonly root: HTMLElement) {
+  constructor(
+    private readonly root: HTMLElement,
+    /** Zonas ya ocupadas (interfaz y rótulos de los momentos): un camino que no fue nunca las pisa. */
+    private readonly occupied: () => readonly Box[] = () => [],
+  ) {
     root.setAttribute('aria-hidden', 'true');
   }
 
@@ -37,10 +41,16 @@ export class GhostLabels implements TimelineViewPart, ProjectionListener {
       const label = this.labels.get(ghost.id);
       if (!label) continue;
       seen.add(ghost.id);
-      const visible = near && ghost.inFront && ghost.x >= 0 && ghost.x <= frame.viewport.width;
+      const y = ghost.y + (ghost.side > 0 ? -OFFSET : OFFSET);
+      // Caja estimada del rótulo (cursiva de 13 px): si pisa otro rótulo o la interfaz, no se pinta.
+      const width = (label.textContent?.length ?? 0) * 7.5 + 16;
+      const height = 20;
+      const top = ghost.side > 0 ? y - height : y;
+      const box: Box = { left: ghost.x - width / 2, right: ghost.x + width / 2, top, bottom: top + height };
+      const free = !this.occupied().some((other) => boxesTouch(box, other, 6));
+      const visible = near && free && ghost.inFront && ghost.x >= 0 && ghost.x <= frame.viewport.width;
       label.classList.toggle('ghost-label--shown', visible);
       if (visible) {
-        const y = ghost.y + (ghost.side > 0 ? -OFFSET : OFFSET);
         label.style.transform = `translate3d(${ghost.x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, ${ghost.side > 0 ? '-100%' : '0'})`;
       }
     }

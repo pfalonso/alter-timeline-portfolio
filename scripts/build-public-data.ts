@@ -7,8 +7,8 @@
  *   npm run build:public-data                       → data/life.json → data/public/life.json
  *   npm run build:public-data -- origen.json destino.json
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { formatIssue } from '../src/domain/errors';
 import { LifeDataValidator } from '../src/domain/services/LifeDataValidator';
 import { validateLineLife } from '../src/domain/services/LineLifeRules';
@@ -36,6 +36,7 @@ interface RawData {
   events: RawEvent[];
   branches?: RawLine[];
   story?: { title?: string; path: string[]; [key: string]: unknown };
+  storyShort?: { title?: string; path: string[]; [key: string]: unknown };
   [key: string]: unknown;
 }
 
@@ -79,7 +80,14 @@ export function toPublicData(data: RawData): RawData {
   if (data.branches) result.branches = publicLines(data.branches, events, byId, publicAncestor, data.meta?.mainBranch ?? 'main');
   cleanUnions(result);
   // El recorrido de la historia pierde los pasos privados; los arcos (capítulos) se conservan.
-  if (data.story) result.story = { ...data.story, path: data.story.path.filter((id) => byId.has(id) && !isPrivate(byId.get(id))) };
+  const publicPath = (path: string[]): string[] => path.filter((id) => byId.has(id) && !isPrivate(byId.get(id)));
+  if (data.story) result.story = { ...data.story, path: publicPath(data.story.path) };
+  // El recorrido corto igual; si se queda sin pasos se quita (el botón principal usará la historia completa).
+  if (data.storyShort) {
+    const path = publicPath(data.storyShort.path);
+    if (path.length > 0) result.storyShort = { ...data.storyShort, path };
+    else delete result.storyShort;
+  }
   return result;
 }
 
@@ -144,6 +152,19 @@ function publicLines(
     });
 }
 
+/**
+ * Copia los CV en PDF (`*.pdf` de un solo segmento) de `from` a `to` para el despliegue público.
+ * Sin directorio de origen no hace nada. Devuelve los nombres copiados.
+ */
+export function copyCvFiles(from: string, to: string): string[] {
+  if (!existsSync(from) || !statSync(from).isDirectory()) return [];
+  const names = readdirSync(from).filter((name) => /^[A-Za-z0-9][A-Za-z0-9._-]*\.pdf$/.test(name) && statSync(join(from, name)).isFile());
+  if (names.length === 0) return [];
+  mkdirSync(to, { recursive: true });
+  for (const name of names) copyFileSync(join(from, name), join(to, name));
+  return names;
+}
+
 function main(): number {
   const source = resolve(process.argv[2] ?? 'data/life.json');
   const target = resolve(process.argv[3] ?? 'data/public/life.json');
@@ -170,6 +191,9 @@ function main(): number {
   }
   mkdirSync(dirname(target), { recursive: true });
   writeFileSync(target, `${JSON.stringify(output, null, 2)}\n`);
+  // El despliegue público monta data/public: los CV en PDF viajan con él (data/public/cv/).
+  const copied = copyCvFiles(join(dirname(source), 'cv'), join(dirname(target), 'cv'));
+  if (copied.length > 0) console.log(`✔ CV copiados a ${join(dirname(target), 'cv')}: ${copied.join(', ')}`);
   const removed = input.events.length - output.events.length;
   console.log(`✔ ${target}: ${output.events.length} eventos públicos (${removed} privados eliminados)`);
   return 0;

@@ -11,7 +11,8 @@ afterEach(() => {
 const PERSONAL = '/data/life.json';
 const EXAMPLE = '/data/life.example.json';
 
-const counter = (t: TestApp): string => t.hud.querySelector('.hud__counter')?.textContent ?? '';
+/** Resultado del filtro: vacío (y oculto) sin filtros. */
+const counter = (t: TestApp): string => (t.result.hidden ? '' : (t.result.querySelector('.filters__result-text')?.textContent ?? ''));
 const chip = (t: TestApp, id: string): HTMLButtonElement => {
   const node = t.filters.querySelector<HTMLButtonElement>(`[data-category="${id}"]`);
   if (!node) throw new Error(`no hay chip ${id}`);
@@ -27,7 +28,7 @@ describe('flujo completo de la aplicación', () => {
     expect(t.started).toBe(true);
     expect(t.hud.querySelector('h1')?.textContent).toBe('Ada Test');
     expect(t.hud.querySelector('[data-testid="example-notice"]')).toBeNull();
-    expect(counter(t)).toBe('4 / 4 eventos');
+    expect(counter(t)).toBe('');
     expect(texts(t.index, '.index__name')).toEqual(['Escuela', 'Primer trabajo', 'Proyecto paralelo', 'Segunda parte']);
     expect(t.popup.hidden).toBe(true);
   });
@@ -64,33 +65,33 @@ describe('flujo completo de la aplicación', () => {
   it('los eventos privados solo aparecen con ?private=1', async () => {
     const hidden = await mountApp(jsonFetch({ [PERSONAL]: makeData() }));
     expect(document.body.textContent).not.toContain('Secreto');
-    expect(counter(hidden)).toBe('4 / 4 eventos');
+    expect(counter(hidden)).toBe('');
     cleanupDom();
 
     window.history.replaceState(null, '', '/?private=1');
     const shown = await mountApp(jsonFetch({ [PERSONAL]: makeData() }));
     expect(texts(shown.index, '.index__name')).toContain('Secreto');
-    expect(counter(shown)).toBe('5 / 5 eventos');
+    expect(counter(shown)).toBe('');
   });
 
   it('filtrar actualiza chips, contador, índice y URL', async () => {
     const t = await mountApp(jsonFetch({ [PERSONAL]: makeData() }));
     click(chip(t, 'play'));
     expect(chip(t, 'play').getAttribute('aria-pressed')).toBe('false');
-    expect(counter(t)).toBe('3 / 4 eventos');
+    expect(counter(t)).toBe('Mostrando 3 de 4 momentos');
     expect(indexButtons(t).map((button) => button.disabled)).toEqual([false, false, true, false]);
     expect(window.location.search).toBe('?cat=work,study');
 
     click(chip(t, 'study'), { altKey: true });
-    expect(counter(t)).toBe('2 / 4 eventos');
+    expect(counter(t)).toBe('Mostrando 2 de 4 momentos');
     expect(window.location.search).toBe('?cat=study');
 
     click([...t.filters.querySelectorAll<HTMLButtonElement>('.filters__bulk')][1]);
-    expect(counter(t)).toBe('0 / 4 eventos');
+    expect(counter(t)).toBe('Mostrando 0 de 4 momentos');
     expect(window.location.search).toBe('?cat=');
 
     click([...t.filters.querySelectorAll<HTMLButtonElement>('.filters__bulk')][0]);
-    expect(counter(t)).toBe('4 / 4 eventos');
+    expect(counter(t)).toBe('');
     expect(window.location.search).toBe('');
   });
 
@@ -98,7 +99,7 @@ describe('flujo completo de la aplicación', () => {
     window.history.replaceState(null, '', '/?cat=work&private=0');
     const t = await mountApp(jsonFetch({ [PERSONAL]: makeData() }));
     expect(['work', 'study', 'play'].map((id) => chip(t, id).getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
-    expect(counter(t)).toBe('2 / 4 eventos');
+    expect(counter(t)).toBe('Mostrando 2 de 4 momentos');
     expect(window.location.search).toBe('?cat=work&private=0');
   });
 
@@ -115,8 +116,10 @@ describe('flujo completo de la aplicación', () => {
     press(t.stage, 'Enter');
     expect(title(t)).toBe('Escuela');
     expect(document.activeElement).toBe(t.popup);
-    expect(t.hud.classList.contains('hud--dimmed')).toBe(true);
-    expect(t.popup.querySelector<HTMLButtonElement>('.popup__nav')?.disabled).toBe(true);
+    // Con la ficha abierta la interfaz se retira (U-39) y «Anterior» no existe en el primero.
+    expect(t.app.classList.contains('app--detail')).toBe(true);
+    expect(t.popup.querySelector<HTMLButtonElement>('.popup__nav--prev')?.hidden).toBe(true);
+    expect(t.popup.querySelector<HTMLButtonElement>('.popup__nav--next')?.textContent).toContain('Primer trabajo');
 
     press(t.popup, 'ArrowRight');
     expect(title(t)).toBe('Primer trabajo');
@@ -128,7 +131,7 @@ describe('flujo completo de la aplicación', () => {
     expect(t.popup.hidden).toBe(true);
     expect(document.activeElement).toBe(t.stage);
     expect(indexButtons(t)[0].getAttribute('aria-current')).toBe('true');
-    expect(t.hud.classList.contains('hud--dimmed')).toBe(false);
+    expect(t.app.classList.contains('app--detail')).toBe(false);
 
     press(t.stage, 'Escape');
     expect(t.index.querySelector('[aria-current]')).toBeNull();

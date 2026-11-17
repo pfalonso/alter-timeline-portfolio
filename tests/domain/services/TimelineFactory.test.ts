@@ -115,4 +115,19 @@ describe('TimelineFactory', () => {
     expect(timeline.meta).not.toBe(data.meta);
     expect(timeline.categories[0]).not.toBe(data.categories[0]);
   });
+
+  it('copia la cabecera profesional y descarta un CV con URL no permitida (defensa en profundidad)', () => {
+    const data = makeData();
+    data.meta = {
+      ...data.meta,
+      headline: 'Technical Artist',
+      email: 'ada@example.com',
+      cv: [{ label: 'CV', url: '/cv/ada.pdf' }, { label: 'Malo', url: 'javascript:alert(1)' }],
+    };
+    const meta = factory.create(data, { now: NOW }).meta;
+    expect(meta.headline).toBe('Technical Artist');
+    expect(meta.email).toBe('ada@example.com');
+    expect(meta.cv).toEqual([{ label: 'CV', url: '/cv/ada.pdf' }]);
+    expect('cv' in factory.create(makeData(), { now: NOW }).meta).toBe(false);
+  });
 });

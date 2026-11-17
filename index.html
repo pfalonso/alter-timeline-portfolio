@@ -7,10 +7,10 @@
     <meta name="theme-color" content="#04050d" />
     <meta name="description" content="Portfolio interactivo: una vida contada como una línea temporal ramificada." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Línea temporal</title>
+    <title>Portfolio · línea a línea</title>
   </head>
   <body>
-    <a class="skip-link" href="#index">Saltar al índice de eventos</a>
+    <a class="skip-link" href="#index">Saltar al índice de momentos</a>
     <div id="app" class="app app--loading">
       <div id="stage" class="stage" data-keep-popup>
         <div id="ghost-labels" class="labels labels--ghosts"></div>
@@ -18,21 +18,43 @@
       </div>
       <div class="vignette" aria-hidden="true"></div>
 
-      <header id="hud" class="hud"></header>
+      <header id="hud" class="hud">
+        <div id="hud-main" class="hud__main"></div>
+        <div id="hud-cta" class="hud__cta" data-keep-popup>
+          <button id="story-toggle" class="cta" type="button" hidden></button>
+          <div class="hud__secondary">
+            <button id="story-full" class="link-button" type="button" hidden></button>
+            <button id="index-toggle" class="link-button" type="button" aria-controls="index">Índice</button>
+            <button id="filters-open" class="link-button link-button--sheet" type="button" aria-controls="filters" aria-expanded="false">Líneas y filtros</button>
+          </div>
+        </div>
+        <div id="hud-contact" class="hud__links"></div>
+      </header>
 
       <div class="toolbar" data-keep-popup>
-        <button id="story-toggle" class="controls__button controls__button--text controls__button--story" type="button" hidden></button>
-        <button id="index-toggle" class="controls__button controls__button--text" type="button" aria-controls="index">Índice</button>
         <div id="controls" class="controls" role="group" aria-label="Controles de cámara"></div>
+        <div id="shortcuts" class="shortcuts"></div>
       </div>
 
-      <section id="filters" class="filters" data-keep-popup>
-        <div id="lines" class="lines" hidden></div>
-        <div id="filter-bar"></div>
+      <section id="filters" class="filters" data-keep-popup aria-label="Líneas y filtros">
+        <div class="filters__sheet-head">
+          <span class="filters__sheet-title">Líneas y filtros</span>
+          <button id="filters-close" class="filters__close" type="button" aria-label="Cerrar filtros"></button>
+        </div>
+        <div id="more-filters" class="filters__more">
+          <div id="filter-bar"></div>
+          <div id="scene-keys" class="filters__keys"></div>
+        </div>
+        <div class="filters__bar">
+          <div id="lines" class="lines" hidden></div>
+          <button id="more-toggle" class="filters__toggle" type="button"></button>
+        </div>
+        <p id="filter-result" class="filters__result"></p>
       </section>
       <div id="arc-strip" class="arc-strip" hidden></div>
       <div id="ruler" class="ruler"></div>
       <section id="chapter" class="chapter" data-keep-popup hidden></section>
+      <section id="story-end" class="story-end" data-keep-popup hidden></section>
       <p id="help" class="help" aria-hidden="true"></p>
 
       <nav id="index" class="index" hidden data-keep-popup></nav>

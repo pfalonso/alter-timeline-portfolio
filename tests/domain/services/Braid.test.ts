@@ -12,6 +12,7 @@ import {
   type TimelineLayoutResult,
 } from '../../../src/domain/services';
 import { makeData, makeEvent, makeLifeLinesData, NOW } from '../../helpers/fixtures';
+import { makeUnionData } from '../../helpers/unionFixtures';
 
 const build = (data: LifeData) => new TimelineFactory().create(data, { now: NOW });
 const layoutOf = (data: LifeData): TimelineLayoutResult => new TimelineLayout().compute(build(data));
@@ -273,5 +274,35 @@ describe('braidMembersAt: la central nace en un nodo y se pausa', () => {
     const originX = layout.nodes.find((node) => node.eventId === 'l1')?.position.x ?? NaN;
     expect(tech?.points[0].x).toBeCloseTo(originX, 6);
     expect(tech?.gaps).toHaveLength(1);
+  });
+});
+
+describe('TimelineLayout.focusSpans: «en foco» según los datos, no según la geometría', () => {
+  it('tramos contiguos que cubren el eje, sin repetir composición, y cuyo contenido es braidMembersAt', () => {
+    const data = makeLifeLinesData();
+    const timeline = build(data);
+    const layout = new TimelineLayout().compute(timeline);
+    const spans = layout.focusSpans;
+    expect(spans[0].startX).toBe(layout.bounds.minX);
+    expect(spans[spans.length - 1].endX).toBe(layout.bounds.maxX);
+    for (let i = 1; i < spans.length; i += 1) {
+      expect(spans[i].startX).toBeCloseTo(spans[i - 1].endX, 6);
+      expect(spans[i].members.join('|')).not.toBe(spans[i - 1].members.join('|'));
+    }
+    // Hoy (último tramo) manda lo que dicen los periodos de foco de hoy.
+    expect(spans[spans.length - 1].members).toEqual(braidMembersAt(timeline, NOW.getFullYear() + 0.5));
+  });
+
+  it('una línea que solo cruza la banda para tocar un nodo de unión no cuenta como en foco', () => {
+    const data = makeUnionData();
+    const timeline = build(data);
+    const layout = new TimelineLayout().compute(timeline);
+    const accident = layout.nodes.find((item) => item.eventId === 'e-accident');
+    expect(accident?.lines.length).toBeGreaterThan(1);
+    const x = accident?.position.x ?? 0;
+    const focus = layout.focusSpans.find((span) => x >= span.startX && x <= span.endX);
+    const year = timeline.getEvent('e-accident')?.start.toDecimalYear() ?? 0;
+    expect(focus?.members).toEqual(braidMembersAt(timeline, year + 1e-3));
+    expect(focus?.members.length).toBeLessThan(accident?.lines.length ?? 0);
   });
 });

@@ -1,7 +1,7 @@
 export { EventFilter } from './EventFilter';
 export { BRIDGE_MAX, LifeDataValidator, PRESENT } from './LifeDataValidator';
 export type { ValidationResult } from './LifeDataValidator';
-export { isHttpUrl } from './safeUrl';
+export { isHttpUrl, isSitePath } from './safeUrl';
 export { TimelineFactory } from './TimelineFactory';
 export type { TimelineFactoryOptions } from './TimelineFactory';
 export { branchPieces, compareOrdinal, DEFAULT_LAYOUT_OPTIONS, TimelineLayout } from './TimelineLayout';

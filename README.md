@@ -25,7 +25,7 @@ Este README es la wiki completa del proyecto: cómo arrancarlo, cómo meter tus 
 
 Una web estática que lee un fichero JSON con los eventos de una vida (estudios, trabajos, proyectos, desvíos) y los dibuja como una línea temporal en 3D: los eventos van de izquierda a derecha en orden cronológico, **siempre a la misma distancia entre sí** (eje ordinal, sin escala temporal) y cada uno es un nodo luminoso. Los eventos se filtran por categorías definidas en los propios datos, y cada nodo abre un panel con todo el detalle.
 
-No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón **Ver la historia** la cuenta de nodo en nodo: la cámara vuela por la banda (o sigue la hebra causal cuando un paso llevó al siguiente) y cada paso trae una frase que lo enlaza con el anterior. Todo sobre un fondo de acuarela en movimiento, no un cielo estrellado.
+No todo pesa igual: los nodos tienen **jerarquía** (mayores, medios y menores, con rótulos que nunca se pisan), la vida se divide en **capítulos** (arcos temporales que se iluminan al recorrerlos) y el botón principal la cuenta de nodo en nodo (versión corta de 6–9 pasos, o la historia completa): la cámara vuela por la banda (o sigue la hebra causal cuando un paso llevó al siguiente) y cada paso trae una frase que lo enlaza con el anterior. Todo sobre un fondo de acuarela en movimiento, no un cielo estrellado.
 
 **Concepto: «mis flores nacieron conmigo, solo he cambiado el foco».** La vida no se dibuja como un tronco del que salen «otros yo», sino como **líneas vitales** (el oficio, el arte, la cocina…) que nacen todas en el nacimiento y discurren en paralelo. Lo que cambia con los años es el **foco**: las líneas en foco viajan juntas por el centro formando una **trenza** (varias hebras de sus colores entrelazándose) y las demás siguen como ramas exteriores, finas y tenues; cada línea se une a la trenza o se separa de ella cuando entra o sale de foco. Dos líneas pueden **fusionarse** (el arte y la tecnología se unen en un máster y desde ahí son una sola), una afición puede seguir **latente** hasta hoy y otra puede apagarse. El modelo clásico de ramas que se bifurcan (`branch` + `branchFrom`) sigue funcionando igual; ver [3.7](#37-líneas-vitales-ramas-y-bifurcaciones).
 
@@ -173,7 +173,8 @@ Raíz del documento:
 | `events` | lista | Sí | Eventos de la línea temporal (puede estar vacía) |
 | `branches` | lista | No | Líneas vitales con nombre, color, nacimiento, fusión y foco (ver `branches[]`) |
 | `arcs` | lista | No | Arcos temporales (capítulos) contiguos: bandas en la escena, franja sobre la regla e índice agrupado (ver `arcs[]`) |
-| `story` | `{ title?, path }` | No | Recorrido del modo historia: ids de eventos en orden cronológico (ver `story`) |
+| `story` | `{ title?, path }` | No | Historia completa: ids de eventos en orden cronológico (ver `story`) |
+| `storyShort` | `{ title?, path }` | No | Versión corta (6–9 pasos) que lanza el botón principal; puede no ser cronológica (ver `story`) |
 | `$schema` | texto | No | Referencia al JSON Schema para el autocompletado del editor |
 
 #### `meta`
@@ -181,10 +182,15 @@ Raíz del documento:
 | Campo | Tipo | Obligatorio | Descripción |
 | --- | --- | --- | --- |
 | `owner` | texto no vacío | Sí | Nombre que aparece como título principal y en el título de la pestaña |
-| `title` | texto no vacío | Sí | Titular del sitio (línea pequeña sobre el nombre) |
+| `title` | texto no vacío | Sí | Titular del sitio (antetítulo sobre el nombre). Si empieza por el nombre («Ana Ruiz · línea a línea») solo se muestra lo que sigue: el nombre nunca sale dos veces |
 | `locale` | texto no vacío | Sí | Idioma BCP 47 (`"es"`, `"en"`…). Se usa para formatear fechas y para el atributo `lang` de la página |
-| `tagline` | texto | No | Frase bajo el nombre |
-| `contact` | lista de `{ label, url }` | No | Enlaces de contacto en la cabecera. `url` debe ser http(s) absoluta |
+| `headline` | texto | No | **Oficio** en una línea, bajo el nombre y a tamaño de subtítulo («Technical Artist · VFX en tiempo real · Desarrollo backend»). También es el título de la pantalla de cierre de la historia |
+| `location` | texto | No | Ciudad o zona, bajo el oficio |
+| `availability` | texto | No | Situación y disponibilidad en una línea («Busco puesto junior o mid · …») |
+| `tagline` | texto | No | Frase secundaria bajo el oficio (3 líneas como mucho; se oculta en pantallas bajas y en móvil) |
+| `email` | correo | No | Se muestra como texto copiable (botón «Copiar») y enlace `mailto:` en la cabecera y en el cierre de la historia |
+| `cv` | lista de `{ label, url }` | No | Enlaces al CV en PDF: URL http(s) o ruta del propio sitio (`/cv/…`, sin `..`). Los PDF privados van en `data/cv/` (fuera de git y de la imagen) y se sirven en `/cv/<nombre>.pdf` en dev, preview y nginx; `build:public-data` los copia a `data/public/cv/` para el despliegue público. Ver DEV_NOTES, decisión 34 |
+| `contact` | lista de `{ label, url }` | No | Enlaces de contacto en la cabecera, como botones con icono. El que parece un reel (YouTube, Vimeo, «reel») va primero; luego CV, correo y el resto. `url` debe ser http(s) absoluta |
 | `mainBranch` | texto kebab-case | No (por defecto `"main"`) | Línea vital central: forma la trenza cuando ninguna línea está en foco (y siempre, si no hay `focus`). Los eventos sin `branch` pertenecen a ella |
 
 #### `categories[]`
@@ -255,12 +261,14 @@ Capítulos de la vida. Son contiguos y no se solapan; un evento pertenece al arc
 | `end` | fecha o `"present"` | Sí | Fin, incluido (`"2014"` llega al final de 2014). Un arco con `"present"` debe ser el último |
 | `summary` | texto | No | Una o dos frases para la tarjeta de capítulo |
 
-#### `story` (opcional)
+#### `story` y `storyShort` (opcionales)
 
 | Campo | Tipo | Obligatorio | Descripción |
 | --- | --- | --- | --- |
-| `title` | texto | No | Título del recorrido |
-| `path` | lista de ids de evento | Sí | Pasos del modo historia: ids existentes, sin repetir y en orden cronológico. Los eventos privados ocultos (o filtrados) se saltan. Si falta o queda vacío, el botón «Ver la historia» no aparece |
+| `title` | texto | No | Título del recorrido (en `storyShort`, el texto del botón principal) |
+| `path` | lista de ids de evento | Sí | Pasos: ids existentes y sin repetir. En `story`, en orden cronológico; en `storyShort` el orden es libre (puede empezar por hoy) y no puede estar vacío. Los eventos privados ocultos (o filtrados) se saltan |
+
+El botón principal de la cabecera lanza `storyShort` (o `story` si no hay versión corta), con su duración estimada (10 s por paso); «Historia completa» lanza `story`. Sin ninguno de los dos, no hay botón.
 
 ```json
 {
@@ -343,7 +351,7 @@ Cómo se ve:
 - **Fusión.** Con `mergeInto`, la línea se curva en sus últimos ~2 años hasta unirse a la línea destino en la posición del evento indicado y termina ahí, con una «costura»: un destello que late y un remolino de motas con los colores de las dos líneas.
 - **Fusión.** Con `mergeInto`, la línea termina dentro de la trenza, en el nodo destino, y ya no sale: si su último periodo de foco llega hasta la fusión (o no tiene eventos entre su final y la fusión), sigue en la trenza desde que empezó; si no, vuelve a su carril y se une justo antes de la fusión.
 - **Final.** Una línea con `until: "present"` llega hasta hoy (atenuada si está fuera de foco). Sin `until` ni `mergeInto`, una línea cuyos eventos han terminado se disuelve en polvo como las ramas clásicas.
-- **Leyenda.** Encima de los filtros aparece la lista de líneas con su color y nombre; las que van por la trenza en la zona que mira la cámara se marcan «en foco ahora» (cambia al recorrer el tiempo) y las demás llevan su estado: «se une a …», «latente» o «cerrada». Ver [4.2](#42-filtros-por-categoría).
+- **Leyenda.** Abajo, la fila de líneas con su color y nombre, que es también el filtro de primer nivel. «En foco» sale de los periodos `focus` en la fecha que mira la cámara (no de qué líneas cruzan la banda) y lleva el momento («En foco · hoy» o «· 2018»); las líneas que se fusionan llevan «se une a …» y las que terminan, «cerrada». Ver [4.2](#42-líneas-y-filtros).
 
 Mini ejemplo:
 
@@ -463,7 +471,7 @@ docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
 | Ratón | Clic en el vacío | Cierra el pop-up; si no hay, suelta el evento enfocado |
 | Teclado | `←` / `→` | Enfoca el evento visible anterior / siguiente **de importancia ≥ 2** (si ya no quedan, el vecino); no da la vuelta al llegar al final. En modo historia, siguen el recorrido |
 | Teclado | `Mayús` + `←` / `→` | Nodo a nodo, incluidos los menores |
-| Teclado | `H` | Entra en el modo historia o sale de él |
+| Teclado | `H` | Entra en el modo historia (la versión corta si existe) o sale de él |
 | Teclado | `Enter` o `Espacio` | Abre el pop-up del evento enfocado |
 | Teclado | `Esc` | Sale del modo historia; si no, cierra el pop-up; si no hay, suelta el foco. En el índice, lo cierra |
 | Teclado | `+` / `-` | Acercar / alejar |
@@ -471,9 +479,10 @@ docker compose -f docker-compose.yml -f docker-compose.public.yml up -d --build
 | Táctil | Arrastrar con un dedo | Desplaza la vista |
 | Táctil | Pellizco | Zoom |
 | Táctil | Toque en un nodo | Abre el pop-up |
-| Botones | `+`, `−`, `◇` | Acercar, alejar, vista general |
-| Botones | `Ver la historia` | Entra en el modo historia (solo si hay `story.path`); durante el recorrido pasa a «Salir de la historia» |
-| Botones | `Índice` | Abre o cierra el índice de eventos |
+| Botones | `+`, `−`, ver toda la línea, `?` | Acercar, alejar, vista general y lista de atajos (cada icono muestra su nombre al pasar el ratón o con el foco) |
+| Botones | Botón principal («Te lo cuento en 1 minuto» o el `storyShort.title`) | Entra en la versión corta de la historia; «Historia completa» entra en la completa |
+| Botones | `Índice` | Abre o cierra el índice de momentos |
+| Botones | `Líneas y filtros` (móvil) | Abre la hoja con las líneas, las categorías y las claves de lectura |
 
 La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cámara y pulso) y `Enter` lo **abre**. Con el pop-up abierto, las flechas cambian de evento sin cerrarlo.
 
@@ -485,52 +494,56 @@ La selección tiene dos niveles: las flechas **enfocan** un evento (vuelo de cá
 | `2` medio | La forma sola, con contorno y relleno suave, sin aura | Al acercarse (cámara a ≤ 72 unidades) y si cabe |
 | `1` menor | Marca pequeña (punto, rombo o gota), sin aura | Solo al pasar el ratón, al enfocarlo con el teclado o al seleccionarlo (y entonces crece y su pigmento se expande) |
 
-Los nodos son **sólidos 3D en wireframe** (aristas luminosas del color de su línea y un relleno interior tenue que tapa lo que pasa por detrás) que giran despacio sobre sí mismos (quietos con movimiento reducido). Los tres niveles se distinguen a primera vista por tamaño y complejidad. La **forma** depende de la línea (`branches[].style`): las racionales (`geometric`) son poliedros rectilíneos (icosaedro con un cubo inscrito que gira al revés, octaedro, tetraedro); las creativas (`organic`), formas curvas (nudo toroidal, esfera deformada, esfera pequeña); las neutras, anillos (giroscopio de tres anillos, toro fino, un anillo). Al señalar o seleccionar un nodo se expande, gira algo más deprisa y brilla un poco. Chips y leyenda repiten el lenguaje (rombo / mancha / círculo).
+Los nodos son **sólidos 3D en wireframe** (aristas luminosas del color de su línea y un relleno interior tenue que tapa lo que pasa por detrás) que giran despacio sobre sí mismos (quietos con movimiento reducido). Los tres niveles se distinguen a primera vista por tamaño y complejidad. La **forma** depende de la línea (`branches[].style`): las racionales (`geometric`) son poliedros rectilíneos (icosaedro con un cubo inscrito que gira al revés, octaedro, cubo); las creativas (`organic`), formas curvas (nudo toroidal, esfera deformada, esfera pequeña); las neutras, anillos (giroscopio de tres anillos, toro fino, un anillo). Al señalar o seleccionar un nodo se expande, gira algo más deprisa y brilla un poco. Al seleccionarlo lleva un aro fino (≤ 1,6 veces su tamaño); en la historia, los demás momentos se atenúan.
 
 Los rótulos se reparten por prioridad (fijado > mayor > medio > menor; a igualdad, el que ya estaba visible) y **nunca se pisan entre sí** ni tapan un nodo medio o mayor: los de la trenza alternan arriba y abajo (de forma regular entre los nodos que se rotulan solos; si no caben en su lado se prueba el otro y después un escalón más lejos) y los de las ramas exteriores se rotulan siempre hacia fuera, nunca sobre la trenza; si no caben, se ocultan los de menor prioridad. Cada rótulo lleva un halo oscuro: las ramas que pasan por detrás no cortan la lectura. Tampoco invaden la cabecera, los filtros, la regla, el pop-up ni el índice.
 
-**Arcos temporales** (`arcs`). Cada capítulo tiene un separador vertical etéreo en su inicio y, cuando la cámara está dentro, un velo tenue que lo ilumina. Encima de la regla de años, una franja muestra el título y los años de cada capítulo, abarcando sus nodos; el actual se ilumina (en tramos estrechos se omiten los años o el título).
+**Arcos temporales** (`arcs`). Cuando la cámara está dentro de un capítulo, un velo tenue lo ilumina (sin separadores verticales ni meridianos de año en la escena: una línea sin rótulo no significa nada). Encima de la regla de años, una franja con un segmento por capítulo: el actual lleva su número, su nombre entero y sus años; los demás, solo su número.
 
 ### Modo historia
 
-El botón **Ver la historia** (o la tecla `H`) recorre `story.path` de nodo en nodo:
+El **botón principal** (o la tecla `H`) recorre la versión corta (`storyShort.path`); **Historia completa**, `story.path`:
 
 - La cámara **vuela por la banda de nodos** de un paso al siguiente, alejándose un poco a mitad de camino; si el paso siguiente es consecuencia del actual (`ledTo`), **sigue la hebra causal** que los une. Con `prefers-reduced-motion` (o `?reduced-motion=1`) son cortes.
-- El pop-up se abre en cada paso con, arriba, el progreso (`3 / 22`), el capítulo actual y la **frase puente** (`bridge`) del evento.
-- `←` / `→`, y los botones **Anterior** / **Siguiente** del pop-up, siguen el recorrido, no la cronología.
-- Al entrar en un capítulo nuevo aparece una **tarjeta de capítulo** (número, título, años, subtítulo y resumen) que se pasa con **Continuar** o con el siguiente paso.
-- Durante el recorrido la cabecera, los filtros y la ayuda se recogen (vuelven al pasar el ratón).
-- Se sale con `Esc`, `H`, **Salir de la historia** o cerrando el pop-up. Pulsar un nodo del recorrido continúa desde él; uno ajeno al recorrido sale.
+- La ficha se abre en cada paso con, arriba, el progreso (`3 / 22`, capítulo y una **barra por capítulos** cuyos pasos se pueden pulsar) y la **frase puente** (`bridge`), que es lo primero que se lee.
+- Un único foco: el momento activo lleva siempre su rótulo y el aro de selección; los demás momentos y rótulos bajan al 45 %.
+- `←` / `→`, y los botones **Anterior** / **Siguiente** de la ficha, siguen el recorrido, no la cronología. En el último paso, **Terminar →** lleva a la **pantalla de cierre**: el oficio (`headline`), ubicación y disponibilidad, las acciones de contacto (reel, CV, correo…) y «Ver la historia completa», «Explorar la línea» o «Volver al principio».
+- En la historia completa, al entrar en un capítulo nuevo aparece la **tarjeta de capítulo** como momento propio (número, título, años, subtítulo y resumen; la ficha espera) con un único botón, **Empezar capítulo →**. La versión corta no lleva tarjetas.
+- Durante el recorrido la cabecera, la leyenda, los filtros y la pista desaparecen; el nombre queda como firma pequeña.
+- En móvil la ficha es una **hoja inferior** (≈ 55 % del alto, ampliable con el asa; arrastrarla hacia abajo la reduce o sale) y la escena, arriba, sigue viéndose con el momento activo centrado.
+- Se sale con `Esc`, `H` o **Salir de la historia**. Pulsar un momento del recorrido continúa desde él; uno ajeno al recorrido sale.
 - El filtro de categorías también acorta el recorrido; los eventos privados ocultos se saltan.
 
 Fuera del modo historia, el pop-up de un evento que forma parte del recorrido ofrece **Siguiente en la historia →**, que entra en el modo historia desde ahí.
 
-### 4.2 Filtros por categoría
+### 4.2 Líneas y filtros
 
-- Cada categoría es un chip con su color, su icono y el número de eventos que tiene.
+**Líneas vitales: el filtro de primer nivel** (solo si los datos declaran `branches`). Una fila fija con el color y el nombre de cada línea; el estado cambia grosor y brillo del trazo, nunca la posición. Encima, «**En foco · hoy:** Tecnología» (o «En foco · 2018: …» si «hoy» no está en pantalla): sale de los periodos `focus` de los datos en la fecha que mira la cámara (`layout.focusSpans`), no de qué líneas cruzan la banda, y solo cambia cuando la cámara se detiene. **Pulsar** una línea la aísla (solo sus momentos, incluidas las encrucijadas por las que pasa); pulsarla otra vez vuelve a mostrarlas todas. **Pasar el ratón** o el foco la resalta en la escena y muestra su descripción y sus periodos en foco. Una línea que termina de verdad lleva «cerrada» y trazo discontinuo.
+
+**Más filtros** despliega el segundo nivel: las categorías y las claves de lectura de la escena (en foco, encrucijada, en activo, camino que no fue, «llevó a»). En móvil, todo va en la hoja **Líneas y filtros**.
+
+- Cada categoría es un chip de texto (sin emojis ni color: el color es de las líneas) con el número de momentos.
 - **Clic** en un chip: lo activa o desactiva (multi-selección).
 - **Doble clic** o `Alt` + clic: deja activa solo esa categoría. Repetirlo sobre la única activa vuelve a mostrarlas todas.
-- **Todas** / **Ninguna**: selección en bloque.
+- **Mostrar todas** / **Ocultar todas**: selección en bloque (solo aparece la que aplica).
 - Un evento es visible si **al menos una** de sus categorías está activa.
 - Los nodos filtrados no desaparecen: se atenúan con una transición. En el índice quedan deshabilitados, y las flechas los saltan.
-- El contador de la cabecera muestra `visibles / total eventos`.
+- Con algún filtro activo, junto a los filtros: «Mostrando 73 de 80 momentos · Mostrar todo» (o «Solo «Arte»: …»). Sin filtros no hay contador.
 - Si el evento enfocado deja de ser visible, la selección se suelta y el pop-up se cierra.
 - El filtro se guarda en la URL (`?cat=`), así que un enlace conserva la vista.
 
-**Leyenda de líneas vitales** (solo si los datos declaran `branches`). Fila compacta encima de los filtros con el color y el nombre de cada línea; las que van por la trenza donde mira la cámara llevan «en foco ahora». Pasar el ratón o el foco de teclado por una línea la resalta en la escena (filamento y partículas) y atenúa las demás; un clic la deja fijada (`aria-pressed`) hasta otro clic. En móvil se pliega tras el botón «Líneas vitales (n)».
-
 ### 4.3 Pop-up de detalle
 
-Muestra, en este orden y solo si hay dato: (en modo historia) progreso, capítulo y frase puente; etiquetas de categoría, título, subtítulo, insignias («Capítulo: …» si hay `arcs`, «En curso», «Privado», «Línea: …» si la línea está declarada en `branches`, o si no «Rama que nace de «…»»), cuándo / dónde / con quién, resumen, descripción en párrafos, **«Viene de…»** (eventos cuyo `ledTo` apunta a este) y **«Esto llevó a…»** (sus `ledTo` visibles), como botones que abren ese evento, imágenes, hitos, habilidades y enlaces. Abajo tiene los botones **Anterior** y **Siguiente**.
+Muestra, en este orden, sin repetir datos y solo si hay dato: (en modo historia) progreso y frase puente; una línea de contexto (fechas · lugar · entidad, sin lo que ya diga el subtítulo); el rótulo corto como antetítulo si no es un recorte del título (para que escena y ficha digan «el mismo nombre»); título; subtítulo; insignias («En activo», «En curso», «Privado»); los dos primeros enlaces como botones; la entradilla (en redonda); habilidades; descripción en párrafos; hitos; imágenes; el resto de enlaces; **«Viene de…»** y **«Esto llevó a…»** (solo fuera de la historia: dentro sacarían del recorrido) y, al pie y en pequeño, las líneas (un punto por línea; en un cruce, «5 de 7 líneas: …»), las categorías y el capítulo. Abajo, **← vecino anterior** y **vecino siguiente →** con su nombre (un botón sin destino se oculta). Si hay más contenido del que cabe, un degradado y «Hay más abajo».
 
-- En pantallas de 900 px o más de ancho es un panel lateral y la cámara desplaza el encuadre para que el nodo no quede tapado.
-- En pantallas de 720 px o menos ocupa toda la pantalla.
+- En pantallas de 900 px o más de ancho es un panel lateral y la cámara desplaza el encuadre para que el nodo no quede tapado. Con la ficha abierta, cabecera, leyenda, filtros y pista se retiran.
+- En pantallas de 720 px o menos es una hoja inferior con asa y barra superior opaca con el cierre.
 - Lo cierran `Esc`, el botón `✕`, un clic en el vacío de la escena o un clic en cualquier zona que no sea escena, filtros, controles o índice. Arrastrar la escena no lo cierra.
 - Al cerrarlo, la cámara recupera la distancia que tenía y el foco del teclado vuelve a donde estaba.
 
 ### 4.4 Índice accesible
 
-El botón **Índice** abre la lista cronológica de todos los eventos (fecha, título, categoría, línea vital si está declarada y resumen). Con `arcs`, los eventos se agrupan por capítulo bajo un encabezado con su título y sus años (lo que cae fuera de todo arco va a «Otros momentos»); los mayores se destacan con la tipografía display. Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL. El enlace «Saltar al índice de eventos» es el primer elemento enfocable de la página.
+El botón **Índice** abre la lista cronológica de momentos: cabecera fija con un salto por capítulo, por defecto solo hitos y momentos medios («Ver todos los momentos» muestra también los menores) y filas compactas (punto del color de su línea · fecha · título · subtítulo) con peso tipográfico según la importancia; tiene su propio botón de cierre. Con `arcs`, los momentos se agrupan por capítulo bajo un encabezado con su título y sus años (lo que cae fuera de todo arco va a «Otros momentos»). Cada entrada es un botón que abre el mismo pop-up. Es la alternativa a la escena para teclado y lector de pantalla, y pasa a ser el contenido principal cuando no hay WebGL: misma cabecera (nombre, oficio, botón principal, contacto), un aviso de una línea («Estás viendo la versión en lista»), cada capítulo con su texto de introducción y todos los momentos con su resumen. El enlace «Saltar al índice de momentos» es el primer elemento enfocable de la página.
 
 ### 4.5 Parámetros de URL
 

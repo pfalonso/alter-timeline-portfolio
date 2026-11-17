@@ -19,7 +19,7 @@ describe('LiveAnnouncer', () => {
     const announcer = new LiveAnnouncer(root);
     announcer.render(buildModel());
     announcer.applySelection(selection('a-school'));
-    expect(root.textContent).toBe('Escuela. 2010 — 2014. Cuatro años de estudio.');
+    expect(root.textContent).toBe('Escuela. 2010 – 2014. Cuatro años de estudio.');
     announcer.applySelection(selection('c-side', true));
     expect(root.textContent).toMatch(/^Proyecto paralelo\. jun\.? 2016\. Una bifurcación\.$/);
   });

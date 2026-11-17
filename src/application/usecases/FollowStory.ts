@@ -1,5 +1,5 @@
 import type { Timeline } from '../../domain/model';
-import type { NavigationDirection } from '../ports';
+import type { NavigationDirection, StoryMode } from '../ports';
 
 /** Un paso resuelto del recorrido. */
 export interface StoryStep {
@@ -8,12 +8,19 @@ export interface StoryStep {
 }
 
 /**
- * Reglas del modo historia: el recorrido es `story.path` limitado a los eventos visibles (el
- * filtro de categorías también lo acorta), en su orden. Sin estado: el controlador guarda el paso.
+ * Reglas del modo historia: el recorrido es `story.path` (historia completa) o `storyShort.path`
+ * (versión corta) limitado a los eventos visibles (el filtro también lo acorta), en su orden. Sin
+ * estado: el controlador guarda el paso.
  */
 export class FollowStory {
-  path(timeline: Timeline, visibleEventIds: ReadonlySet<string>): string[] {
-    return timeline.storyPath.filter((id) => visibleEventIds.has(id));
+  path(timeline: Timeline, visibleEventIds: ReadonlySet<string>, mode: StoryMode = 'full'): string[] {
+    const source = mode === 'short' ? timeline.storyShortPath : timeline.storyPath;
+    return source.filter((id) => visibleEventIds.has(id));
+  }
+
+  /** Recorrido por defecto: la versión corta si existe; si no, la completa. */
+  defaultMode(timeline: Timeline): StoryMode {
+    return timeline.storyShortPath.length > 0 ? 'short' : 'full';
   }
 
   /** Paso desde el que empieza el recorrido: el evento indicado si está en él; si no, el primero. */

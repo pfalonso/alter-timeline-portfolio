@@ -2,13 +2,27 @@
   "schemaVersion": 1,
   "meta": {
     "owner": "Noa Ferrer Lindqvist",
-    "title": "Líneas de vida",
-    "tagline": "Ingeniera de sonido que acabó construyendo salas que escuchan. Todas sus líneas nacieron con ella; solo ha ido cambiando el foco. Persona ficticia: estos son datos de ejemplo.",
+    "title": "línea a línea",
+    "tagline": "Todas mis líneas nacieron conmigo; solo ha ido cambiando cuál brilla más. Persona ficticia: datos de ejemplo.",
+    "headline": "Diseño de sonido · Instalaciones interactivas · Audio en tiempo real",
+    "location": "València",
+    "availability": "Abierta a proyectos de sala y museo · Incorporación en un mes",
+    "email": "noa@example.com",
+    "cv": [
+      {
+        "label": "CV (PDF)",
+        "url": "https://example.com/noa/cv.pdf"
+      },
+      {
+        "label": "CV in English",
+        "url": "https://example.com/noa/cv-en.pdf"
+      }
+    ],
     "locale": "es",
     "contact": [
       {
-        "label": "Correo",
-        "url": "https://example.com/contacto"
+        "label": "Demo reel",
+        "url": "https://example.com/noa/reel"
       },
       {
         "label": "Código",
@@ -986,6 +1000,19 @@
       "museo-mareas",
       "sala-de-los-ecos",
       "gira-mareografo"
+    ]
+  },
+  "storyShort": {
+    "title": "Te lo cuento en 1 minuto",
+    "path": [
+      "gira-mareografo",
+      "sala-de-los-ecos",
+      "museo-mareas",
+      "master-artes-digitales",
+      "estudio-penumbra",
+      "lumen-atelier",
+      "grado-sonido-imagen",
+      "nacimiento"
     ]
   }
 }

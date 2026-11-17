@@ -15,6 +15,8 @@ export interface ResolvedMerge {
 export interface TimelineNarrative {
   readonly arcs?: readonly LifeArc[];
   readonly story?: Story;
+  /** Recorrido corto (el del botón principal). */
+  readonly storyShort?: Story;
 }
 
 /** Agregado raíz: eventos ordenados cronológicamente, categorías y líneas vitales (ramas). */
@@ -34,6 +36,10 @@ export class Timeline {
   readonly storyTitle?: string;
   /** Recorrido guiado: solo eventos presentes (los privados ocultos se quitan), en orden. */
   readonly storyPath: readonly string[];
+  /** Título del recorrido corto, si lo hay. */
+  readonly storyShortTitle?: string;
+  /** Recorrido corto: solo eventos presentes, en el orden declarado (puede no ser cronológico). */
+  readonly storyShortPath: readonly string[];
 
   constructor(
     readonly meta: Readonly<LifeMetaData>,
@@ -54,6 +60,8 @@ export class Timeline {
     this.arcs = [...(narrative.arcs ?? [])].sort((a, b) => a.start.compareTo(b.start) || a.id.localeCompare(b.id));
     this.storyTitle = narrative.story?.title;
     this.storyPath = (narrative.story?.path ?? []).filter((id) => this.eventsById.has(id));
+    this.storyShortTitle = narrative.storyShort?.title;
+    this.storyShortPath = (narrative.storyShort?.path ?? []).filter((id) => this.eventsById.has(id));
   }
 
   /** Arco que contiene un año decimal: el último que ya ha empezado, si aún no ha terminado. */

@@ -15,6 +15,22 @@
         "owner": { "$ref": "#/$defs/nonEmptyString" },
         "title": { "$ref": "#/$defs/nonEmptyString", "description": "Titular del sitio" },
         "tagline": { "type": "string" },
+        "headline": { "type": "string", "description": "Oficio en una línea, bajo el nombre (p. ej. «Technical Artist · VFX en tiempo real · Desarrollo backend»)" },
+        "location": { "type": "string", "description": "Ciudad o zona («Donostia / San Sebastián»)" },
+        "availability": { "type": "string", "description": "Situación y disponibilidad en una línea" },
+        "email": { "type": "string", "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$", "description": "Correo de contacto: texto copiable y enlace mailto" },
+        "cv": {
+          "type": "array",
+          "description": "Enlaces al CV en PDF",
+          "items": {
+            "type": "object",
+            "required": ["label", "url"],
+            "properties": {
+              "label": { "$ref": "#/$defs/nonEmptyString" },
+              "url": { "type": "string", "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]?://\\S+|/(?!/)[A-Za-z0-9._~%/-]+)$", "description": "URL http(s) absoluta o ruta del sitio (/cv/…); sin «..»" }
+            }
+          }
+        },
         "locale": { "$ref": "#/$defs/nonEmptyString", "description": "Idioma BCP 47: \"es\", \"en\"…" },
         "contact": { "type": "array", "items": { "$ref": "#/$defs/link" } },
         "mainBranch": {
@@ -43,7 +59,8 @@
       "items": { "$ref": "#/$defs/arc" },
       "description": "Arcos temporales (capítulos) contiguos y sin solapes. Opcional."
     },
-    "story": { "$ref": "#/$defs/story" }
+    "story": { "$ref": "#/$defs/story" },
+    "storyShort": { "$ref": "#/$defs/storyShort" }
   },
   "$defs": {
     "nonEmptyString": { "type": "string", "pattern": "\\S" },
@@ -97,34 +114,7 @@
           "required": ["branch", "event"],
           "properties": {
             "branch": { "$ref": "#/$defs/kebabId", "description": "Línea en la que converge (distinta de esta)" },
-            "arc": {
-      "type": "object",
-      "required": ["id", "title", "start", "end"],
-      "description": "Capítulo: banda sutil en la escena y grupo en el índice. end >= start y sin solaparse con otros arcos (lo comprueba validate:data).",
-      "properties": {
-        "id": { "$ref": "#/$defs/kebabId" },
-        "title": { "$ref": "#/$defs/nonEmptyString" },
-        "subtitle": { "type": "string" },
-        "start": { "$ref": "#/$defs/partialDate" },
-        "end": { "anyOf": [{ "$ref": "#/$defs/partialDate" }, { "const": "present" }] },
-        "summary": { "type": "string" }
-      }
-    },
-    "story": {
-      "type": "object",
-      "required": ["path"],
-      "description": "Recorrido del modo historia («Ver la historia»).",
-      "properties": {
-        "title": { "type": "string" },
-        "path": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/kebabId" },
-          "description": "Ids de eventos existentes, sin repetir y en orden cronológico"
-        }
-      }
-    },
-    "event": { "$ref": "#/$defs/kebabId", "description": "Evento de esa línea donde se produce la fusión" }
+            "event": { "$ref": "#/$defs/kebabId", "description": "Evento de esa línea donde se produce la fusión" }
           }
         },
         "until": { "const": "present", "description": "La línea sigue viva hasta hoy; incompatible con mergeInto" },
@@ -160,7 +150,7 @@
     "story": {
       "type": "object",
       "required": ["path"],
-      "description": "Recorrido del modo historia («Ver la historia»).",
+      "description": "Recorrido completo del modo historia («Historia completa»).",
       "properties": {
         "title": { "type": "string" },
         "path": {
@@ -168,6 +158,21 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/kebabId" },
           "description": "Ids de eventos existentes, sin repetir y en orden cronológico"
+        }
+      }
+    },
+    "storyShort": {
+      "type": "object",
+      "required": ["path"],
+      "description": "Recorrido corto (recomendado 6–9 pasos) que lanza el botón principal. Puede no ir en orden cronológico (p. ej. empezar en hoy).",
+      "properties": {
+        "title": { "type": "string" },
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/kebabId" },
+          "description": "Ids de eventos existentes y sin repetir"
         }
       }
     },

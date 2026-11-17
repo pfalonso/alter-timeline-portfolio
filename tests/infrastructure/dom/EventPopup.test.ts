@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { NEUTRAL_CHIP } from '../../../src/infrastructure/dom/dom';
 import { EventPopup } from '../../../src/infrastructure/dom/EventPopup';
 import { STRINGS } from '../../../src/infrastructure/dom/strings';
 import { cleanupDom, click, mount, press, texts } from '../../helpers/dom';
@@ -85,32 +84,39 @@ describe('EventPopup: accesibilidad del diálogo', () => {
 });
 
 describe('EventPopup: contenido', () => {
-  it('muestra todo el detalle del evento', () => {
+  it('muestra el detalle en orden: contexto, título, subtítulo, enlaces, entradilla, habilidades, cuerpo y al pie las categorías', () => {
     const { root, popup } = setup();
     popup.applySelection(selection('b-job', true));
 
-    expect(texts(root, '.popup__categories .tag')).toEqual(['▲ Trabajo', 'Estudios']);
+    // Contexto en una línea (sin repetir lo que ya dice el subtítulo: «Acme»).
+    expect(root.querySelector('.popup__context')?.textContent).toMatch(/^mar\.? 2015 – hoy · Donostia$/);
     expect(root.querySelector('.popup__subtitle')?.textContent).toBe('Ingeniera · Acme');
     expect(root.querySelector('.popup__summary')?.textContent).toBe('Un trabajo que sigue.');
     expect(texts(root, '.popup__paragraph')).toEqual(['Primer párrafo.', 'Segundo párrafo.']);
     expect(texts(root, '.popup__highlights li')).toEqual(['Un hito']);
     expect(texts(root, '.popup__skills li')).toEqual(['TypeScript', 'three.js']);
-    expect(texts(root, '.popup__section h3')).toEqual([STRINGS.highlights, STRINGS.skills, STRINGS.links]);
-
-    const facts = [...root.querySelectorAll('.popup__facts > div')].map((row) => [
-      row.querySelector('dt')?.textContent,
-      row.querySelector('dd')?.textContent,
-    ]);
-    expect(facts[0][0]).toBe('Cuándo');
-    expect(facts[0][1]).toMatch(/^mar\.? 2015 — actualidad$/);
-    expect(facts.slice(1)).toEqual([
-      ['Dónde', 'Donostia'],
-      ['Con', 'Acme'],
-    ]);
+    expect(texts(root, '.popup__section h3')).toEqual([STRINGS.highlights]);
+    expect(texts(root, '.popup__links--top a')).toEqual(['Acme ↗']);
     expect(texts(root, '.popup__badges .badge')).toEqual([STRINGS.ongoing]);
-    // El acento es el color de la línea del evento (main: el de su primer evento); las categorías, neutras.
+    expect(texts(root, '.popup__categories')).toEqual(['Trabajo · Estudios']);
+    const order = [...root.querySelectorAll('.popup__body > *')].map((node) => node.className.split(' ')[0]);
+    expect(order.indexOf('popup__links')).toBeLessThan(order.indexOf('popup__summary'));
+    expect(order.indexOf('popup__summary')).toBeLessThan(order.indexOf('popup__skills'));
+    expect(order.at(-1)).toBe('popup__meta');
+    // El acento es el color de la línea del evento (main: el de su primer evento).
     expect(root.style.getPropertyValue('--accent')).toBe('#6EA8FF');
-    expect(root.querySelector<HTMLElement>('.tag')?.style.getPropertyValue('--chip-color')).toBe(NEUTRAL_CHIP);
+    expect(root.querySelector('.tag')).toBeNull();
+  });
+
+  it('el rótulo corto que no es un recorte del título va como antetítulo (mismo nombre en escena y ficha)', () => {
+    const data = makeData();
+    data.events[0].shortTitle = 'Cole';
+    data.events[1].shortTitle = 'Primer trabajo';
+    const { root, popup } = setup(data);
+    popup.applySelection(selection('a-school', true));
+    expect(texts(root, '.popup__kicker')).toEqual(['Cole']);
+    popup.applySelection(selection('b-job', true));
+    expect(root.querySelector('.popup__kicker')).toBeNull();
   });
 
   it('los enlaces se abren en otra pestaña con rel="noopener noreferrer"', () => {
@@ -132,9 +138,9 @@ describe('EventPopup: contenido', () => {
     expect(root.querySelector('.popup__section')).toBeNull();
     expect(root.querySelector('.popup__media')).toBeNull();
     expect(root.querySelector('.popup__paragraph')).toBeNull();
-    expect(root.querySelectorAll('.popup__facts > div')).toHaveLength(1);
-    expect(root.querySelector('.popup__facts dd')?.textContent).toBe('2010 — 2014');
-    expect(root.querySelector('.popup__badges')?.childElementCount).toBe(0);
+    expect(root.querySelector('.popup__context')?.textContent).toBe('2010 – 2014');
+    expect(root.querySelector('.popup__badges')).toBeNull();
+    expect(root.querySelector('.popup__links')).toBeNull();
   });
 
   it('indica de qué evento nace una rama', () => {
@@ -194,9 +200,13 @@ describe('EventPopup: contenido', () => {
 describe('EventPopup: navegación y cierre', () => {
   it('los botones anterior/siguiente se desactivan según haya vecinos y avisan al controlador', () => {
     const { root, popup, handlers } = setup();
-    popup.applySelection(selection('a-school', true, { hasPrevious: false, hasNext: true }));
+    popup.applySelection(selection('a-school', true, { hasPrevious: false, hasNext: true, nextId: 'b-job' }));
     expect(prevButton(root).disabled).toBe(true);
+    // Un botón sin destino no se enseña apagado: se oculta. El otro dice adónde va (U-46).
+    expect(prevButton(root).hidden).toBe(true);
     expect(nextButton(root).disabled).toBe(false);
+    expect(nextButton(root).textContent).toContain('Primer trabajo');
+    expect(nextButton(root).title).toBe(`${STRINGS.next}: Primer trabajo`);
     click(nextButton(root));
     expect(handlers.onNavigate).toHaveBeenCalledExactlyOnceWith('next');
 

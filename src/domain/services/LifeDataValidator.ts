@@ -5,7 +5,7 @@ import { MAIN_BRANCH } from '../model/LifeEvent';
 import { LINE_STYLES } from '../model/LifeLine';
 import { PartialDate } from '../model/PartialDate';
 import { validateLineLife } from './LineLifeRules';
-import { isHttpUrl } from './safeUrl';
+import { isHttpUrl, isSitePath } from './safeUrl';
 
 /** Longitud máxima del título corto que se usa en los rótulos de la escena. */
 export const SHORT_TITLE_MAX = 40;
@@ -21,6 +21,8 @@ export interface ValidationResult {
 
 const KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export const PRESENT = 'present';
 
 type Rec = Record<string, unknown>;
@@ -118,6 +120,7 @@ export class LifeDataValidator {
     this.checkOriginCycles(graph, mainBranch, collector);
     this.validateArcs(input.arcs, collector);
     this.validateStory(input.story, input.events, collector);
+    this.validateStory(input.storyShort, input.events, collector, 'storyShort');
     this.validateLedTo(input.events, collector);
     validateLineLife(input, mainBranch, (path, message) => collector.add(path, message));
 
@@ -142,6 +145,13 @@ export class LifeDataValidator {
     c.requiredString(meta, 'title', 'meta');
     c.requiredString(meta, 'locale', 'meta');
     c.optionalString(meta, 'tagline', 'meta');
+    c.optionalString(meta, 'headline', 'meta');
+    c.optionalString(meta, 'location', 'meta');
+    c.optionalString(meta, 'availability', 'meta');
+    if (meta.email !== undefined && (typeof meta.email !== 'string' || !EMAIL.test(meta.email))) {
+      c.add('meta.email', 'debe ser una dirección de correo válida');
+    }
+    this.validateCv(meta.cv, c);
     c.links(meta.contact, 'meta.contact');
     if (meta.mainBranch === undefined) return MAIN_BRANCH;
     if (typeof meta.mainBranch !== 'string' || !KEBAB.test(meta.mainBranch)) {
@@ -516,18 +526,42 @@ export class LifeDataValidator {
     }
   }
 
-  /** `story`: recorrido con ids de eventos existentes, sin repetir y en orden cronológico. */
-  private validateStory(story: unknown, events: unknown, c: IssueCollector): void {
+  /** `meta.cv`: lista de { label, url } con URL http(s) o ruta relativa al sitio. */
+  private validateCv(value: unknown, c: IssueCollector): void {
+    if (value === undefined) return;
+    if (!Array.isArray(value)) {
+      c.add('meta.cv', 'debe ser una lista de enlaces { label, url }');
+      return;
+    }
+    value.forEach((link, index) => {
+      const path = `meta.cv[${index}]`;
+      if (!isRecord(link)) {
+        c.add(path, 'debe ser un objeto { label, url }');
+        return;
+      }
+      c.requiredString(link, 'label', path);
+      const url = c.requiredString(link, 'url', path);
+      if (url !== null && !isHttpUrl(url) && !isSitePath(url)) {
+        c.add(`${path}.url`, `"${url}" debe ser una URL http(s) o una ruta del sitio que empiece por /`);
+      }
+    });
+  }
+
+  /** `story` / `storyShort`: recorrido con ids de eventos existentes, sin repetir y en orden cronológico. */
+  private validateStory(story: unknown, events: unknown, c: IssueCollector, key: 'story' | 'storyShort' = 'story'): void {
     if (story === undefined) return;
     if (!isRecord(story)) {
-      c.add('story', 'debe ser un objeto { title?, path }');
+      c.add(key, 'debe ser un objeto { title?, path }');
       return;
     }
-    c.optionalString(story, 'title', 'story');
+    c.optionalString(story, 'title', key);
     if (!Array.isArray(story.path)) {
-      c.add('story.path', 'es obligatorio y debe ser una lista de ids de eventos');
+      c.add(`${key}.path`, 'es obligatorio y debe ser una lista de ids de eventos');
       return;
     }
+    // El recorrido corto puede empezar por hoy: no se le exige orden cronológico, pero no puede estar vacío.
+    const chronological = key === 'story';
+    if (!chronological && story.path.length === 0) c.add(`${key}.path`, 'no puede estar vacío');
     const starts = new Map<string, PartialDate | null>();
     if (Array.isArray(events)) {
       for (const event of events) {
@@ -539,7 +573,7 @@ export class LifeDataValidator {
     const seen = new Set<string>();
     let previous: { id: string; start: PartialDate } | null = null;
     story.path.forEach((id, index) => {
-      const path = `story.path[${index}]`;
+      const path = `${key}.path[${index}]`;
       if (typeof id !== 'string') {
         c.add(path, 'debe ser el id de un evento');
         return;
@@ -555,7 +589,7 @@ export class LifeDataValidator {
       seen.add(id);
       const start = starts.get(id);
       if (!start) return;
-      if (previous && start.compareTo(previous.start) < 0) {
+      if (chronological && previous && start.compareTo(previous.start) < 0) {
         c.add(path, `"${id}" (${start.toString()}) es anterior a "${previous.id}" (${previous.start.toString()}): el recorrido debe ir en orden cronológico`);
       }
       previous = { id, start };

@@ -133,8 +133,9 @@ describe('ArcBands', () => {
     expect(bands.bands[1].edge.material.opacity).toBeCloseTo(ARC_OPACITY.edge.active, 6);
     bands.setActive(null);
     bands.update(frameContext({ delta: 0.016 }));
-    expect(bands.bands[1].edge.material.opacity).toBeGreaterThan(ARC_OPACITY.edge.idle);
-    expect(bands.bands[1].edge.material.opacity).toBeLessThan(ARC_OPACITY.edge.active);
+    expect(bands.bands[1].veil.material.opacity).toBeGreaterThan(ARC_OPACITY.veil.idle);
+    // Sin separadores visibles: el umbral de capítulo no se dibuja (U-14/U-15).
+    expect(bands.bands[1].edge.visible).toBe(false);
     // El velo se difumina en vertical y en los bordes: hay vértices con alfa 0.
     const alpha = bands.bands[1].veil.geometry.getAttribute('color');
     expect(alpha.itemSize).toBe(4);

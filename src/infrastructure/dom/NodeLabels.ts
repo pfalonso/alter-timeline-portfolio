@@ -25,6 +25,19 @@ export const BIG_UNION_LINES = 4;
 /** Alto estimado por nivel (título + año); se sustituye por el medido. */
 const LABEL_HEIGHT: Record<number, number> = { 1: 30, 2: 32, 3: 40 };
 
+export interface NodeLabelsOptions {
+  /**
+   * Durante la apertura (ms desde el primer fotograma) no se rotula nada: la línea se dibuja sin
+   * rótulos y estos entran cuando la cámara se ha detenido. 0 = sin espera (movimiento reducido).
+   */
+  readonly openingHoldMs?: number;
+  /** Reloj en ms (inyectable en tests). */
+  readonly clock?: () => number;
+}
+
+/** Fotogramas iniciales en los que las zonas reservadas se miden en cada fotograma (la interfaz aún se asienta). */
+const EARLY_FRAMES = 40;
+
 /** Rótulos DOM (tipografía nítida) que siguen a los nodos de la escena. Decorativos: aria-hidden. */
 export class NodeLabels implements TimelineViewPart, ProjectionListener {
   private readonly labels = new Map<string, Label>();
@@ -33,14 +46,22 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
   private storyStep: string | undefined;
 
   private reserved: Box[] = [];
+  private placedBoxes: Box[] = [];
   private frames = 0;
+  private firstFrameAt: number | null = null;
 
   constructor(
     private readonly root: HTMLElement,
     /** Elementos de interfaz que los rótulos no deben pisar (cabecera, filtros…). */
     private readonly keepClear: readonly HTMLElement[] = [],
+    private readonly options: NodeLabelsOptions = {},
   ) {
     root.setAttribute('aria-hidden', 'true');
+  }
+
+  /** Zonas ocupadas (interfaz y rótulos colocados) en el último fotograma: otros rótulos las evitan. */
+  occupied(): Box[] {
+    return [...this.reserved, ...this.placedBoxes];
   }
 
   /** Mide las zonas reservadas solo de vez en cuando: leer el layout cada fotograma sale caro. */
@@ -132,8 +153,11 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
   }
 
   onProjected(frame: ProjectedFrame): void {
-    if (this.frames % 20 === 0) this.refreshReserved();
+    if (this.frames < EARLY_FRAMES || this.frames % 20 === 0) this.refreshReserved();
     this.frames += 1;
+    const clock = this.options.clock ?? (() => performance.now());
+    this.firstFrameAt ??= clock();
+    const holding = clock() - this.firstFrameAt < (this.options.openingHoldMs ?? 0);
     const candidates: LabelCandidate[] = [];
     const obstacles: Obstacle[] = [];
     for (const node of frame.nodes) {
@@ -145,7 +169,7 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
       if (node.presence > 0.5 && (importance >= 2 || pinned)) {
         obstacles.push({ id: node.eventId, x: node.x, y: node.y, radius: node.radius * 1.5 });
       }
-      const eligible = node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(importance));
+      const eligible = !holding && node.presence > 0.5 && (pinned || frame.cameraDistance <= labelDistanceLimit(importance));
       // Un rótulo cuyo nodo está fuera de pantalla no se pinta; si el nodo está dentro, el rótulo
       // se desplaza lo necesario para no quedar cortado por el borde.
       if (!eligible || node.x < 0 || node.x > frame.viewport.width) continue;
@@ -158,9 +182,16 @@ export class NodeLabels implements TimelineViewPart, ProjectionListener {
         width: label.width,
         height: label.height,
         priority: labelPriority(importance, pinned, label.shown, node.radius),
+        // En la historia, el momento activo lleva siempre su rótulo.
+        force: this.storyStep !== undefined && node.eventId === this.storyStep,
       });
     }
     const placed = layoutLabels(candidates, frame.viewport, obstacles, this.reserved);
+    const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+    this.placedBoxes = [...placed].map(([id, top]) => {
+      const candidate = byId.get(id) as LabelCandidate;
+      return { left: candidate.x - candidate.width / 2, right: candidate.x + candidate.width / 2, top, bottom: top + candidate.height };
+    });
     const xById = new Map(candidates.map((candidate) => [candidate.id, candidate.x]));
     for (const [id, label] of this.labels) {
       const y = placed.get(id);

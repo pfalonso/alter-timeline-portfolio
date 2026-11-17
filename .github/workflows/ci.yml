@@ -50,4 +50,22 @@ jobs:
           curl -fsS -o /dev/null http://localhost:8080/
           curl -fsS -o /dev/null http://localhost:8080/data/life.example.json
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/data/life.json)" = "404"
+          # CV privados: sin fichero montado, /cv/ responde 404 y la web sigue en pie.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/cv/CV.pdf)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/cv/)" = "404"
+          curl -fsS -o /dev/null http://localhost:8080/
+          docker rm -f web
+      - name: Prueba de humo con un CV montado
+        run: |
+          mkdir -p "$RUNNER_TEMP/data/cv"
+          printf '%%PDF-1.4\n%% CV de prueba\n' > "$RUNNER_TEMP/data/cv/CV_Prueba.pdf"
+          docker run -d --name web -p 8080:80 -v "$RUNNER_TEMP/data:/usr/share/nginx/userdata:ro" alter-timeline-portfolio:ci
+          for i in $(seq 1 20); do curl -fsS http://localhost:8080/healthz && break || sleep 1; done
+          curl -fsS -D headers.txt -o cv.pdf http://localhost:8080/cv/CV_Prueba.pdf
+          grep -qi '^content-type: application/pdf' headers.txt
+          grep -qi '^content-disposition: inline' headers.txt
+          grep -qi '^x-content-type-options: nosniff' headers.txt
+          head -c 5 cv.pdf | grep -q '%PDF'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/cv/Otro.pdf)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/cv/CV_Prueba.txt)" = "404"
           docker rm -f web
