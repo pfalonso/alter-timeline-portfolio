@@ -64,6 +64,10 @@ export class YearRuler implements TimelineViewPart, ProjectionListener {
     }
     const nowVisible = frame.nowX !== null && frame.nowX >= 24 && frame.nowX <= viewport.width - 24;
     this.now.hidden = !nowVisible;
-    if (nowVisible && frame.nowX !== null) this.now.style.transform = `translate3d(${frame.nowX.toFixed(1)}px, 0, 0)`;
+    // «hoy · nov 2026» es más ancho que una marca: junto al borde se desplaza para verse entero (U-27).
+    if (nowVisible && frame.nowX !== null) {
+      const x = Math.min(viewport.width - 64, Math.max(64, frame.nowX));
+      this.now.style.transform = `translate3d(${x.toFixed(1)}px, 0, 0)`;
+    }
   }
 }

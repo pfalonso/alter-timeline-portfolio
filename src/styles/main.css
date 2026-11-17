@@ -4321,6 +4321,8 @@ a {
 /* Sin 3D la cabecera va en el flujo: el velo (pensado para la escena) sobra y oscurecería la lista. */
 .app--no-webgl .hud {
   position: relative;
+  top: auto;
+  left: auto;
 }
 
 .app--no-webgl .hud::before {
