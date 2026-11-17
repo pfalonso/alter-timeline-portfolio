@@ -189,7 +189,7 @@ Raíz del documento:
 | `availability` | texto | No | Situación y disponibilidad en una línea («Busco puesto junior o mid · …») |
 | `tagline` | texto | No | Frase secundaria bajo el oficio (3 líneas como mucho; se oculta en pantallas bajas y en móvil) |
 | `email` | correo | No | Se muestra como texto copiable (botón «Copiar») y enlace `mailto:` en la cabecera y en el cierre de la historia |
-| `cv` | lista de `{ label, url }` | No | Enlaces al CV en PDF: URL http(s) o ruta del propio sitio (`/cv/…`, sin `..`) |
+| `cv` | lista de `{ label, url }` | No | Enlaces al CV en PDF: URL http(s) o ruta del propio sitio (`/cv/…`, sin `..`). Los PDF privados van en `data/cv/` (fuera de git y de la imagen) y se sirven en `/cv/<nombre>.pdf` en dev, preview y nginx; `build:public-data` los copia a `data/public/cv/` para el despliegue público. Ver DEV_NOTES, decisión 34 |
 | `contact` | lista de `{ label, url }` | No | Enlaces de contacto en la cabecera, como botones con icono. El que parece un reel (YouTube, Vimeo, «reel») va primero; luego CV, correo y el resto. `url` debe ser http(s) absoluta |
 | `mainBranch` | texto kebab-case | No (por defecto `"main"`) | Línea vital central: forma la trenza cuando ninguna línea está en foco (y siempre, si no hay `focus`). Los eventos sin `branch` pertenecen a ella |
 

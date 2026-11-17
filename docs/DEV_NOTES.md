@@ -545,3 +545,24 @@ Sustituye a la decisión 28 (la central ya no es una columna fija: el centro es 
 - **CSS.** Bloque «Revisión UX» al final de `main.css`, que manda sobre lo anterior: escala 12 · 14 ·
   16 · 21 · 40+, zonas pulsables ≥ 32 px (≥ 44 px con `app--touch`), foco blanco de 2 px, sin marco
   en la escena enfocada; móvil (≤ 720 px) y apaisado bajo (≤ 520 px de alto) con hoja de filtros.
+
+### 34. CV en PDF privado servido en `/cv/` (17/11/2026)
+
+- El CV vive en `data/cv/*.pdf` (fuera de git y de la imagen; contiene datos personales) y
+  `meta.cv[].url` apunta a `/cv/<nombre>.pdf`. Nunca se copia a `public/`.
+- **Dev/preview**: `build/personalDataPlugin.ts` sirve `./data/cv/<nombre>.pdf` en `/cv/<nombre>.pdf`
+  (`application/pdf`, `Content-Disposition: inline`, `no-cache`, `nosniff`). Solo nombres de un
+  segmento con extensión `.pdf` (`cvFileName`: sin `..`, barras ni escapes); lo demás, 404.
+- **nginx**: `location ~ ^/cv/<nombre>.pdf$` con `try_files /userdata/cv/$1 =404` (el directorio
+  `./data` ya está montado en `/usr/share/nginx/userdata`); `location /cv/` → 404 para todo lo
+  demás. CSP propia y mínima (`frame-ancestors 'none'`): la del sitio (`object-src 'none'`…) puede
+  impedir el visor de PDF del navegador. Resto de cabeceras de seguridad, iguales.
+- **Despliegue público** (`docker-compose.public.yml` monta `./data/public`): se eligió que
+  `npm run build:public-data` copie `data/cv/*.pdf` a `data/public/cv/` (`copyCvFiles`), así el
+  override no necesita un segundo volumen y lo publicado es exactamente lo que hay en
+  `data/public`. Si no hay `data/cv`, no copia nada y el enlace del CV daría 404 (la web no se rompe;
+  conviene quitar `meta.cv` en ese caso).
+- **CI**: la prueba de humo comprueba que `/cv/CV.pdf` y `/cv/` dan 404 sin fichero y, con un PDF
+  de prueba montado, 200 con `application/pdf`, `inline` y `nosniff`; otro nombre o extensión, 404.
+- En la cabecera, el botón del CV solo existe si hay `meta.cv`; el correo (`meta.email`) se ve como
+  texto con `mailto:` y botón «Copiar».

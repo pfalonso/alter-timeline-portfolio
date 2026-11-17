@@ -39,6 +39,9 @@ y salen de ella como hebras, y las hebras causales (`ledTo`) unen lo que llevó 
   Para un servidor público, `npm run build:public-data [origen] [destino]` genera `data/public/life.json` sin
   eventos privados (reengancha `branchFrom` al ancestro público más cercano y valida el resultado), y se despliega
   con `docker compose -f docker-compose.yml -f docker-compose.public.yml up -d`.
+- `data/cv/*.pdf` — CV privados (nunca en git ni en la imagen). Se sirven en `/cv/<nombre>.pdf`
+  (plugin de Vite y nginx desde el volumen; nombres de un segmento `.pdf`, lo demás 404);
+  `build:public-data` los copia a `data/public/cv/`.
 
 ### Esquema `LifeData`
 
